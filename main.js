@@ -686,24 +686,42 @@ function drawCalligraphyFu(alpha) {
 }
 
 // --- Draw a frosted-glass card backdrop ---
-function drawCardAt(cx, cy, cw, ch, alpha, borderColor) {
+function drawCardAt(cx, cy, cw, ch, alpha, borderColor, fillColor) {
     const cardX = cx - cw / 2;
     const cardY = cy - ch / 2;
     const r = 10;
 
+    function traceDevicePath() {
+        ctx.beginPath();
+        ctx.moveTo((cardX + r) * dpr, cardY * dpr);
+        ctx.lineTo((cardX + cw - r) * dpr, cardY * dpr);
+        ctx.quadraticCurveTo((cardX + cw) * dpr, cardY * dpr, (cardX + cw) * dpr, (cardY + r) * dpr);
+        ctx.lineTo((cardX + cw) * dpr, (cardY + ch - r) * dpr);
+        ctx.quadraticCurveTo((cardX + cw) * dpr, (cardY + ch) * dpr, (cardX + cw - r) * dpr, (cardY + ch) * dpr);
+        ctx.lineTo((cardX + r) * dpr, (cardY + ch) * dpr);
+        ctx.quadraticCurveTo(cardX * dpr, (cardY + ch) * dpr, cardX * dpr, (cardY + ch - r) * dpr);
+        ctx.lineTo(cardX * dpr, (cardY + r) * dpr);
+        ctx.quadraticCurveTo(cardX * dpr, cardY * dpr, (cardX + r) * dpr, cardY * dpr);
+        ctx.closePath();
+    }
+    function traceCSSPath() {
+        ctx.beginPath();
+        ctx.moveTo(cardX + r, cardY);
+        ctx.lineTo(cardX + cw - r, cardY);
+        ctx.quadraticCurveTo(cardX + cw, cardY, cardX + cw, cardY + r);
+        ctx.lineTo(cardX + cw, cardY + ch - r);
+        ctx.quadraticCurveTo(cardX + cw, cardY + ch, cardX + cw - r, cardY + ch);
+        ctx.lineTo(cardX + r, cardY + ch);
+        ctx.quadraticCurveTo(cardX, cardY + ch, cardX, cardY + ch - r);
+        ctx.lineTo(cardX, cardY + r);
+        ctx.quadraticCurveTo(cardX, cardY, cardX + r, cardY);
+        ctx.closePath();
+    }
+
+    // Blur pass
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.beginPath();
-    ctx.moveTo((cardX + r) * dpr, cardY * dpr);
-    ctx.lineTo((cardX + cw - r) * dpr, cardY * dpr);
-    ctx.quadraticCurveTo((cardX + cw) * dpr, cardY * dpr, (cardX + cw) * dpr, (cardY + r) * dpr);
-    ctx.lineTo((cardX + cw) * dpr, (cardY + ch - r) * dpr);
-    ctx.quadraticCurveTo((cardX + cw) * dpr, (cardY + ch) * dpr, (cardX + cw - r) * dpr, (cardY + ch) * dpr);
-    ctx.lineTo((cardX + r) * dpr, (cardY + ch) * dpr);
-    ctx.quadraticCurveTo(cardX * dpr, (cardY + ch) * dpr, cardX * dpr, (cardY + ch - r) * dpr);
-    ctx.lineTo(cardX * dpr, (cardY + r) * dpr);
-    ctx.quadraticCurveTo(cardX * dpr, cardY * dpr, (cardX + r) * dpr, cardY * dpr);
-    ctx.closePath();
+    traceDevicePath();
     ctx.clip();
     ctx.filter = 'blur(12px)';
     ctx.globalAlpha = 1;
@@ -711,21 +729,12 @@ function drawCardAt(cx, cy, cw, ch, alpha, borderColor) {
     ctx.filter = 'none';
     ctx.restore();
 
+    // Fill + border
     ctx.save();
     ctx.scale(dpr, dpr);
     ctx.globalAlpha = alpha;
-    ctx.beginPath();
-    ctx.moveTo(cardX + r, cardY);
-    ctx.lineTo(cardX + cw - r, cardY);
-    ctx.quadraticCurveTo(cardX + cw, cardY, cardX + cw, cardY + r);
-    ctx.lineTo(cardX + cw, cardY + ch - r);
-    ctx.quadraticCurveTo(cardX + cw, cardY + ch, cardX + cw - r, cardY + ch);
-    ctx.lineTo(cardX + r, cardY + ch);
-    ctx.quadraticCurveTo(cardX, cardY + ch, cardX, cardY + ch - r);
-    ctx.lineTo(cardX, cardY + r);
-    ctx.quadraticCurveTo(cardX, cardY, cardX + r, cardY);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(80, 10, 10, 0.4)';
+    traceCSSPath();
+    ctx.fillStyle = fillColor || 'rgba(80, 10, 10, 0.4)';
     ctx.fill();
     ctx.strokeStyle = borderColor || 'rgba(255, 215, 0, 0.2)';
     ctx.lineWidth = 1.5;
@@ -1786,10 +1795,16 @@ function renderFortuneOverlay() {
                 scale = lerp(1.03, 1.0, easeInOut((t - 0.7) / 0.3));
             }
 
-            // Draw individual card background
-            const borderCol = d.rarity.color || 'rgba(255, 215, 0, 0.2)';
-            const borderAlpha = `rgba(${parseInt(borderCol.slice(1,3),16)||255}, ${parseInt(borderCol.slice(3,5),16)||215}, ${parseInt(borderCol.slice(5,7),16)||0}, ${alpha * 0.35})`;
-            drawCardAt(cx_i, cy_i, cardW * scale, cardH * scale, alpha * 0.7, borderAlpha);
+            // Parse rarity color for card background
+            const rc = d.rarity.color || '#FFD700';
+            const rR = parseInt(rc.slice(1,3), 16) || 255;
+            const rG = parseInt(rc.slice(3,5), 16) || 215;
+            const rB = parseInt(rc.slice(5,7), 16) || 0;
+
+            // Card with rarity-colored background and border
+            const fillCol = `rgba(${rR}, ${rG}, ${rB}, ${alpha * 0.18})`;
+            const borderCol = `rgba(${rR}, ${rG}, ${rB}, ${alpha * 0.5})`;
+            drawCardAt(cx_i, cy_i, cardW * scale, cardH * scale, alpha * 0.85, borderCol, fillCol);
 
             // Draw character + stars + tier inside card
             ctx.save();
@@ -1799,35 +1814,52 @@ function renderFortuneOverlay() {
 
             const glowMult = 1 + Math.max(0, 1 - t * 2) * 1.5;
 
-            // Stars above character
+            // Stars above character — gold with bloom
             const starsY = cy_i - cardH * 0.32 * scale;
             const starsFull = '\u2605'.repeat(d.rarity.stars);
             const starsEmpty = '\u2606'.repeat(6 - d.rarity.stars);
             ctx.font = `${starsSize * scale}px "Courier New", monospace`;
-            ctx.globalAlpha = alpha * 0.85;
-            ctx.fillStyle = d.rarity.color || CONFIG.glowGold;
-            ctx.shadowColor = d.rarity.color || CONFIG.glowGold;
-            ctx.shadowBlur = starsSize * 0.3;
+            // Bloom pass
+            ctx.globalAlpha = alpha * 0.5;
+            ctx.fillStyle = CONFIG.glowGold;
+            ctx.shadowColor = CONFIG.glowGold;
+            ctx.shadowBlur = starsSize * 1.2;
+            ctx.fillText(starsFull + starsEmpty, cx_i, starsY);
+            // Solid pass
+            ctx.globalAlpha = alpha * 0.9;
+            ctx.shadowBlur = starsSize * 0.4;
             ctx.fillText(starsFull + starsEmpty, cx_i, starsY);
 
-            // Character
+            // Character — gold with strong bloom
+            const charY = cy_i - cardH * 0.02;
             ctx.font = `${charSize * scale}px ${font}, serif`;
-            ctx.globalAlpha = alpha * 0.35 * glowMult;
-            ctx.fillStyle = d.rarity.color || CONFIG.glowGold;
-            ctx.shadowColor = d.rarity.color || CONFIG.glowGold;
-            ctx.shadowBlur = charSize * 0.2 * glowMult;
-            ctx.fillText(d.char, cx_i, cy_i - cardH * 0.02);
+            // Wide bloom pass
+            ctx.globalAlpha = alpha * 0.3 * glowMult;
+            ctx.fillStyle = CONFIG.glowGold;
+            ctx.shadowColor = CONFIG.glowGold;
+            ctx.shadowBlur = charSize * 0.4 * glowMult;
+            ctx.fillText(d.char, cx_i, charY);
+            // Medium glow pass
+            ctx.globalAlpha = alpha * 0.5 * glowMult;
+            ctx.shadowBlur = charSize * 0.15;
+            ctx.fillText(d.char, cx_i, charY);
+            // Solid pass
+            ctx.globalAlpha = alpha * 0.95;
+            ctx.shadowBlur = charSize * 0.06;
+            ctx.fillText(d.char, cx_i, charY);
 
-            ctx.globalAlpha = alpha * 0.9;
-            ctx.shadowBlur = charSize * 0.08;
-            ctx.fillText(d.char, cx_i, cy_i - cardH * 0.02);
-
-            // Tier label below character
+            // Tier label below character — gold with bloom
             const tierY = cy_i + cardH * 0.32 * scale;
-            ctx.font = `${tierSize * scale}px "Courier New", monospace`;
-            ctx.globalAlpha = alpha * 0.65;
-            ctx.fillStyle = d.rarity.color || CONFIG.glowGold;
-            ctx.shadowBlur = tierSize * 0.2;
+            ctx.font = `${tierSize * scale}px ${font}, serif`;
+            // Bloom pass
+            ctx.globalAlpha = alpha * 0.4;
+            ctx.fillStyle = CONFIG.glowGold;
+            ctx.shadowColor = CONFIG.glowGold;
+            ctx.shadowBlur = tierSize * 1.0;
+            ctx.fillText(d.rarity.label, cx_i, tierY);
+            // Solid pass
+            ctx.globalAlpha = alpha * 0.85;
+            ctx.shadowBlur = tierSize * 0.3;
             ctx.fillText(d.rarity.label, cx_i, tierY);
 
             ctx.shadowBlur = 0;
