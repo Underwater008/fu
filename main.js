@@ -1669,20 +1669,20 @@ function renderFortuneOverlay() {
 
     // --- Blessing phrase + english ---
     const blessFade = Math.min(1, Math.max(0, (stateTime - 0.5) / 0.9));
-    drawOverlayText(dr.blessing.phrase, 0.82, CONFIG.glowRed, blessFade * 0.7, cellSize * 1.5);
-    drawOverlayText(dr.blessing.english, 0.87, CONFIG.glowGold, blessFade * 0.5, cellSize * 1);
+    drawOverlayText(dr.blessing.phrase, 0.73, CONFIG.glowRed, blessFade * 0.7, cellSize * 1.5);
+    drawOverlayText(dr.blessing.english, 0.78, CONFIG.glowGold, blessFade * 0.5, cellSize * 1);
 
     // --- Hint to draw again ---
     if (stateTime > 2.5) {
         const hintFade = Math.min(1, (stateTime - 2.5) / 0.5);
         const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;
-        
+
         const isMulti = selectedMode === 'multi';
         const mainText = isMulti ? '\u2191 \u518D\u6765\u5341\u8FDE \u2191' : '\u2191 \u518D\u62BD\u4E00\u6B21 \u2191';
         const subText = isMulti ? 'Swipe Up to Draw \u00D710' : 'Swipe Up to Draw Again';
-        
-        drawOverlayText(mainText, 0.94, CONFIG.glowGold, hintFade * pulse, cellSize * 1.2);
-        drawOverlayText(subText, 0.97, CONFIG.glowGold, hintFade * pulse, cellSize * 0.9);
+
+        drawOverlayText(mainText, 0.85, CONFIG.glowGold, hintFade * pulse, cellSize * 1.2);
+        drawOverlayText(subText, 0.88, CONFIG.glowGold, hintFade * pulse, cellSize * 0.9);
     }
 }
 
