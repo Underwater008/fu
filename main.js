@@ -181,12 +181,12 @@ function initThreeJS() {
         '\u00B7',
     ]);
 
-    actx.font = `${Math.floor(CELL_PX * 0.65)}px "Courier New", "SF Mono", monospace`;
+    actx.font = `bold ${Math.floor(CELL_PX * 0.7)}px "Courier New", "SF Mono", monospace`;
     actx.textAlign = 'center';
     actx.textBaseline = 'middle';
     actx.fillStyle = '#FFFFFF';
     actx.shadowColor = 'white';
-    actx.shadowBlur = CELL_PX * 0.05;
+    actx.shadowBlur = CELL_PX * 0.12;
 
     let idx = 0;
     uniqueChars.forEach(char => {
@@ -303,7 +303,7 @@ function sampleCharacterShape(char, resolution, fontOverride) {
         for (let x = 0; x < w; x += step) {
             const idx = (y * w + x) * 4;
             const brightness = data[idx] / 255;
-            if (brightness > 0.35) {
+            if (brightness > 0.1) {
                 points.push({
                     nx: (x / w) * 2 - 1,
                     ny: (y / h) * 2 - 1,
@@ -383,11 +383,11 @@ function initDaji3D(seedParticles) {
         const color = lerpColor(lum);
 
         daji3DParticles.push({
-            baseX: pt.nx * spread * 0.6 * pt.aspect,
-            baseY: pt.ny * spread * 0.6,
+            baseX: pt.nx * spread * 0.8 * pt.aspect,
+            baseY: pt.ny * spread * 0.8,
             origZ: (Math.random() - 0.5) * depth,
             char,
-            fontIdx: null,
+            fontIdx: Math.random() < 0.7 ? Math.floor(Math.random() * CALLI_FONTS.length) : null,
             r: color.r, g: color.g, b: color.b,
             alpha: 0.3 + lum * 0.7,
             lum,
@@ -462,7 +462,7 @@ function updateDajiToGPU(skipRender) {
         const uv = (p.fontIdx != null && charToUV[p.char + '|' + p.fontIdx]) || charToUV[p.char];
         if (uv) instUV.setXY(i, uv.u, uv.v);
 
-        let scale = cellSize * 1.1;
+        let scale = cellSize * 0.65;
         if (isHovered) scale *= 2.2;
         instScale.setX(i, scale);
     }
@@ -903,14 +903,14 @@ function initDrawAnimation() {
 
         // 2. Sample shape — fewer particles per char to reduce density
         const res = isMultiMode ? 30 : 50;
-        const shape = sampleCharacterShape(drawRes.char, res, chosenFont);
+        const shape = sampleCharacterShape(drawRes.char, res);
 
         const spread = Math.min(cols, rows) * 0.40 * cellSize * scaleFactor;
         const depth = spread * 0.4;
         
         const drawTargets = shape.map(pt => ({
-            x: pt.nx * spread * 0.6 * pt.aspect + targetCenterX,
-            y: pt.ny * spread * 0.6 + targetCenterY,
+            x: pt.nx * spread * 0.5 * pt.aspect + targetCenterX,
+            y: pt.ny * spread * 0.5 + targetCenterY,
             z: (Math.random() - 0.5) * depth,
             brightness: pt.brightness,
         }));
@@ -919,7 +919,7 @@ function initDrawAnimation() {
             const tgt = drawTargets[i];
             const angle = Math.random() * Math.PI * 2;
             const scatterRadius = spread * (0.8 + Math.random() * 1.2);
-            const scatterLift = -spread * (0.1 + Math.random() * 0.4);
+            const scatterLift = spread * (0.1 + Math.random() * 0.4);
 
             // Scatter center = where the 福 explodes (screen coords → world coords)
             const fuEnd = fuEndScreenPositions[idx];
@@ -944,7 +944,7 @@ function initDrawAnimation() {
                 finalChar: selectCharByLuminance(tgt.brightness),
                 brightness: tgt.brightness,
                 phase: Math.random() * Math.PI * 2,
-                fontIdx: null, // Use monospace for uniform spacing in reformed cluster
+                fontIdx: Math.random() < 0.7 ? Math.floor(Math.random() * CALLI_FONTS.length) : null,
                 active: false,
                 drawIndex: idx // Keep track which character this belongs to
             });
@@ -1054,7 +1054,7 @@ function updateDraw() {
                 const st = (t - DRAW_LAUNCH) / (DRAW_SCATTER - DRAW_LAUNCH);
                 const eased = 1 - Math.pow(1 - st, 2);
                 p.x = lerp(p.startX, p.scatterX, eased);
-                p.y = lerp(p.startY, p.scatterY, eased) + eased * cellSize * 1.5;
+                p.y = lerp(p.startY, p.scatterY, eased) + eased * cellSize * 6.0;
                 p.z = lerp(p.startZ, p.scatterZ, eased);
 
                 const wobble = st * cellSize * 0.8;
@@ -1071,7 +1071,7 @@ function updateDraw() {
                 const st = (t - DRAW_SCATTER) / (DRAW_REFORM - DRAW_SCATTER);
                 const eased = easeInOut(st);
                 p.x = lerp(p.scatterX, p.targetX, eased);
-                p.y = lerp(p.scatterY + cellSize * 1.5, p.targetY, eased);
+                p.y = lerp(p.scatterY + cellSize * 6.0, p.targetY, eased);
                 p.z = lerp(p.scatterZ, p.targetZ, eased);
                 const wobble = (1 - eased) * cellSize * 0.8;
                 p.x += Math.sin(p.phase + globalTime * 4) * wobble;
