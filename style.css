@@ -23,7 +23,7 @@ canvas {
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 0 20px 6vh;
+    padding: 0 20px calc(20px + env(safe-area-inset-bottom)); /* Respect safe area */
     display: flex;
     justify-content: center;
     gap: 32px;
@@ -199,9 +199,11 @@ canvas {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(10, 2, 2, 0.95);
-    overflow-y: auto;
-    padding: 20px 10px;
+    background: rgba(60, 5, 5, 0.55);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    overflow: hidden;
+    padding: 16px 10px;
 }
 #multi-overlay.visible { display: flex; }
 
@@ -217,25 +219,31 @@ canvas {
 .multi-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 10px;
-    max-width: 600px;
-    width: 92vw;
+    gap: 16px;
+    max-width: 800px;
+    width: 94vw;
     margin: 0 auto;
 }
-@media (max-width: 520px) {
-    .multi-grid { gap: 6px; }
+
+@media (min-width: 600px) {
+    .multi-grid {
+        gap: 20px;
+        width: 88vw;
+    }
 }
 
 .multi-card {
     position: relative;
-    aspect-ratio: 3/4;
-    background: rgba(20, 8, 8, 0.9);
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border: 1.5px solid var(--mc-color, #FFD700);
     border-radius: 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    padding: 6px 4px;
     cursor: pointer;
     box-shadow: 0 0 16px var(--mc-glow, rgba(255,215,0,0.2));
     transition: transform 0.2s, box-shadow 0.2s;
@@ -259,29 +267,39 @@ canvas {
 }
 
 .mc-stars {
-    font-size: 0.5rem;
+    font-size: 0.45rem;
     color: var(--mc-color, #FFD700);
     letter-spacing: 1px;
     margin-bottom: 2px;
     text-shadow: 0 0 6px var(--mc-glow, rgba(255,215,0,0.4));
 }
 .mc-char {
-    font-size: 2.2rem;
+    font-size: 1.8rem;
     color: #FFF;
     text-shadow: 0 0 16px var(--mc-glow, rgba(255,215,0,0.5));
     line-height: 1.2;
+    margin: 2px 0;
+}
+.mc-tier {
+    font-size: 0.35rem;
+    color: var(--mc-color, #FFD700);
+    opacity: 0.6;
+    letter-spacing: 0.5px;
+    margin-bottom: 1px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 .mc-phrase {
-    font-size: 0.45rem;
+    font-size: 0.4rem;
     color: var(--mc-color, #FFD700);
     opacity: 0.7;
     margin-top: 2px;
     letter-spacing: 1px;
 }
 @media (max-width: 520px) {
-    .mc-char { font-size: 1.6rem; }
-    .mc-stars { font-size: 0.4rem; }
-    .mc-phrase { font-size: 0.35rem; }
+    .mc-char { font-size: 1.4rem; }
+    .mc-stars { font-size: 0.35rem; }
+    .mc-tier { font-size: 0.3rem; }
+    .mc-phrase { font-size: 0.3rem; }
 }
 
 .multi-actions {
@@ -299,7 +317,9 @@ canvas {
     display: none;
     align-items: center;
     justify-content: center;
-    background: rgba(0,0,0,0.7);
+    background: rgba(10, 2, 2, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     cursor: pointer;
 }
 #multi-detail.visible { display: flex; }
@@ -307,7 +327,7 @@ canvas {
 .detail-card {
     width: min(380px, 82vw);
     padding: 36px 28px 28px;
-    background: rgba(15, 5, 5, 0.92);
+    background: rgba(40, 8, 8, 0.7);
     border: 2px solid var(--card-color, #FFD700);
     border-radius: 16px;
     box-shadow:
@@ -315,6 +335,7 @@ canvas {
         0 0 80px var(--card-glow, rgba(255,215,0,0.15)),
         inset 0 0 30px rgba(0,0,0,0.4);
     backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     text-align: center;
     animation: cardAppear 0.6s ease-out;
     position: relative;

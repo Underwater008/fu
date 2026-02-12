@@ -685,6 +685,114 @@ function drawCalligraphyFu(alpha) {
     ctx.restore();
 }
 
+// --- Draw a frosted-glass card backdrop ---
+function drawCardAt(cx, cy, cw, ch, alpha, borderColor) {
+    const cardX = cx - cw / 2;
+    const cardY = cy - ch / 2;
+    const r = 10;
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.beginPath();
+    ctx.moveTo((cardX + r) * dpr, cardY * dpr);
+    ctx.lineTo((cardX + cw - r) * dpr, cardY * dpr);
+    ctx.quadraticCurveTo((cardX + cw) * dpr, cardY * dpr, (cardX + cw) * dpr, (cardY + r) * dpr);
+    ctx.lineTo((cardX + cw) * dpr, (cardY + ch - r) * dpr);
+    ctx.quadraticCurveTo((cardX + cw) * dpr, (cardY + ch) * dpr, (cardX + cw - r) * dpr, (cardY + ch) * dpr);
+    ctx.lineTo((cardX + r) * dpr, (cardY + ch) * dpr);
+    ctx.quadraticCurveTo(cardX * dpr, (cardY + ch) * dpr, cardX * dpr, (cardY + ch - r) * dpr);
+    ctx.lineTo(cardX * dpr, (cardY + r) * dpr);
+    ctx.quadraticCurveTo(cardX * dpr, cardY * dpr, (cardX + r) * dpr, cardY * dpr);
+    ctx.closePath();
+    ctx.clip();
+    ctx.filter = 'blur(12px)';
+    ctx.globalAlpha = 1;
+    ctx.drawImage(canvas, 0, 0);
+    ctx.filter = 'none';
+    ctx.restore();
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.moveTo(cardX + r, cardY);
+    ctx.lineTo(cardX + cw - r, cardY);
+    ctx.quadraticCurveTo(cardX + cw, cardY, cardX + cw, cardY + r);
+    ctx.lineTo(cardX + cw, cardY + ch - r);
+    ctx.quadraticCurveTo(cardX + cw, cardY + ch, cardX + cw - r, cardY + ch);
+    ctx.lineTo(cardX + r, cardY + ch);
+    ctx.quadraticCurveTo(cardX, cardY + ch, cardX, cardY + ch - r);
+    ctx.lineTo(cardX, cardY + r);
+    ctx.quadraticCurveTo(cardX, cardY, cardX + r, cardY);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(80, 10, 10, 0.4)';
+    ctx.fill();
+    ctx.strokeStyle = borderColor || 'rgba(255, 215, 0, 0.2)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawCard(yTop, yBottom, alpha, widthFraction) {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const cardW = w * (widthFraction || 0.7);
+    const cardX = (w - cardW) / 2;
+    const cardY = h * yTop;
+    const cardH = h * (yBottom - yTop);
+    const r = 16;
+
+    // Helper: trace the rounded rect path (in CSS-pixel coords)
+    function tracePath() {
+        ctx.beginPath();
+        ctx.moveTo(cardX + r, cardY);
+        ctx.lineTo(cardX + cardW - r, cardY);
+        ctx.quadraticCurveTo(cardX + cardW, cardY, cardX + cardW, cardY + r);
+        ctx.lineTo(cardX + cardW, cardY + cardH - r);
+        ctx.quadraticCurveTo(cardX + cardW, cardY + cardH, cardX + cardW - r, cardY + cardH);
+        ctx.lineTo(cardX + r, cardY + cardH);
+        ctx.quadraticCurveTo(cardX, cardY + cardH, cardX, cardY + cardH - r);
+        ctx.lineTo(cardX, cardY + r);
+        ctx.quadraticCurveTo(cardX, cardY, cardX + r, cardY);
+        ctx.closePath();
+    }
+
+    // 1) Blur pass: clip to card shape, redraw canvas content blurred
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // reset to device pixels
+    // Scale path coords to device pixels
+    ctx.beginPath();
+    ctx.moveTo((cardX + r) * dpr, cardY * dpr);
+    ctx.lineTo((cardX + cardW - r) * dpr, cardY * dpr);
+    ctx.quadraticCurveTo((cardX + cardW) * dpr, cardY * dpr, (cardX + cardW) * dpr, (cardY + r) * dpr);
+    ctx.lineTo((cardX + cardW) * dpr, (cardY + cardH - r) * dpr);
+    ctx.quadraticCurveTo((cardX + cardW) * dpr, (cardY + cardH) * dpr, (cardX + cardW - r) * dpr, (cardY + cardH) * dpr);
+    ctx.lineTo((cardX + r) * dpr, (cardY + cardH) * dpr);
+    ctx.quadraticCurveTo(cardX * dpr, (cardY + cardH) * dpr, cardX * dpr, (cardY + cardH - r) * dpr);
+    ctx.lineTo(cardX * dpr, (cardY + r) * dpr);
+    ctx.quadraticCurveTo(cardX * dpr, cardY * dpr, (cardX + r) * dpr, cardY * dpr);
+    ctx.closePath();
+    ctx.clip();
+    ctx.filter = 'blur(16px)';
+    ctx.globalAlpha = 1;
+    ctx.drawImage(canvas, 0, 0);
+    ctx.filter = 'none';
+    ctx.restore();
+
+    // 2) Tint + border
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.globalAlpha = alpha || 0.5;
+    tracePath();
+    ctx.fillStyle = 'rgba(80, 10, 10, 0.35)';
+    ctx.fill();
+    // Subtle gold border
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+}
+
 // --- Draw text overlay ---
 function drawOverlayText(text, yFraction, color, alpha, size, fontOverride) {
     ctx.save();
@@ -1115,11 +1223,7 @@ function updateDraw() {
         drawToFortuneSeed = seeded.length > 0 ? seeded : null;
 
         if (isMultiMode) {
-            // After draw animation, show multi-results overlay
             changeState('fortune');
-            setTimeout(() => {
-                showMultiResults(multiDrawResults);
-            }, 800);
         } else {
             changeState('fortune');
         }
@@ -1635,42 +1739,152 @@ function renderFortuneOverlay() {
     const fadeIn = Math.min(1, stateTime / 0.9);
     const dr = currentDrawResult;
 
-    // --- Single character title with font cycling ---
-    if (dajiFontTransition) {
-        const transDur = 1.2;
-        const tt = (globalTime - dajiFontTransition.startTime) / transDur;
-        if (tt >= 1) {
-            dajiFontTransition = null;
-            drawOverlayText(dr.char, 0.15, CONFIG.glowGold, fadeIn * 0.9, cellSize * 5, getDajiFont());
-        } else {
-            renderCharMorph(tt, fadeIn, dajiFontTransition.oldFont, getDajiFont());
+    // --- Multi-mode: 5x2 grid of individual cards, each appearing one by one ---
+    if (isMultiMode && multiDrawResults && multiDrawResults.length > 1) {
+        const count = multiDrawResults.length;
+        const mCols = 5;
+        const mRows = 2;
+        const charDelay = 0.15;
+        const charAnimDur = 0.5;
+
+        // Grid sizing
+        const gridPadX = window.innerWidth * 0.06;
+        const gap = Math.min(cellSize * 0.6, 8);
+        const availW = window.innerWidth - gridPadX * 2;
+        const availH = window.innerHeight * 0.75;
+        const cardW = (availW - gap * (mCols - 1)) / mCols;
+        const cardH = (availH - gap * (mRows - 1)) / mRows;
+        const gridStartX = gridPadX + cardW / 2;
+        const gridStartY = window.innerHeight * 0.1 + cardH / 2;
+
+        const font = getDajiFont();
+        const charSize = Math.min(cardW * 0.65, cardH * 0.45);
+        const starsSize = Math.max(8, charSize * 0.22);
+        const tierSize = Math.max(7, charSize * 0.18);
+
+        for (let i = 0; i < count; i++) {
+            const d = multiDrawResults[i];
+            const col = i % mCols;
+            const row = Math.floor(i / mCols);
+            const cx_i = gridStartX + col * (cardW + gap);
+            const cy_i = gridStartY + row * (cardH + gap);
+
+            const charStartTime = 0.3 + i * charDelay;
+            const elapsed = stateTime - charStartTime;
+            if (elapsed <= 0) continue;
+
+            const t = Math.min(1, elapsed / charAnimDur);
+            const alpha = Math.min(1, t * 3);
+
+            // Scale: pop in then settle
+            let scale;
+            if (t < 0.4) {
+                scale = lerp(1.3, 0.97, easeInOut(t / 0.4));
+            } else if (t < 0.7) {
+                scale = lerp(0.97, 1.03, easeInOut((t - 0.4) / 0.3));
+            } else {
+                scale = lerp(1.03, 1.0, easeInOut((t - 0.7) / 0.3));
+            }
+
+            // Draw individual card background
+            const borderCol = d.rarity.color || 'rgba(255, 215, 0, 0.2)';
+            const borderAlpha = `rgba(${parseInt(borderCol.slice(1,3),16)||255}, ${parseInt(borderCol.slice(3,5),16)||215}, ${parseInt(borderCol.slice(5,7),16)||0}, ${alpha * 0.35})`;
+            drawCardAt(cx_i, cy_i, cardW * scale, cardH * scale, alpha * 0.7, borderAlpha);
+
+            // Draw character + stars + tier inside card
+            ctx.save();
+            ctx.scale(dpr, dpr);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const glowMult = 1 + Math.max(0, 1 - t * 2) * 1.5;
+
+            // Stars above character
+            const starsY = cy_i - cardH * 0.32 * scale;
+            const starsFull = '\u2605'.repeat(d.rarity.stars);
+            const starsEmpty = '\u2606'.repeat(6 - d.rarity.stars);
+            ctx.font = `${starsSize * scale}px "Courier New", monospace`;
+            ctx.globalAlpha = alpha * 0.85;
+            ctx.fillStyle = d.rarity.color || CONFIG.glowGold;
+            ctx.shadowColor = d.rarity.color || CONFIG.glowGold;
+            ctx.shadowBlur = starsSize * 0.3;
+            ctx.fillText(starsFull + starsEmpty, cx_i, starsY);
+
+            // Character
+            ctx.font = `${charSize * scale}px ${font}, serif`;
+            ctx.globalAlpha = alpha * 0.35 * glowMult;
+            ctx.fillStyle = d.rarity.color || CONFIG.glowGold;
+            ctx.shadowColor = d.rarity.color || CONFIG.glowGold;
+            ctx.shadowBlur = charSize * 0.2 * glowMult;
+            ctx.fillText(d.char, cx_i, cy_i - cardH * 0.02);
+
+            ctx.globalAlpha = alpha * 0.9;
+            ctx.shadowBlur = charSize * 0.08;
+            ctx.fillText(d.char, cx_i, cy_i - cardH * 0.02);
+
+            // Tier label below character
+            const tierY = cy_i + cardH * 0.32 * scale;
+            ctx.font = `${tierSize * scale}px "Courier New", monospace`;
+            ctx.globalAlpha = alpha * 0.65;
+            ctx.fillStyle = d.rarity.color || CONFIG.glowGold;
+            ctx.shadowBlur = tierSize * 0.2;
+            ctx.fillText(d.rarity.label, cx_i, tierY);
+
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = 'transparent';
+            ctx.restore();
         }
-    } else if (stateTime < 1.5) {
-        renderCharTitleEntrance(stateTime, getDajiFont());
+
+        // --- Hint to draw again (multi-specific, skip shared text below) ---
+        if (stateTime > 2.5) {
+            const hintFade = Math.min(1, (stateTime - 2.5) / 0.5);
+            const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;
+            drawOverlayText('\u2191 \u518D\u6765\u5341\u8FDE \u2191', 0.92, CONFIG.glowGold, hintFade * pulse, cellSize * 1.2);
+            drawOverlayText('Swipe Up to Draw \u00D710', 0.95, CONFIG.glowGold, hintFade * pulse, cellSize * 0.9);
+        }
+        return; // Skip single-mode text rendering below
     } else {
-        drawOverlayText(dr.char, 0.15, CONFIG.glowGold, fadeIn * 0.9, cellSize * 5, getDajiFont());
+        // --- Single mode ---
+        const topCardFade = Math.min(1, Math.max(0, (stateTime - 0.3) / 0.6));
+        drawCard(0.04, 0.26, topCardFade * 0.8, 0.5);
+
+        // --- Single character title with font cycling ---
+        if (dajiFontTransition) {
+            const transDur = 1.2;
+            const tt = (globalTime - dajiFontTransition.startTime) / transDur;
+            if (tt >= 1) {
+                dajiFontTransition = null;
+                drawOverlayText(dr.char, 0.15, CONFIG.glowGold, fadeIn * 0.9, cellSize * 5, getDajiFont());
+            } else {
+                renderCharMorph(tt, fadeIn, dajiFontTransition.oldFont, getDajiFont());
+            }
+        } else if (stateTime < 1.5) {
+            renderCharTitleEntrance(stateTime, getDajiFont());
+        } else {
+            drawOverlayText(dr.char, 0.15, CONFIG.glowGold, fadeIn * 0.9, cellSize * 5, getDajiFont());
+        }
+
+        // --- Stars line ---
+        const starsFade = Math.min(1, Math.max(0, (stateTime - 0.3) / 0.6));
+        const starsFull = '\u2605'.repeat(dr.rarity.stars);
+        const starsEmpty = '\u2606'.repeat(6 - dr.rarity.stars);
+        drawOverlayText(starsFull + starsEmpty, 0.08, dr.rarity.color, starsFade * 0.85, cellSize * 1.4);
+
+        // --- Tier label ---
+        const tierFade = Math.min(1, Math.max(0, (stateTime - 0.5) / 0.7));
+        const tierLabel = dr.rarity.label + ' \u00B7 ' + dr.rarity.labelEn;
+        drawOverlayText(tierLabel, 0.22, dr.rarity.color, tierFade * 0.7, cellSize * 1.0);
     }
-
-    // --- Stars line ---
-    const starsFade = Math.min(1, Math.max(0, (stateTime - 0.3) / 0.6));
-    const starsFull = '\u2605'.repeat(dr.rarity.stars);
-    const starsEmpty = '\u2606'.repeat(6 - dr.rarity.stars);
-    drawOverlayText(starsFull + starsEmpty, 0.06, dr.rarity.color, starsFade * 0.85, cellSize * 1.4);
-
-    // --- Tier label ---
-    const tierFade = Math.min(1, Math.max(0, (stateTime - 0.5) / 0.7));
-    const tierLabel = dr.rarity.label + ' \u00B7 ' + dr.rarity.labelEn;
-    drawOverlayText(tierLabel, 0.10, dr.rarity.color, tierFade * 0.7, cellSize * 1.0);
 
     // --- Category ---
     const catFade = Math.min(1, Math.max(0, (stateTime - 0.7) / 0.7));
     const catLabel = '[ ' + dr.category.name + ' ]';
-    drawOverlayText(catLabel, 0.22, dr.category.color, catFade * 0.6, cellSize * 1.2);
+    drawOverlayText(catLabel, 0.56, dr.category.color, catFade * 0.6, cellSize * 1.2);
 
     // --- Blessing phrase + english ---
     const blessFade = Math.min(1, Math.max(0, (stateTime - 0.5) / 0.9));
-    drawOverlayText(dr.blessing.phrase, 0.73, CONFIG.glowRed, blessFade * 0.7, cellSize * 1.5);
-    drawOverlayText(dr.blessing.english, 0.78, CONFIG.glowGold, blessFade * 0.5, cellSize * 1);
+    drawOverlayText(dr.blessing.phrase, 0.66, CONFIG.glowRed, blessFade * 0.7, cellSize * 1.5);
+    drawOverlayText(dr.blessing.english, 0.72, CONFIG.glowGold, blessFade * 0.5, cellSize * 1);
 
     // --- Hint to draw again ---
     if (stateTime > 2.5) {
@@ -2086,6 +2300,7 @@ function showMultiResults(draws) {
 
         card.innerHTML =
             `<div class="mc-stars">${starsStr}</div>` +
+            `<div class="mc-tier">${draw.rarity.label}</div>` +
             `<div class="mc-char">${draw.char}</div>` +
             `<div class="mc-phrase">${draw.blessing.phrase}</div>`;
 
