@@ -191,11 +191,11 @@ function getLayout() {
         cardTop: 0.04,
         cardBottom: 0.26,
         cardWidth: 0.5,
-        categoryY: 0.56,
-        phraseY: 0.66,
-        englishY: 0.72,
-        hintY: 0.85,
-        hintSubY: 0.88,
+        categoryY: 0.61,
+        phraseY: 0.71,
+        englishY: 0.77,
+        hintY: 0.87,
+        hintSubY: 0.91,
         charFontSize: cellSize * 5,
         arrivalTitleY: 0.15,
         arrivalSubY: 0.20,
@@ -999,9 +999,14 @@ function changeState(newState) {
 // ============================================================
 function updateArrival() {
     updateBgParticles(globalTime);
+    // Update tap-triggered firework particles
+    if (hasTapFireworks()) updateFireworkPhysics();
 }
 
 function renderArrivalOverlay() {
+    // Render tap-triggered fireworks in arrival state
+    if (hasTapFireworks()) appendFireworksToGPU(0);
+
     const fadeIn = Math.min(1, stateTime / 1.0);
     const L = getLayout();
     drawCalligraphyFu(fadeIn);
@@ -1102,8 +1107,8 @@ function initDrawAnimation() {
             targetCenterY = fuEndScreenPositions[idx].y - window.innerHeight / 2;
         }
 
-        // 2. Sample shape — much fewer particles per char in multi-mode
-        const res = isMultiMode ? 18 : 50;
+        // 2. Sample shape — proportionally scaled with cluster size
+        const res = isMultiMode ? Math.round(50 * scaleFactor) : 50;
         const shape = sampleCharacterShape(drawRes.char, res);
 
         const spread = getClusterSpread() * scaleFactor;
@@ -1420,8 +1425,7 @@ function renderDrawParticles3D(t) {
         const breathing = Math.sin(globalTime * 1.5 + p.phase) * breatheAmp;
         const renderZ = p.z + breathing * breatheMix;
 
-        // In multi-mode, reduce particle brightness and size
-        const multiDim = isMultiMode ? 0.5 : 1.0;
+        // In multi-mode, uniformly scale particle size with cluster (same proportions as single)
         glyphs.push({
             x: p.x,
             y: p.y,
@@ -1431,9 +1435,9 @@ function renderDrawParticles3D(t) {
             r: Math.round(r),
             g: Math.round(g),
             b: Math.round(b),
-            alpha: alpha * multiDim,
-            size: size * (isMultiMode ? 0.7 : 1.0),
-            glow: 0.7 * multiDim,
+            alpha: alpha * (isMultiMode ? scaleFactor : 1.0),
+            size: size * (isMultiMode ? scaleFactor : 1.0),
+            glow: 0.7,
             blur: 0.65,
         });
     }
@@ -1472,41 +1476,56 @@ function renderDrawOverlay() {
         const stepY = gridH / multiRows;
 
         if (count > 1) {
-            // Multi: single 福 rising from bottom center
-            const cx = window.innerWidth / 2;
-            const cy = window.innerHeight * lerp(0.7, 0.35, riseEased);
-            const baseSize = isLandscape() ? Math.min(vmin * 0.22, window.innerHeight * 0.18) : vmin * 0.22;
-            const fuSize = baseSize * lerp(1, 0.6, shrinkEased);
+            // Multi: 10 福 characters rising from bottom, spreading to their grid positions
+            const baseSize = isLandscape() ? Math.min(vmin * 0.08, window.innerHeight * 0.07) : vmin * 0.08;
+            const fuSize = baseSize * lerp(1, 0.5, shrinkEased);
 
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            ctx.fillStyle = CONFIG.glowGold;
+            ctx.shadowColor = CONFIG.glowGold;
 
             const morphSpeed = 1.2 + riseT * 4.5;
             const morphPhase = t * morphSpeed;
             const fontCount = CALLI_FONTS.length;
-            const rawIdx = (morphPhase % fontCount + fontCount) % fontCount;
-            const fontA = Math.floor(rawIdx) % fontCount;
-            const fontB = (fontA + 1) % fontCount;
-            const crossFade = rawIdx - Math.floor(rawIdx);
-            const intensity = 1 + riseT * 2.0;
 
-            ctx.font = `${fuSize}px ${CALLI_FONTS[fontA]}, serif`;
-            ctx.globalAlpha = Math.min(1, 0.3 * intensity) * (1 - crossFade);
-            ctx.shadowColor = CONFIG.glowGold;
-            ctx.shadowBlur = fuSize * 0.15 * intensity;
-            ctx.fillStyle = CONFIG.glowGold;
-            ctx.fillText('\u798F', cx, cy);
-            ctx.globalAlpha = (1 - crossFade);
-            ctx.shadowBlur = fuSize * 0.06 * intensity;
-            ctx.fillText('\u798F', cx, cy);
+            for (let i = 0; i < count; i++) {
+                const c = i % multiCols;
+                const r = Math.floor(i / multiCols);
+                const targetX = startX + c * stepX;
+                const targetY = startY + r * stepY;
 
-            ctx.font = `${fuSize}px ${CALLI_FONTS[fontB]}, serif`;
-            ctx.globalAlpha = Math.min(1, 0.3 * intensity) * crossFade;
-            ctx.shadowBlur = fuSize * 0.15 * intensity;
-            ctx.fillText('\u798F', cx, cy);
-            ctx.globalAlpha = crossFade;
-            ctx.shadowBlur = fuSize * 0.06 * intensity;
-            ctx.fillText('\u798F', cx, cy);
+                // Each 福 rises from bottom center, spreading out to its grid target
+                const bottomX = window.innerWidth / 2;
+                const bottomY = window.innerHeight * 0.85;
+                const cx = lerp(bottomX, targetX, riseEased);
+                const cy = lerp(bottomY, targetY, riseEased);
+
+                // Stagger font morph slightly per character
+                const iPhase = morphPhase + i * 0.3;
+                const rawIdx = (iPhase % fontCount + fontCount) % fontCount;
+                const fontA = Math.floor(rawIdx) % fontCount;
+                const fontB = (fontA + 1) % fontCount;
+                const crossFade = rawIdx - Math.floor(rawIdx);
+                const intensity = 1 + riseT * 1.8;
+                const alphaScale = 0.8;
+
+                ctx.font = `${fuSize}px ${CALLI_FONTS[fontA]}, serif`;
+                ctx.globalAlpha = Math.min(1, 0.25 * intensity) * (1 - crossFade) * alphaScale;
+                ctx.shadowBlur = fuSize * 0.12 * intensity;
+                ctx.fillText('\u798F', cx, cy);
+                ctx.globalAlpha = (1 - crossFade) * alphaScale;
+                ctx.shadowBlur = fuSize * 0.05 * intensity;
+                ctx.fillText('\u798F', cx, cy);
+
+                ctx.font = `${fuSize}px ${CALLI_FONTS[fontB]}, serif`;
+                ctx.globalAlpha = Math.min(1, 0.25 * intensity) * crossFade * alphaScale;
+                ctx.shadowBlur = fuSize * 0.12 * intensity;
+                ctx.fillText('\u798F', cx, cy);
+                ctx.globalAlpha = crossFade * alphaScale;
+                ctx.shadowBlur = fuSize * 0.05 * intensity;
+                ctx.fillText('\u798F', cx, cy);
+            }
         } else {
             // Single (Original behavior)
             const cx = window.innerWidth / 2;
@@ -1565,7 +1584,7 @@ function renderDrawOverlay() {
                 ? (0.2 + draw.rarity.stars * 0.05)
                 : 0.4;
             const baseRadius = Math.min(window.innerWidth, window.innerHeight) * rarityScale * burstFlash;
-            const radius = isMultiMode ? baseRadius * 0.5 : baseRadius;
+            const radius = isMultiMode ? baseRadius * 0.35 : baseRadius;
 
             let burstR = 255, burstG = 255, burstB = 220;
             if (draw) {
@@ -1576,7 +1595,7 @@ function renderDrawOverlay() {
             }
 
             const gradient = ctx.createRadialGradient(bx, by, 0, bx, by, radius);
-            const flashMul = isMultiMode ? 0.35 : 1.0;
+            const flashMul = isMultiMode ? 0.2 : 1.0;
             gradient.addColorStop(0, `rgba(${burstR}, ${burstG}, ${burstB}, ${burstFlash * 0.8 * flashMul})`);
             gradient.addColorStop(0.4, `rgba(${burstR}, ${burstG}, ${Math.floor(burstB * 0.8)}, ${burstFlash * 0.4 * flashMul})`);
             gradient.addColorStop(1, `rgba(${burstR}, ${burstG}, 0, 0)`);
@@ -1609,8 +1628,8 @@ function renderDaji(alpha) {
 
 function updateFortune() {
     updateBgParticles(globalTime);
-    // Only update firework physics if we have fireworks active (4+ stars)
-    if (currentDrawResult && currentDrawResult.rarity.stars >= 4) {
+    // Update firework physics if we have fireworks active (4+ stars or tap fireworks)
+    if ((currentDrawResult && currentDrawResult.rarity.stars >= 4) || hasTapFireworks()) {
         updateFireworkPhysics();
     }
     // Auto-cycle font when idle
@@ -1847,8 +1866,8 @@ function renderFortuneOverlay() {
     // Combined GPU render: character cluster + fireworks in one pass
     const dajiCount = updateDajiToGPU(true);
 
-    if (currentDrawResult && currentDrawResult.rarity.stars >= 4 &&
-        (fwShells.length || fwTrail.length || fwParticles.length)) {
+    if ((currentDrawResult && currentDrawResult.rarity.stars >= 4 &&
+        (fwShells.length || fwTrail.length || fwParticles.length)) || hasTapFireworks()) {
         appendFireworksToGPU(dajiCount);
     } else {
         renderAndCompositeGL();
@@ -1994,6 +2013,38 @@ function burstShell(shell) {
     }
 }
 
+// --- Tap-to-burst firework at screen coordinates ---
+function tapBurstAtScreen(screenX, screenY) {
+    // Convert screen coords to world coords (at z=0, scale=1)
+    const worldX = screenX - window.innerWidth / 2;
+    const worldY = screenY - window.innerHeight / 2;
+    const cat = FW_CATEGORIES[Math.floor(Math.random() * FW_CATEGORIES.length)];
+    const count = 20 + Math.floor(Math.random() * 25);
+    const { chars, r, g, b } = cat;
+    for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
+        const speed = cellSize * (0.05 + Math.random() * 0.09);
+        fwParticles.push({
+            x: worldX, y: worldY, z: (Math.random() - 0.5) * cellSize * 4,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - cellSize * 0.04,
+            vz: (Math.random() - 0.5) * speed * 0.4,
+            char: chars[Math.floor(Math.random() * chars.length)],
+            r, g, b,
+            life: 0.5 + Math.random() * 0.3,
+            decay: 0.01 + Math.random() * 0.008,
+            gravity: cellSize * (0.001 + Math.random() * 0.001),
+            drag: 0.985,
+            trailSegs: [],
+            lastTrailTime: globalTime,
+        });
+    }
+}
+
+function hasTapFireworks() {
+    return fwParticles.length > 0 || fwShells.length > 0 || fwTrail.length > 0;
+}
+
 function initFireworks() {
     fwShells.length = 0;
     fwTrail.length = 0;
@@ -2007,13 +2058,15 @@ function initFireworks() {
 }
 
 function updateFireworkPhysics() {
-    // Auto-launch on a timer
-    fwLaunchTimer--;
-    if (fwLaunchTimer <= 0) {
-        launchShell();
-        fwLaunchTimer = fwLaunchCount < 3
-            ? 40 + Math.random() * 30
-            : 70 + Math.random() * 80;
+    // Auto-launch on a timer (only during fortune state with 4+ star draws)
+    if (state === 'fortune' && currentDrawResult && currentDrawResult.rarity.stars >= 4) {
+        fwLaunchTimer--;
+        if (fwLaunchTimer <= 0) {
+            launchShell();
+            fwLaunchTimer = fwLaunchCount < 3
+                ? 40 + Math.random() * 30
+                : 70 + Math.random() * 80;
+        }
     }
 
     const halfW = cols * cellSize * 0.5;
@@ -2819,13 +2872,18 @@ canvas.addEventListener('touchend', (e) => {
     if (touchHoldTimer) { clearTimeout(touchHoldTimer); touchHoldTimer = null; }
     hoveredIdx = -1;
     hideTooltip();
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    const dy = touchStartY - e.changedTouches[0].clientY;
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const dx = endX - touchStartX;
+    const dy = touchStartY - endY;
     const dt = performance.now() - touchStartTime;
     if (state === 'fortune' && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) && dt < 500) {
         cycleDajiFont(dx > 0 ? 1 : -1);
     } else if (dy > 50 && dt < 500) {
         handleSwipeUp();
+    } else if (!touchMoved && dt < 300 && (state === 'arrival' || state === 'fortune')) {
+        // Tap → firework burst
+        tapBurstAtScreen(endX, endY);
     }
 }, { passive: true });
 
@@ -2839,9 +2897,10 @@ canvas.addEventListener('mouseleave', () => {
 });
 
 // Desktop mouse drag
-let mouseStartY = 0, mouseDown = false;
+let mouseStartX = 0, mouseStartY = 0, mouseDown = false;
 let mouseHoldTimer = null;
 canvas.addEventListener('mousedown', (e) => {
+    mouseStartX = e.clientX;
     mouseStartY = e.clientY;
     mouseDown = true;
     if (mouseHoldTimer) clearTimeout(mouseHoldTimer);
@@ -2857,7 +2916,13 @@ canvas.addEventListener('mouseup', (e) => {
     hideTooltip();
     if (mouseDown) {
         const dy = mouseStartY - e.clientY;
-        if (dy > 50) handleSwipeUp();
+        const dx = Math.abs(e.clientX - mouseStartX);
+        if (dy > 50) {
+            handleSwipeUp();
+        } else if (dy < 20 && dx < 20 && (state === 'arrival' || state === 'fortune')) {
+            // Click → firework burst
+            tapBurstAtScreen(e.clientX, e.clientY);
+        }
     }
     mouseDown = false;
 });
