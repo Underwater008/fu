@@ -1,0 +1,28 @@
+{
+  "name": "fu",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "vite --open",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Underwater008/fu.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/Underwater008/fu/issues"
+  },
+  "homepage": "https://github.com/Underwater008/fu#readme",
+  "devDependencies": {
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "three": "^0.182.0"
+  }
+}

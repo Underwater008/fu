@@ -1,0 +1,228 @@
+// ============================================================
+// gacha.js — Fortune Gacha Mechanics
+// Pure data + logic, no DOM/rendering
+// ============================================================
+
+// --- Rarity Tiers (weighted probabilities) ---
+export const RARITY_TIERS = [
+    { stars: 6, weight: 3,  label: '天赐鸿福', labelEn: 'Heavenly Fortune', color: '#FF4500', glow: 'rgba(255,69,0,0.5)',   burstRGB: [255, 69, 0] },
+    { stars: 5, weight: 7,  label: '吉星高照', labelEn: 'Auspicious Stars', color: '#A855F7', glow: 'rgba(168,85,247,0.5)', burstRGB: [168, 85, 247] },
+    { stars: 4, weight: 15, label: '福泽绵长', labelEn: 'Enduring Blessings', color: '#3B82F6', glow: 'rgba(59,130,246,0.5)', burstRGB: [59, 130, 246] },
+    { stars: 3, weight: 25, label: '万事如意', labelEn: 'All Wishes Fulfilled', color: '#22C55E', glow: 'rgba(34,197,94,0.5)', burstRGB: [34, 197, 94] },
+    { stars: 2, weight: 50, label: '迎春纳福', labelEn: 'Welcoming Fortune',   color: '#94A3B8', glow: 'rgba(148,163,184,0.5)', burstRGB: [148, 163, 184] },
+];
+
+// --- Blessing Categories (9 categories) ---
+export const BLESSING_CATEGORIES = [
+    { name: '五福临门', nameEn: 'Five Blessings', chars: '福禄寿喜财',              r: 255, g: 45,  b: 45,  color: '#FF2D2D' },
+    { name: '招财进宝', nameEn: 'Wealth',         chars: '富贵发金玉宝余丰盛利旺隆昌', r: 255, g: 215, b: 0,   color: '#FFD700' },
+    { name: '岁岁平安', nameEn: 'Peace',          chars: '安康宁泰和平顺健',          r: 0,   g: 255, b: 159, color: '#00FF9F' },
+    { name: '喜气洋洋', nameEn: 'Joy',            chars: '乐欢庆禧祺嘉春',            r: 255, g: 120, b: 80,  color: '#FF7850' },
+    { name: '厚德载物', nameEn: 'Virtue',         chars: '德善仁义忠信孝慧恩',         r: 255, g: 200, b: 50,  color: '#FFC832' },
+    { name: '花好月圆', nameEn: 'Love',           chars: '爱合圆满美馨雅',             r: 255, g: 130, b: 180, color: '#FF82B4' },
+    { name: '吉祥如意', nameEn: 'Auspicious',     chars: '吉祥瑞如意祝运',             r: 180, g: 255, b: 80,  color: '#B4FF50' },
+    { name: '神兽庇佑', nameEn: 'Mythical',       chars: '龙凤麟鹤华',                r: 255, g: 180, b: 50,  color: '#FFB432' },
+    { name: '步步高升', nameEn: 'Achievement',    chars: '成升登高兴进',               r: 80,  g: 220, b: 255, color: '#50DCFF' },
+];
+
+// --- Tier → Category mapping (which categories can appear at which rarity) ---
+const TIER_CATEGORIES = [
+    [0],          // 6-star: Five Blessings only
+    [7, 8],       // 5-star: Mythical, Achievement
+    [4, 5],       // 4-star: Virtue, Love
+    [2, 6],       // 3-star: Peace, Auspicious
+    [1, 3],       // 2-star: Wealth, Joy
+];
+
+// --- Full Blessings Map (70+ characters) ---
+export const FULL_CHAR_BLESSINGS = {
+    '福': { phrase: '福星高照', english: 'The star of fortune shines bright' },
+    '禄': { phrase: '高官厚禄', english: 'High rank and generous reward' },
+    '寿': { phrase: '福寿双全', english: 'Both blessings and longevity' },
+    '喜': { phrase: '双喜临门', english: 'Double happiness at the door' },
+    '财': { phrase: '财源广进', english: 'Wealth flowing from all directions' },
+    '富': { phrase: '富贵有余', english: 'Wealth and abundance to spare' },
+    '贵': { phrase: '荣华富贵', english: 'Glory, splendor, and riches' },
+    '发': { phrase: '恭喜发财', english: 'Wishing you great prosperity' },
+    '金': { phrase: '金玉满堂', english: 'Gold and jade fill the hall' },
+    '玉': { phrase: '金枝玉叶', english: 'Golden branches, jade leaves' },
+    '宝': { phrase: '招财进宝', english: 'Bringing in wealth and treasure' },
+    '余': { phrase: '年年有余', english: 'Surplus and abundance every year' },
+    '丰': { phrase: '五谷丰登', english: 'Bumper grain harvest' },
+    '盛': { phrase: '繁荣昌盛', english: 'Prosperous and flourishing' },
+    '利': { phrase: '开岁大利', english: 'Great profit in the new year' },
+    '旺': { phrase: '人丁兴旺', english: 'A growing and prosperous family' },
+    '隆': { phrase: '隆盛昌达', english: 'Grand and flourishing' },
+    '昌': { phrase: '国运昌盛', english: 'National destiny flourishing' },
+    '安': { phrase: '岁岁平安', english: 'Peace and safety year after year' },
+    '康': { phrase: '健康长寿', english: 'Health and longevity' },
+    '宁': { phrase: '宁静致远', english: 'Tranquility leads to greatness' },
+    '泰': { phrase: '国泰民安', english: 'National peace, people safe' },
+    '和': { phrase: '和气生财', english: 'Harmony brings prosperity' },
+    '平': { phrase: '四季平安', english: 'Peace through all four seasons' },
+    '顺': { phrase: '万事顺利', english: 'All things go smoothly' },
+    '健': { phrase: '身体健康', english: 'Strong health of body' },
+    '乐': { phrase: '快乐无忧', english: 'Joy without worry' },
+    '欢': { phrase: '合家欢乐', english: 'The whole family rejoices' },
+    '庆': { phrase: '普天同庆', english: 'The whole world celebrates' },
+    '禧': { phrase: '恭贺新禧', english: 'Congratulations and new joy' },
+    '祺': { phrase: '吉祥如意', english: 'Lucky and as you wish' },
+    '嘉': { phrase: '嘉年华会', english: 'A grand festival gathering' },
+    '春': { phrase: '春风得意', english: 'Success on the spring breeze' },
+    '德': { phrase: '厚德载物', english: 'Great virtue carries all' },
+    '善': { phrase: '上善若水', english: 'The greatest good is like water' },
+    '仁': { phrase: '仁者无敌', english: 'The benevolent are invincible' },
+    '义': { phrase: '义薄云天', english: 'Righteousness reaching the clouds' },
+    '忠': { phrase: '忠义双全', english: 'Both loyal and righteous' },
+    '信': { phrase: '言而有信', english: 'True to one\'s word' },
+    '孝': { phrase: '百善孝先', english: 'Of all virtues, filial piety first' },
+    '慧': { phrase: '慧心巧思', english: 'Wise heart, clever mind' },
+    '恩': { phrase: '恩重如山', english: 'Kindness as heavy as mountains' },
+    '爱': { phrase: '大爱无疆', english: 'Great love knows no bounds' },
+    '合': { phrase: '百年好合', english: 'A hundred years of harmony' },
+    '圆': { phrase: '花好月圆', english: 'Flowers bloom, moon is full' },
+    '满': { phrase: '圆圆满满', english: 'Perfectly complete in every way' },
+    '美': { phrase: '十全十美', english: 'Perfection in every way' },
+    '馨': { phrase: '温馨美满', english: 'Warm and blissful' },
+    '雅': { phrase: '雅量高致', english: 'Elegant and magnanimous spirit' },
+    '吉': { phrase: '吉祥如意', english: 'Good fortune as you wish' },
+    '祥': { phrase: '龙凤呈祥', english: 'Dragon and phoenix bring fortune' },
+    '瑞': { phrase: '瑞气盈门', english: 'Auspicious energy fills the door' },
+    '如': { phrase: '称心如意', english: 'Everything goes as desired' },
+    '意': { phrase: '万事如意', english: 'All things as you wish' },
+    '祝': { phrase: '祝福满满', english: 'Brimming with blessings' },
+    '运': { phrase: '鸿运当头', english: 'Great fortune on its way' },
+    '龙': { phrase: '龙马精神', english: 'The vigor of dragons and horses' },
+    '凤': { phrase: '凤鸣朝阳', english: 'Phoenix singing to the rising sun' },
+    '麟': { phrase: '凤毛麟角', english: 'Rare as phoenix feathers' },
+    '鹤': { phrase: '鹤寿延年', english: 'Longevity of the crane' },
+    '华': { phrase: '荣华富贵', english: 'Prosperity and splendor' },
+    '成': { phrase: '马到成功', english: 'Success upon arrival' },
+    '升': { phrase: '步步高升', english: 'Rising higher step by step' },
+    '登': { phrase: '五子登科', english: 'All five sons pass the exam' },
+    '高': { phrase: '高瞻远瞩', english: 'Far-sighted vision' },
+    '兴': { phrase: '兴旺发达', english: 'Flourishing and thriving' },
+    '进': { phrase: '招财进宝', english: 'Attracting wealth and treasure' },
+};
+
+// All unique characters across all categories
+export const ALL_CHARS = [...new Set(BLESSING_CATEGORIES.flatMap(c => [...c.chars]))];
+
+// --- Core Draw Functions ---
+
+export function performDraw() {
+    // 1. Weighted random: pick a rarity tier
+    const totalWeight = RARITY_TIERS.reduce((s, t) => s + t.weight, 0);
+    let roll = Math.random() * totalWeight;
+    let tierIdx = RARITY_TIERS.length - 1;
+    for (let i = 0; i < RARITY_TIERS.length; i++) {
+        roll -= RARITY_TIERS[i].weight;
+        if (roll <= 0) { tierIdx = i; break; }
+    }
+    const tier = RARITY_TIERS[tierIdx];
+
+    // 2. Pick a category valid for this tier
+    const catIndices = TIER_CATEGORIES[tierIdx];
+    const catIdx = catIndices[Math.floor(Math.random() * catIndices.length)];
+    const category = BLESSING_CATEGORIES[catIdx];
+
+    // 3. Pick a random character from that category
+    const chars = [...category.chars];
+    const char = chars[Math.floor(Math.random() * chars.length)];
+
+    // 4. Get blessing
+    const blessing = FULL_CHAR_BLESSINGS[char] || { phrase: char + '运亨通', english: 'Fortune and blessings upon you' };
+
+    return { char, rarity: tier, tierIndex: tierIdx, category, blessing };
+}
+
+export function performMultiDraw() {
+    const draws = [];
+    for (let i = 0; i < 10; i++) draws.push(performDraw());
+    draws.sort((a, b) => a.tierIndex - b.tierIndex);
+    return draws;
+}
+
+// --- Collection Management (localStorage) ---
+
+const COLLECTION_KEY = 'fu_gacha_collection';
+const STATS_KEY = 'fu_gacha_stats';
+
+export function loadCollection() {
+    try {
+        return JSON.parse(localStorage.getItem(COLLECTION_KEY)) || {};
+    } catch { return {}; }
+}
+
+export function loadStats() {
+    try {
+        return JSON.parse(localStorage.getItem(STATS_KEY)) || { totalDraws: 0 };
+    } catch { return { totalDraws: 0 }; }
+}
+
+export function saveToCollection(draw) {
+    const coll = loadCollection();
+    const key = draw.char;
+    if (!coll[key]) {
+        coll[key] = {
+            char: draw.char,
+            maxStars: draw.rarity.stars,
+            count: 1,
+            firstDrawn: Date.now(),
+            categoryName: draw.category.name,
+        };
+    } else {
+        coll[key].count++;
+        coll[key].maxStars = Math.max(coll[key].maxStars, draw.rarity.stars);
+    }
+    localStorage.setItem(COLLECTION_KEY, JSON.stringify(coll));
+
+    const stats = loadStats();
+    stats.totalDraws = (stats.totalDraws || 0) + 1;
+    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+}
+
+export function saveMultiToCollection(draws) {
+    const coll = loadCollection();
+    const stats = loadStats();
+    for (const draw of draws) {
+        const key = draw.char;
+        if (!coll[key]) {
+            coll[key] = {
+                char: draw.char,
+                maxStars: draw.rarity.stars,
+                count: 1,
+                firstDrawn: Date.now(),
+                categoryName: draw.category.name,
+            };
+        } else {
+            coll[key].count++;
+            coll[key].maxStars = Math.max(coll[key].maxStars, draw.rarity.stars);
+        }
+        stats.totalDraws = (stats.totalDraws || 0) + 1;
+    }
+    localStorage.setItem(COLLECTION_KEY, JSON.stringify(coll));
+    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+}
+
+export function getCollectionProgress() {
+    const coll = loadCollection();
+    const total = ALL_CHARS.length;
+    const collected = Object.keys(coll).length;
+    return { collected, total, percentage: total > 0 ? Math.floor(collected / total * 100) : 0 };
+}
+
+export function getCollectionByCategory() {
+    const coll = loadCollection();
+    return BLESSING_CATEGORIES.map(cat => ({
+        ...cat,
+        items: [...cat.chars].map(ch => ({
+            char: ch,
+            collected: !!coll[ch],
+            count: coll[ch]?.count || 0,
+            maxStars: coll[ch]?.maxStars || 0,
+            blessing: FULL_CHAR_BLESSINGS[ch],
+        })),
+        collectedCount: [...cat.chars].filter(ch => !!coll[ch]).length,
+    }));
+}

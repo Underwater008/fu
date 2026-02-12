@@ -1,0 +1,461 @@
+/* ============================================================
+   Fortune Gacha — Styles
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: #990000;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    font-family: 'Courier New', 'SF Mono', monospace;
+}
+
+canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* ============ BOTTOM CONTROLS ============ */
+.bottom-controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0 5vw 8vh;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 15;
+    pointer-events: none; /* Let clicks pass through to canvas if not on buttons */
+}
+
+/* ============ 10-PULL BUTTON ============ */
+.btn-multi-pull {
+    pointer-events: auto;
+    /* Position reset, controlled by flex container */
+    position: static;
+    padding: 14px 28px;
+    background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,165,0,0.1));
+    color: #FFD700;
+    border: 1.5px solid rgba(255,215,0,0.5);
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: 3px;
+    text-shadow: 0 0 10px rgba(255,215,0,0.4);
+    box-shadow: 0 0 24px rgba(255,215,0,0.12), inset 0 0 12px rgba(255,215,0,0.03);
+    transition: all 0.3s ease;
+    animation: multiPulse 2.5s ease-in-out infinite;
+    opacity: 0;
+    transform: translateY(20px);
+    visibility: hidden;
+}
+.btn-multi-pull.visible {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+}
+.btn-multi-pull:hover {
+    background: linear-gradient(135deg, rgba(255,215,0,0.3), rgba(255,165,0,0.2));
+    box-shadow: 0 0 36px rgba(255,215,0,0.25);
+    transform: translateY(-2px) scale(1.03);
+}
+@keyframes multiPulse {
+    0%, 100% { box-shadow: 0 0 24px rgba(255,215,0,0.12); }
+    50% { box-shadow: 0 0 36px rgba(255,215,0,0.25); }
+}
+
+/* ============ COLLECTION FAB ============ */
+.collection-fab {
+    pointer-events: auto;
+    /* Position reset */
+    position: static;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(255, 45, 45, 0.2);
+    border: 1.5px solid rgba(255, 215, 0, 0.35);
+    color: #FFD700;
+    font-size: 14px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 0;
+    letter-spacing: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    transition: all 0.3s ease;
+    opacity: 0;
+    transform: translateY(20px);
+    visibility: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.collection-fab.visible {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+}
+.collection-fab:hover {
+    background: rgba(255, 45, 45, 0.35);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+}
+
+/* ============ SHARED BUTTON STYLES ============ */
+.btn-action {
+    display: block;
+    margin: 12px auto 0;
+    padding: 12px 32px;
+    background: rgba(255, 215, 0, 0.12);
+    color: #FFD700;
+    border: 1.5px solid rgba(255, 215, 0, 0.4);
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    transition: all 0.3s ease;
+    letter-spacing: 2px;
+    text-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+}
+.btn-action:hover {
+    background: rgba(255, 215, 0, 0.25);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.15);
+    transform: translateY(-1px);
+}
+.btn-action.btn-secondary {
+    background: transparent;
+    border-color: rgba(255, 215, 0, 0.2);
+    color: rgba(255, 215, 0, 0.5);
+    font-size: 0.85rem;
+}
+.btn-action.btn-secondary:hover {
+    color: rgba(255, 215, 0, 0.7);
+    border-color: rgba(255, 215, 0, 0.4);
+}
+
+/* ============ MULTI-PULL OVERLAY ============ */
+#multi-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 30;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 2, 2, 0.95);
+    overflow-y: auto;
+    padding: 20px 10px;
+}
+#multi-overlay.visible { display: flex; }
+
+.multi-title {
+    font-size: 1.4rem;
+    color: #FFD700;
+    letter-spacing: 8px;
+    margin-bottom: 20px;
+    text-shadow: 0 0 12px rgba(255,215,0,0.4);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.multi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    max-width: 600px;
+    width: 92vw;
+    margin: 0 auto;
+}
+@media (max-width: 520px) {
+    .multi-grid { gap: 6px; }
+}
+
+.multi-card {
+    position: relative;
+    aspect-ratio: 3/4;
+    background: rgba(20, 8, 8, 0.9);
+    border: 1.5px solid var(--mc-color, #FFD700);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 0 16px var(--mc-glow, rgba(255,215,0,0.2));
+    transition: transform 0.2s, box-shadow 0.2s;
+    animation: mcAppear 0.5s ease-out both;
+    overflow: hidden;
+}
+.multi-card:hover {
+    transform: scale(1.06);
+    box-shadow: 0 0 28px var(--mc-glow, rgba(255,215,0,0.4));
+}
+.multi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at center, var(--mc-glow, rgba(255,215,0,0.08)), transparent 70%);
+    pointer-events: none;
+}
+@keyframes mcAppear {
+    0% { transform: scale(0) rotateY(90deg); opacity: 0; }
+    100% { transform: scale(1) rotateY(0deg); opacity: 1; }
+}
+
+.mc-stars {
+    font-size: 0.5rem;
+    color: var(--mc-color, #FFD700);
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+    text-shadow: 0 0 6px var(--mc-glow, rgba(255,215,0,0.4));
+}
+.mc-char {
+    font-size: 2.2rem;
+    color: #FFF;
+    text-shadow: 0 0 16px var(--mc-glow, rgba(255,215,0,0.5));
+    line-height: 1.2;
+}
+.mc-phrase {
+    font-size: 0.45rem;
+    color: var(--mc-color, #FFD700);
+    opacity: 0.7;
+    margin-top: 2px;
+    letter-spacing: 1px;
+}
+@media (max-width: 520px) {
+    .mc-char { font-size: 1.6rem; }
+    .mc-stars { font-size: 0.4rem; }
+    .mc-phrase { font-size: 0.35rem; }
+}
+
+.multi-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 16px;
+}
+
+/* ============ MULTI-PULL DETAIL POPUP ============ */
+#multi-detail {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 35;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.7);
+    cursor: pointer;
+}
+#multi-detail.visible { display: flex; }
+
+.detail-card {
+    width: min(380px, 82vw);
+    padding: 36px 28px 28px;
+    background: rgba(15, 5, 5, 0.92);
+    border: 2px solid var(--card-color, #FFD700);
+    border-radius: 16px;
+    box-shadow:
+        0 0 40px var(--card-glow, rgba(255,215,0,0.3)),
+        0 0 80px var(--card-glow, rgba(255,215,0,0.15)),
+        inset 0 0 30px rgba(0,0,0,0.4);
+    backdrop-filter: blur(12px);
+    text-align: center;
+    animation: cardAppear 0.6s ease-out;
+    position: relative;
+    overflow: hidden;
+}
+@keyframes cardAppear {
+    0% { transform: scale(0.3) rotateY(90deg); opacity: 0; }
+    50% { transform: scale(1.05) rotateY(0deg); opacity: 1; }
+    100% { transform: scale(1) rotateY(0deg); opacity: 1; }
+}
+
+.detail-card::before,
+.detail-card::after {
+    content: '';
+    position: absolute;
+    width: 24px; height: 24px;
+    border-color: var(--card-color, #FFD700);
+    border-style: solid;
+    opacity: 0.5;
+}
+.detail-card::before { top: 8px; left: 8px; border-width: 2px 0 0 2px; }
+.detail-card::after { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
+
+.detail-stars {
+    font-size: 1.4rem;
+    letter-spacing: 4px;
+    margin-bottom: 8px;
+    color: var(--card-color, #FFD700);
+    text-shadow: 0 0 10px var(--card-glow, rgba(255,215,0,0.5));
+}
+.detail-category {
+    font-size: 0.85rem;
+    color: var(--card-color, #FFD700);
+    opacity: 0.8;
+    margin-bottom: 16px;
+    letter-spacing: 6px;
+}
+.detail-character {
+    font-size: 7rem;
+    line-height: 1.1;
+    color: #FFF;
+    text-shadow:
+        0 0 30px var(--card-glow, rgba(255,215,0,0.6)),
+        0 0 60px var(--card-glow, rgba(255,215,0,0.3));
+    margin: 12px 0 20px;
+}
+.detail-divider {
+    width: 60%;
+    height: 1px;
+    margin: 0 auto 16px;
+    background: linear-gradient(90deg, transparent, var(--card-color, #FFD700), transparent);
+    opacity: 0.5;
+}
+.detail-phrase {
+    font-size: 1.4rem;
+    color: var(--card-color, #FFD700);
+    letter-spacing: 8px;
+    margin-bottom: 8px;
+    text-shadow: 0 0 12px var(--card-glow, rgba(255,215,0,0.4));
+}
+.detail-english {
+    font-size: 0.8rem;
+    color: rgba(255, 215, 0, 0.55);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+}
+.detail-tier {
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.35);
+    margin-top: 8px;
+}
+
+/* ============ COLLECTION PANEL ============ */
+#collection-panel {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 25;
+    display: none;
+    flex-direction: column;
+    background: rgba(10, 2, 2, 0.96);
+    overflow-y: auto;
+    padding: 24px 16px;
+}
+#collection-panel.visible { display: flex; }
+
+.collection-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+.collection-header h1 {
+    font-size: 2rem;
+    color: #FFD700;
+    letter-spacing: 8px;
+    text-shadow: 0 0 20px rgba(255,215,0,0.4);
+    font-family: "Zhi Mang Xing", serif;
+}
+.collection-header h2 {
+    font-size: 0.8rem;
+    color: rgba(255,215,0,0.4);
+    letter-spacing: 4px;
+    margin-top: 4px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-weight: normal;
+}
+
+.collection-progress {
+    margin-top: 12px;
+    text-align: center;
+    font-size: 0.9rem;
+    color: rgba(255,215,0,0.7);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.progress-bar {
+    width: 80%;
+    max-width: 300px;
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    margin: 8px auto 0;
+    overflow: hidden;
+}
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #FF2D2D, #FFD700);
+    transition: width 0.6s ease;
+    border-radius: 2px;
+}
+
+.collection-grid {
+    flex: 1;
+    padding: 0 8px;
+}
+
+.collection-category {
+    margin-bottom: 20px;
+}
+.collection-category-name {
+    font-size: 0.8rem;
+    letter-spacing: 3px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255,215,0,0.1);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.collection-chars {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.collection-char {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,215,0,0.12);
+    background: rgba(0,0,0,0.2);
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.collection-char.collected {
+    color: #FFD700;
+    text-shadow: 0 0 8px rgba(255,215,0,0.4);
+    border-color: rgba(255,215,0,0.25);
+}
+.collection-char.collected:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 16px rgba(255,215,0,0.3);
+}
+.collection-char.uncollected {
+    color: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.05);
+}
+.star-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    font-size: 7px;
+    padding: 1px 2px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.7);
+    line-height: 1;
+}
+.star-badge.s6 { color: #FF4500; }
+.star-badge.s5 { color: #A855F7; }
+.star-badge.s4 { color: #3B82F6; }
+.star-badge.s3 { color: #22C55E; }
+.star-badge.s2 { color: #94A3B8; }
+
+.collection-actions {
+    padding: 16px 0 24px;
+    text-align: center;
+}
