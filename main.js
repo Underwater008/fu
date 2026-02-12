@@ -691,7 +691,7 @@ function drawOverlayText(text, yFraction, color, alpha, size, fontOverride) {
     ctx.scale(dpr, dpr);
     const fontSize = size || Math.max(12, cellSize * 1.2);
     const font = fontOverride || '"Courier New", "SF Mono", monospace';
-    ctx.font = `${fontSize}px ${font}`;
+    ctx.font = `${fontSize}px ${font}, serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = color || CONFIG.glowGreen;
@@ -1299,16 +1299,35 @@ function renderDrawOverlay() {
 
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.font = `${fuSize}px ${chosenFont}, serif`;
+
+            // Font morphing: cycle through calligraphy fonts, accelerating as it rises
+            const morphSpeed = 1.2 + riseT * 4.5; // cycles per second, faster near top
+            const morphPhase = t * morphSpeed;
+            const fontCount = CALLI_FONTS.length;
+            const rawIdx = (morphPhase % fontCount + fontCount) % fontCount;
+            const fontA = Math.floor(rawIdx) % fontCount;
+            const fontB = (fontA + 1) % fontCount;
+            const crossFade = rawIdx - Math.floor(rawIdx); // 0→1 blend between A and B
 
             const intensity = 1 + riseT * 2.5;
-            ctx.globalAlpha = Math.min(1, 0.3 * intensity);
+
+            // Draw font A (fading out)
+            ctx.font = `${fuSize}px ${CALLI_FONTS[fontA]}, serif`;
+            ctx.globalAlpha = Math.min(1, 0.3 * intensity) * (1 - crossFade);
             ctx.shadowColor = CONFIG.glowGold;
             ctx.shadowBlur = fuSize * 0.2 * intensity;
             ctx.fillStyle = CONFIG.glowGold;
             ctx.fillText('\u798F', cx, cy);
+            ctx.globalAlpha = (1 - crossFade);
+            ctx.shadowBlur = fuSize * 0.08 * intensity;
+            ctx.fillText('\u798F', cx, cy);
 
-            ctx.globalAlpha = 1;
+            // Draw font B (fading in)
+            ctx.font = `${fuSize}px ${CALLI_FONTS[fontB]}, serif`;
+            ctx.globalAlpha = Math.min(1, 0.3 * intensity) * crossFade;
+            ctx.shadowBlur = fuSize * 0.2 * intensity;
+            ctx.fillText('\u798F', cx, cy);
+            ctx.globalAlpha = crossFade;
             ctx.shadowBlur = fuSize * 0.08 * intensity;
             ctx.fillText('\u798F', cx, cy);
         }
@@ -1381,7 +1400,7 @@ function updateFortune() {
         updateFireworkPhysics();
     }
     // Auto-cycle font when idle
-    if (!dajiFontTransition && stateTime > 6 && globalTime - dajiFontAutoTimer > DAJI_AUTO_INTERVAL) {
+    if (!dajiFontTransition && stateTime > 1.5 && globalTime - dajiFontAutoTimer > DAJI_AUTO_INTERVAL) {
         dajiFontAutoTimer = globalTime;
         cycleDajiFont(1);
     }
