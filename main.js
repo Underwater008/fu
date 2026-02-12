@@ -1435,8 +1435,8 @@ function renderDrawParticles3D(t) {
             r: Math.round(r),
             g: Math.round(g),
             b: Math.round(b),
-            alpha: alpha * (isMultiMode ? scaleFactor : 1.0),
-            size: size * (isMultiMode ? scaleFactor : 1.0),
+            alpha: alpha * (isMultiMode ? 0.35 : 1.0),
+            size: size * (isMultiMode ? 0.35 : 1.0),
             glow: 0.7,
             blur: 0.65,
         });
