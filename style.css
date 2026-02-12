@@ -23,50 +23,82 @@ canvas {
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 0 5vw 8vh;
+    padding: 0 20px 6vh;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
+    gap: 32px;
     align-items: center;
     z-index: 15;
     pointer-events: none; /* Let clicks pass through to canvas if not on buttons */
 }
 
-/* ============ 10-PULL BUTTON ============ */
-.btn-multi-pull {
+/* ============ MODE SWITCH TOGGLE ============ */
+.mode-switch {
     pointer-events: auto;
-    /* Position reset, controlled by flex container */
-    position: static;
-    padding: 14px 28px;
-    background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,165,0,0.1));
-    color: #FFD700;
-    border: 1.5px solid rgba(255,215,0,0.5);
-    border-radius: 12px;
-    font-size: 1.1rem;
-    font-weight: bold;
+    position: relative;
+    display: flex;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1.5px solid rgba(255, 215, 0, 0.4);
+    border-radius: 24px;
+    padding: 4px;
+    width: 140px;
+    height: 48px;
     cursor: pointer;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    letter-spacing: 3px;
-    text-shadow: 0 0 10px rgba(255,215,0,0.4);
-    box-shadow: 0 0 24px rgba(255,215,0,0.12), inset 0 0 12px rgba(255,215,0,0.03);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     transition: all 0.3s ease;
-    animation: multiPulse 2.5s ease-in-out infinite;
     opacity: 0;
     transform: translateY(20px);
     visibility: hidden;
 }
-.btn-multi-pull.visible {
+.mode-switch.visible {
     opacity: 1;
     transform: translateY(0);
     visibility: visible;
 }
-.btn-multi-pull:hover {
-    background: linear-gradient(135deg, rgba(255,215,0,0.3), rgba(255,165,0,0.2));
-    box-shadow: 0 0 36px rgba(255,215,0,0.25);
-    transform: translateY(-2px) scale(1.03);
+
+.switch-track {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    width: calc(50% - 4px);
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    border-radius: 20px;
+    transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+    z-index: 1;
 }
-@keyframes multiPulse {
-    0%, 100% { box-shadow: 0 0 24px rgba(255,215,0,0.12); }
-    50% { box-shadow: 0 0 36px rgba(255,215,0,0.25); }
+.mode-switch.multi .switch-track {
+    transform: translateX(100%);
+}
+
+.switch-option {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    color: rgba(255, 215, 0, 0.6);
+    font-size: 1.1rem;
+    font-weight: bold;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    transition: color 0.3s;
+    user-select: none;
+}
+.switch-option.active {
+    color: #8B0000; /* Dark red for contrast on gold */
+    text-shadow: none;
+}
+/* Ensure the inactive one stays gold */
+.mode-switch.multi .switch-option[data-mode="single"] {
+    color: rgba(255, 215, 0, 0.6);
+}
+.mode-switch.multi .switch-option[data-mode="multi"] {
+    color: #8B0000;
+}
+.mode-switch:not(.multi) .switch-option[data-mode="single"] {
+    color: #8B0000;
 }
 
 /* ============ COLLECTION FAB ============ */
@@ -343,14 +375,19 @@ canvas {
     display: none;
     flex-direction: column;
     background: rgba(10, 2, 2, 0.96);
-    overflow-y: auto;
-    padding: 24px 16px;
+    overflow: hidden; /* Prevent body scroll, handle inside grid */
+    padding: 0; /* Padding moved to children for full-height scroll area */
 }
 #collection-panel.visible { display: flex; }
 
 .collection-header {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 0; /* Margin moved to padding */
+    padding: 24px 16px 16px;
+    flex-shrink: 0;
+    background: rgba(10, 2, 2, 0.98);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 2;
 }
 .collection-header h1 {
     font-size: 2rem;
@@ -393,7 +430,9 @@ canvas {
 
 .collection-grid {
     flex: 1;
-    padding: 0 8px;
+    overflow-y: auto;
+    padding: 20px 16px;
+    -webkit-overflow-scrolling: touch;
 }
 
 .collection-category {
@@ -456,6 +495,10 @@ canvas {
 .star-badge.s2 { color: #94A3B8; }
 
 .collection-actions {
-    padding: 16px 0 24px;
+    flex-shrink: 0;
+    padding: 16px 0 32px;
     text-align: center;
+    background: rgba(10, 2, 2, 0.98);
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+    z-index: 2;
 }

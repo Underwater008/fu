@@ -821,8 +821,14 @@ function renderArrivalOverlay() {
         const decay = 1 - hopPhase / 0.9;
         hopOffset = -Math.abs(Math.sin(hopPhase / 0.9 * Math.PI * 3)) * 0.012 * decay;
     }
-    drawOverlayText('\u2191  \u4E0A\u6ED1\u62BD\u7B7E  \u2191', 0.88 + hopOffset, CONFIG.glowGold, hintFade * pulse, cellSize * 1.6);
-    drawOverlayText('Swipe Up to Draw Fortune', 0.92 + hopOffset, CONFIG.glowGold, hintFade * pulse, cellSize * 1.1);
+    
+    // Dynamic text based on mode
+    const isMulti = selectedMode === 'multi';
+    const mainText = isMulti ? '\u2191  \u4E0A\u6ED1\u5341\u8FDE  \u2191' : '\u2191  \u4E0A\u6ED1\u62BD\u7B7E  \u2191';
+    const subText = isMulti ? 'Swipe Up to Draw \u00D710' : 'Swipe Up to Draw Fortune';
+
+    drawOverlayText(mainText, 0.78 + hopOffset, CONFIG.glowGold, hintFade * pulse, cellSize * 1.6);
+    drawOverlayText(subText, 0.82 + hopOffset, CONFIG.glowGold, hintFade * pulse, cellSize * 1.1);
 }
 
 // ============================================================
@@ -1688,8 +1694,13 @@ function renderFortuneOverlay() {
     if (stateTime > 2.5) {
         const hintFade = Math.min(1, (stateTime - 2.5) / 0.5);
         const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;
-        drawOverlayText('\u2191 \u518D\u62BD\u4E00\u6B21 \u2191', 0.94, CONFIG.glowGold, hintFade * pulse, cellSize * 1.2);
-        drawOverlayText('Swipe Up to Draw Again', 0.97, CONFIG.glowGold, hintFade * pulse, cellSize * 0.9);
+        
+        const isMulti = selectedMode === 'multi';
+        const mainText = isMulti ? '\u2191 \u518D\u6765\u5341\u8FDE \u2191' : '\u2191 \u518D\u62BD\u4E00\u6B21 \u2191';
+        const subText = isMulti ? 'Swipe Up to Draw \u00D710' : 'Swipe Up to Draw Again';
+        
+        drawOverlayText(mainText, 0.94, CONFIG.glowGold, hintFade * pulse, cellSize * 1.2);
+        drawOverlayText(subText, 0.97, CONFIG.glowGold, hintFade * pulse, cellSize * 0.9);
     }
 }
 
@@ -2028,7 +2039,8 @@ function appendFireworksToGPU(startIdx) {
 // MULTI-PULL (10-pull) SYSTEM
 // ============================================================
 
-const btnMultiPull = document.getElementById('btn-multi-pull');
+// const btnMultiPull = document.getElementById('btn-multi-pull'); // Removed
+const modeSwitch = document.getElementById('mode-switch');
 const multiOverlay = document.getElementById('multi-overlay');
 const multiGrid = document.getElementById('multi-grid');
 const multiDetail = document.getElementById('multi-detail');
@@ -2036,6 +2048,25 @@ const detailCard = document.getElementById('detail-card');
 const btnMultiAgain = document.getElementById('btn-multi-again');
 const btnMultiSingle = document.getElementById('btn-multi-single');
 const btnMultiCollection = document.getElementById('btn-multi-collection');
+
+let selectedMode = 'single'; // 'single' or 'multi'
+
+if (modeSwitch) {
+    modeSwitch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectedMode = selectedMode === 'single' ? 'multi' : 'single';
+        updateModeSwitchUI();
+    });
+}
+
+function updateModeSwitchUI() {
+    if (!modeSwitch) return;
+    if (selectedMode === 'multi') {
+        modeSwitch.classList.add('multi');
+    } else {
+        modeSwitch.classList.remove('multi');
+    }
+}
 
 function startMultiPull() {
     multiDrawResults = performMultiDraw();
@@ -2117,18 +2148,7 @@ function hideMultiOverlay() {
     multiDetail.classList.remove('visible');
     isMultiMode = false;
     multiDrawResults = null;
-}
-
-// Multi-pull button click
-if (btnMultiPull) {
-    btnMultiPull.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (state === 'arrival' && fontsReady) {
-            startMultiPull();
-        } else if (state === 'fortune') {
-            startMultiPull();
-        }
-    });
+    // Don't reset selectedMode here, let user keep toggle preference
 }
 
 // Multi-overlay buttons
@@ -2144,8 +2164,11 @@ if (btnMultiSingle) {
     btnMultiSingle.addEventListener('click', (e) => {
         e.stopPropagation();
         hideMultiOverlay();
+        // Force single mode for this specific action
+        selectedMode = 'single';
+        updateModeSwitchUI();
+        
         isMultiMode = false;
-        // Reset and do single draw
         daji3DParticles = [];
         hoveredIdx = -1;
         if (particlesMesh) particlesMesh.count = 0;
@@ -2276,12 +2299,12 @@ function updateUIVisibility() {
     const collVisible = collectionPanel && collectionPanel.classList.contains('visible');
     const panelOpen = multiVisible || collVisible;
 
-    // Multi-pull button: visible in arrival and fortune, hidden during draw and when overlays are open
-    if (btnMultiPull) {
+    // Mode Switch: visible in arrival and fortune, hidden during draw and when overlays are open
+    if (modeSwitch) {
         if (!panelOpen && (state === 'arrival' || state === 'fortune') && fontsReady) {
-            btnMultiPull.classList.add('visible');
+            modeSwitch.classList.add('visible');
         } else {
-            btnMultiPull.classList.remove('visible');
+            modeSwitch.classList.remove('visible');
         }
     }
 
@@ -2395,16 +2418,25 @@ window.addEventListener('keydown', (e) => {
 
 function handleSwipeUp() {
     if (state === 'arrival' && fontsReady) {
-        isMultiMode = false;
-        changeState('draw');
+        if (selectedMode === 'multi') {
+            startMultiPull();
+        } else {
+            isMultiMode = false;
+            changeState('draw');
+        }
     } else if (state === 'fortune') {
         // Draw again loop
-        isMultiMode = false;
         daji3DParticles = [];
         hoveredIdx = -1;
         if (particlesMesh) particlesMesh.count = 0;
         hideTooltip();
-        changeState('draw');
+        
+        if (selectedMode === 'multi') {
+            startMultiPull();
+        } else {
+            isMultiMode = false;
+            changeState('draw');
+        }
     }
 }
 
