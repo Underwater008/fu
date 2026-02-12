@@ -887,7 +887,7 @@ function initDrawAnimation() {
             const r = Math.floor(idx / multiCols);
             fuEndScreenPositions.push({ x: startX + c * stepX, y: startY + r * stepY });
         } else {
-            fuEndScreenPositions.push({ x: window.innerWidth / 2, y: window.innerHeight * 0.22 });
+            fuEndScreenPositions.push({ x: window.innerWidth / 2, y: window.innerHeight * 0.20 });
         }
     });
 
@@ -919,7 +919,7 @@ function initDrawAnimation() {
             const tgt = drawTargets[i];
             const angle = Math.random() * Math.PI * 2;
             const scatterRadius = spread * (0.8 + Math.random() * 1.2);
-            const scatterLift = spread * (0.1 + Math.random() * 0.4);
+
 
             // Scatter center = where the 福 explodes (screen coords → world coords)
             const fuEnd = fuEndScreenPositions[idx];
@@ -934,7 +934,7 @@ function initDrawAnimation() {
                 startY: scatterOriginY,
                 startZ: 0,
                 scatterX: scatterOriginX + Math.cos(angle) * scatterRadius,
-                scatterY: scatterOriginY + Math.sin(angle) * scatterRadius * 0.6 + scatterLift,
+                scatterY: scatterOriginY + Math.sin(angle) * scatterRadius * 0.6,
                 scatterZ: (Math.random() - 0.5) * depth * 1.6,
                 targetX: tgt.x,
                 targetY: tgt.y,
@@ -1014,7 +1014,7 @@ function updateDraw() {
                 cy = curY2D - window.innerHeight / 2; // +y is down on screen, +y is down in world logic here
 
             } else {
-                const fuRow = lerp(rows * 0.5, rows * 0.22, launchT);
+                const fuRow = lerp(rows * 0.5, rows * 0.20, launchT);
                 const fuCol = cols / 2;
                 const fuPos = gridToWorld(fuCol, fuRow);
                 cx = fuPos.x;
@@ -1054,7 +1054,7 @@ function updateDraw() {
                 const st = (t - DRAW_LAUNCH) / (DRAW_SCATTER - DRAW_LAUNCH);
                 const eased = 1 - Math.pow(1 - st, 2);
                 p.x = lerp(p.startX, p.scatterX, eased);
-                p.y = lerp(p.startY, p.scatterY, eased) + eased * cellSize * 6.0;
+                p.y = lerp(p.startY, p.scatterY, eased);
                 p.z = lerp(p.startZ, p.scatterZ, eased);
 
                 const wobble = st * cellSize * 0.8;
@@ -1071,7 +1071,7 @@ function updateDraw() {
                 const st = (t - DRAW_SCATTER) / (DRAW_REFORM - DRAW_SCATTER);
                 const eased = easeInOut(st);
                 p.x = lerp(p.scatterX, p.targetX, eased);
-                p.y = lerp(p.scatterY + cellSize * 6.0, p.targetY, eased);
+                p.y = lerp(p.scatterY, p.targetY, eased);
                 p.z = lerp(p.scatterZ, p.targetZ, eased);
                 const wobble = (1 - eased) * cellSize * 0.8;
                 p.x += Math.sin(p.phase + globalTime * 4) * wobble;
@@ -1294,7 +1294,7 @@ function renderDrawOverlay() {
                 const baseSize = vmin * 0.55;
                 fuSize = baseSize * lerp(1, DRAW_SHRINK_END_SCALE, shrinkEased);
                 cx = window.innerWidth / 2;
-                cy = window.innerHeight * lerp(0.5, 0.22, riseEased);
+                cy = window.innerHeight * lerp(0.5, 0.20, riseEased);
             }
 
             ctx.textAlign = 'center';
