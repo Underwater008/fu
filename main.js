@@ -1319,6 +1319,7 @@ function updateDraw() {
     if (t >= DRAW_SETTLE + 0.3) {
         if (isMultiMode) {
             // Multi-mode: no particle seeding needed, go straight to DOM overlay
+            console.log('[draw→fortune] Multi-mode transition, multiDrawResults:', multiDrawResults?.length);
             daji3DParticles = [];
             if (particlesMesh) particlesMesh.count = 0;
             drawToFortuneSeed = null;
@@ -1636,6 +1637,10 @@ function updateFortune() {
     if (!dajiFontTransition && stateTime > 1.5 && globalTime - dajiFontAutoTimer > DAJI_AUTO_INTERVAL) {
         dajiFontAutoTimer = globalTime;
         cycleDajiFont(1);
+    }
+    // Safety: ensure multi-mode overlay is shown
+    if (isMultiMode && multiDrawResults && multiDrawResults.length > 1 && !multiFlipState && stateTime > 0.1) {
+        showMultiCardsWithFlip(multiDrawResults);
     }
 }
 
@@ -2403,6 +2408,7 @@ function hideHoverDetail() {
 }
 
 function showMultiCardsWithFlip(draws) {
+    console.log('[showMultiCardsWithFlip] Called with', draws?.length, 'draws, multiOverlay:', !!multiOverlay, 'multiGrid:', !!multiGrid);
     if (!draws || !draws.length) return;
 
     multiFlipState = { revealedCount: 0, cardElements: [] };
@@ -2548,6 +2554,7 @@ function hideMultiDetail() {
 }
 
 function hideMultiOverlay() {
+    console.log('[hideMultiOverlay] Called, stack:', new Error().stack?.split('\n').slice(1, 3).join(' | '));
     multiOverlay.classList.remove('visible');
     multiDetail.classList.remove('visible');
     hideHoverDetail();
@@ -2983,45 +2990,54 @@ function handleSwipeUp() {
 const startTime = performance.now();
 
 function frame(now) {
-    globalTime = (now - startTime) / 1000;
-    stateTime = globalTime - stateStartGlobal;
+    try {
+        globalTime = (now - startTime) / 1000;
+        stateTime = globalTime - stateStartGlobal;
 
-    clearGrid();
+        clearGrid();
 
-    switch (state) {
-        case 'arrival':  updateArrival(); break;
-        case 'draw':     updateDraw(); break;
-        case 'fortune':  updateFortune(); break;
-    }
-
-    // Camera follow during draw launch
-    let camShift = 0;
-    if (state === 'draw') {
-        if (stateTime < DRAW_LAUNCH) {
-            if (stateTime < DRAW_CAMERA_PULLBACK) {
-                const pullbackT = Math.min(1, stateTime / Math.max(0.001, DRAW_CAMERA_PULLBACK));
-                camShift = -easeInOut(pullbackT) * cellSize * 3;
-            } else {
-                camShift = -cellSize * 3;
-            }
-        } else {
-            const returnT = Math.min(1, (stateTime - DRAW_LAUNCH) / Math.max(0.001, DRAW_CAMERA_RETURN));
-            camShift = -(1 - easeInOut(returnT)) * cellSize * 3;
+        switch (state) {
+            case 'arrival':  updateArrival(); break;
+            case 'draw':     updateDraw(); break;
+            case 'fortune':  updateFortune(); break;
         }
-        offsetY += camShift;
-    }
 
-    renderGrid();
+        // Camera follow during draw launch
+        let camShift = 0;
+        if (state === 'draw') {
+            if (stateTime < DRAW_LAUNCH) {
+                if (stateTime < DRAW_CAMERA_PULLBACK) {
+                    const pullbackT = Math.min(1, stateTime / Math.max(0.001, DRAW_CAMERA_PULLBACK));
+                    camShift = -easeInOut(pullbackT) * cellSize * 3;
+                } else {
+                    camShift = -cellSize * 3;
+                }
+            } else {
+                const returnT = Math.min(1, (stateTime - DRAW_LAUNCH) / Math.max(0.001, DRAW_CAMERA_RETURN));
+                camShift = -(1 - easeInOut(returnT)) * cellSize * 3;
+            }
+            offsetY += camShift;
+        }
 
-    if (camShift !== 0) offsetY -= camShift;
+        renderGrid();
 
-    // Reset particle count
-    if (particlesMesh) particlesMesh.count = 0;
+        if (camShift !== 0) offsetY -= camShift;
 
-    switch (state) {
-        case 'arrival':  renderArrivalOverlay(); break;
-        case 'draw':     renderDrawOverlay(); break;
-        case 'fortune':  renderFortuneOverlay(); break;
+        // Reset particle count
+        if (particlesMesh) particlesMesh.count = 0;
+
+        switch (state) {
+            case 'arrival':  renderArrivalOverlay(); break;
+            case 'draw':     renderDrawOverlay(); break;
+            case 'fortune':  renderFortuneOverlay(); break;
+        }
+    } catch (err) {
+        console.error('[frame error]', err);
+        // Safety: if draw crashed, force transition to fortune for multi-mode
+        if (state === 'draw' && isMultiMode && multiDrawResults) {
+            console.warn('[safety] Forcing transition to fortune after draw error');
+            changeState('fortune');
+        }
     }
 
     requestAnimationFrame(frame);
