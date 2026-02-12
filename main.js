@@ -70,7 +70,7 @@ const FONT_DISPLAY_NAMES = [
 const chosenFont = CALLI_FONTS[Math.floor(Math.random() * CALLI_FONTS.length)];
 
 // --- Daji title font cycling ---
-let dajiFontIdx = 0;
+let dajiFontIdx = 2; // Start with Ma Shan Zheng
 let dajiFontTransition = null; // { oldFont, startTime }
 let dajiFontAutoTimer = 0;
 const DAJI_AUTO_INTERVAL = 4.5;
@@ -181,12 +181,12 @@ function initThreeJS() {
         '\u00B7',
     ]);
 
-    actx.font = `bold ${Math.floor(CELL_PX * 0.7)}px "Courier New", "SF Mono", monospace`;
+    actx.font = `${Math.floor(CELL_PX * 0.65)}px "Courier New", "SF Mono", monospace`;
     actx.textAlign = 'center';
     actx.textBaseline = 'middle';
     actx.fillStyle = '#FFFFFF';
     actx.shadowColor = 'white';
-    actx.shadowBlur = CELL_PX * 0.12;
+    actx.shadowBlur = CELL_PX * 0.05;
 
     let idx = 0;
     uniqueChars.forEach(char => {
@@ -303,7 +303,7 @@ function sampleCharacterShape(char, resolution, fontOverride) {
         for (let x = 0; x < w; x += step) {
             const idx = (y * w + x) * 4;
             const brightness = data[idx] / 255;
-            if (brightness > 0.1) {
+            if (brightness > 0.35) {
                 points.push({
                     nx: (x / w) * 2 - 1,
                     ny: (y / h) * 2 - 1,
@@ -383,11 +383,11 @@ function initDaji3D(seedParticles) {
         const color = lerpColor(lum);
 
         daji3DParticles.push({
-            baseX: pt.nx * spread * 0.5 * pt.aspect,
-            baseY: pt.ny * spread * 0.5,
+            baseX: pt.nx * spread * 0.6 * pt.aspect,
+            baseY: pt.ny * spread * 0.6,
             origZ: (Math.random() - 0.5) * depth,
             char,
-            fontIdx: Math.random() < 0.7 ? Math.floor(Math.random() * CALLI_FONTS.length) : null,
+            fontIdx: null,
             r: color.r, g: color.g, b: color.b,
             alpha: 0.3 + lum * 0.7,
             lum,
@@ -909,8 +909,8 @@ function initDrawAnimation() {
         const depth = spread * 0.4;
         
         const drawTargets = shape.map(pt => ({
-            x: pt.nx * spread * 0.5 * pt.aspect + targetCenterX,
-            y: pt.ny * spread * 0.5 + targetCenterY,
+            x: pt.nx * spread * 0.6 * pt.aspect + targetCenterX,
+            y: pt.ny * spread * 0.6 + targetCenterY,
             z: (Math.random() - 0.5) * depth,
             brightness: pt.brightness,
         }));
@@ -944,7 +944,7 @@ function initDrawAnimation() {
                 finalChar: selectCharByLuminance(tgt.brightness),
                 brightness: tgt.brightness,
                 phase: Math.random() * Math.PI * 2,
-                fontIdx: Math.random() < 0.7 ? Math.floor(Math.random() * CALLI_FONTS.length) : null,
+                fontIdx: null, // Use monospace for uniform spacing in reformed cluster
                 active: false,
                 drawIndex: idx // Keep track which character this belongs to
             });
