@@ -229,7 +229,7 @@ function initThreeJS() {
     atlasTexture.minFilter = THREE.LinearFilter;
 
     // 5. InstancedMesh
-    const MAX_PARTICLES = 4000;
+    const MAX_PARTICLES = 10000;
     const geometry = new THREE.PlaneGeometry(1, 1);
     const material = new THREE.ShaderMaterial({
         uniforms: {
@@ -837,6 +837,7 @@ function renderArrivalOverlay() {
 let morphParticles = [];
 let launchTrail = [];
 let burstFlash = 0;
+let fuEndScreenPositions = []; // screen-coord positions where each 福 ends up before exploding
 
 const DRAW_LAUNCH = CONFIG.fuExplodeDelay;
 const DRAW_RISE = CONFIG.fuRiseDuration;
@@ -852,6 +853,7 @@ function initDrawAnimation() {
     morphParticles = [];
     launchTrail = [];
     burstFlash = 0;
+    fuEndScreenPositions = [];
     drawToFortuneSeed = null;
     if (!fontsReady) return;
 
@@ -863,19 +865,14 @@ function initDrawAnimation() {
         saveToCollection(currentDrawResult);
         drawsToAnimate = [currentDrawResult];
     } else {
-        // Multi-mode: currentDrawResult is already set to the *best* result for UI purposes
-        // but we want to animate all of them.
         drawsToAnimate = multiDrawResults;
     }
 
     // Grid layout configuration for 10x
     const multiCols = 5;
     const multiRows = 2;
-    // Scale down characters in multi-mode so they fit
-    const scaleFactor = isMultiMode ? 0.45 : 1.0; 
+    const scaleFactor = isMultiMode ? 0.45 : 1.0;
 
-    // Calculate grid centers if multi-mode
-    // We'll center the 5x2 grid on screen
     const gridW = window.innerWidth * 0.8;
     const gridH = window.innerHeight * 0.5;
     const startX = (window.innerWidth - gridW) / 2 + (gridW / multiCols) / 2;
@@ -883,46 +880,29 @@ function initDrawAnimation() {
     const stepX = gridW / multiCols;
     const stepY = gridH / multiRows;
 
+    // Pre-compute where each 福 ends up (screen coords) before exploding
     drawsToAnimate.forEach((drawRes, idx) => {
-        // 1. Calculate target center for this character
+        if (isMultiMode) {
+            const c = idx % multiCols;
+            const r = Math.floor(idx / multiCols);
+            fuEndScreenPositions.push({ x: startX + c * stepX, y: startY + r * stepY });
+        } else {
+            fuEndScreenPositions.push({ x: window.innerWidth / 2, y: window.innerHeight * 0.22 });
+        }
+    });
+
+    drawsToAnimate.forEach((drawRes, idx) => {
+        // 1. Target center = where the reformed character forms (world coords, 0,0 = screen center)
         let targetCenterX = 0;
         let targetCenterY = 0;
 
         if (isMultiMode) {
-            const c = idx % multiCols;
-            const r = Math.floor(idx / multiCols);
-            targetCenterX = startX + c * stepX - window.innerWidth / 2; // relative to center 0,0?
-            // Wait, gridToWorld returns coords relative to center if we look at `project3D`?
-            // No, gridToWorld uses `offsetX` which is top-left based.
-            // Let's stick to world coordinates where (0,0) is center of screen for 3D projection?
-            // Checking project3D: screenX = x * scale + window.innerWidth / 2
-            // So x=0 is center.
-            targetCenterX = (startX + c * stepX) - window.innerWidth / 2;
-            targetCenterY = (startY + r * stepY) - window.innerHeight / 2;
-            // Invert Y because 3D Y is up?
-            // In renderGrid, y increases downwards (canvas coords).
-            // In renderAndCompositeGL, it uses particlesMesh.
-            // In updateDraw: p.y = lerp(..., targetY). 
-            // project3D: screenY = y * scale + height/2.
-            // If y is positive, screenY is > height/2 (down). So +y is down in this system?
-            // Let's check `gridToWorld`: y = (row - rows/2) * cellSize. 
-            // If row increases, y increases. 
-            // So Yes, +y is down.
-            
-        } else {
-            // Single draw center (slightly above center usually)
-            // Original code: tgt.x/y were based on shape centered at 0,0
-            // but `morphParticles` logic didn't add an offset for single draw 
-            // implying 0,0 is the center.
-            targetCenterX = 0;
-            targetCenterY = 0; 
+            targetCenterX = fuEndScreenPositions[idx].x - window.innerWidth / 2;
+            targetCenterY = fuEndScreenPositions[idx].y - window.innerHeight / 2;
         }
 
-        // 2. Sample shape
-        // We use a simpler font sampling for multi-draw to save perf? Or same?
-        // Let's use same but maybe lower resolution if needed. 
-        // 80 is high, maybe 60 for multi?
-        const res = isMultiMode ? 50 : 80; 
+        // 2. Sample shape — fewer particles per char to reduce density
+        const res = isMultiMode ? 30 : 50;
         const shape = sampleCharacterShape(drawRes.char, res, chosenFont);
 
         const spread = Math.min(cols, rows) * 0.40 * cellSize * scaleFactor;
@@ -935,39 +915,16 @@ function initDrawAnimation() {
             brightness: pt.brightness,
         }));
 
-        // Burst origin - separate for each if multi? or all from center?
-        // "10 fu shooting up" -> implies 10 origins.
-        // Let's make them start from bottom screen, distributed horizontally.
-        const launchX = isMultiMode 
-            ? (window.innerWidth * 0.2 + (idx / (drawsToAnimate.length - 1)) * window.innerWidth * 0.6) - window.innerWidth/2
-            : gridToWorld(cols / 2, rows * 0.22).x; // Keep original single draw origin logic? 
-            // Wait, original: gridToWorld(cols/2, rows * 0.22). 
-            // rows*0.22 is top part of screen? 
-            // gridToWorld(0,0) is top left.
-            // rows*0.5 is center.
-            // rows*0.22 is top.
-            // So single draw bursts from top??
-            // Ah, `updateDraw` logic: `fuRow = lerp(rows * 0.5, rows * 0.22, launchT)`.
-            // It rises from center (0.5) to top (0.22).
-        
-        // For multi: Let's have them rise from bottom (rows * 0.8) to their target Y.
-        const originX = launchX;
-        const originY = isMultiMode ? (rows * 0.5 * cellSize) : (rows * 0.22 * cellSize); 
-        // Using world units. gridToWorld returns (col - cols/2)*size.
-        
-        // Let's simplify launch origin.
-        // Single mode: starts at center, rises to top-ish, then bursts.
-        // Multi mode: 10 trails start from bottom, rise to their grid positions.
-        
         for (let i = 0; i < drawTargets.length; i++) {
             const tgt = drawTargets[i];
             const angle = Math.random() * Math.PI * 2;
             const scatterRadius = spread * (0.8 + Math.random() * 1.2);
-            const scatterLift = spread * (0.1 + Math.random() * 0.4);
+            const scatterLift = -spread * (0.1 + Math.random() * 0.4);
 
-            // For multi-mode, scatter center should be the target center
-            const scatterOriginX = targetCenterX;
-            const scatterOriginY = targetCenterY;
+            // Scatter center = where the 福 explodes (screen coords → world coords)
+            const fuEnd = fuEndScreenPositions[idx];
+            const scatterOriginX = fuEnd.x - window.innerWidth / 2;
+            const scatterOriginY = fuEnd.y - window.innerHeight / 2;
 
             morphParticles.push({
                 x: scatterOriginX, // Initial burst pos
@@ -1097,7 +1054,7 @@ function updateDraw() {
                 const st = (t - DRAW_LAUNCH) / (DRAW_SCATTER - DRAW_LAUNCH);
                 const eased = 1 - Math.pow(1 - st, 2);
                 p.x = lerp(p.startX, p.scatterX, eased);
-                p.y = lerp(p.startY, p.scatterY, eased) + eased * cellSize * 6.0;
+                p.y = lerp(p.startY, p.scatterY, eased) + eased * cellSize * 1.5;
                 p.z = lerp(p.startZ, p.scatterZ, eased);
 
                 const wobble = st * cellSize * 0.8;
@@ -1114,7 +1071,7 @@ function updateDraw() {
                 const st = (t - DRAW_SCATTER) / (DRAW_REFORM - DRAW_SCATTER);
                 const eased = easeInOut(st);
                 p.x = lerp(p.scatterX, p.targetX, eased);
-                p.y = lerp(p.scatterY + cellSize * 6.0, p.targetY, eased);
+                p.y = lerp(p.scatterY + cellSize * 1.5, p.targetY, eased);
                 p.z = lerp(p.scatterZ, p.targetZ, eased);
                 const wobble = (1 - eased) * cellSize * 0.8;
                 p.x += Math.sin(p.phase + globalTime * 4) * wobble;
@@ -1337,7 +1294,7 @@ function renderDrawOverlay() {
                 const baseSize = vmin * 0.55;
                 fuSize = baseSize * lerp(1, DRAW_SHRINK_END_SCALE, shrinkEased);
                 cx = window.innerWidth / 2;
-                cy = window.innerHeight * lerp(0.5, 0.2, riseEased);
+                cy = window.innerHeight * lerp(0.5, 0.22, riseEased);
             }
 
             ctx.textAlign = 'center';
@@ -1360,34 +1317,40 @@ function renderDrawOverlay() {
         ctx.restore();
     }
 
-    // Burst flash — scaled by rarity
+    // Burst flash — one per 福, at each 福's end position
     if (burstFlash > 0) {
         ctx.save();
         ctx.scale(dpr, dpr);
-        // Multi mode burst center? Just do screen center for impact
-        const bx = window.innerWidth / 2;
-        const by = window.innerHeight * (isMultiMode ? 0.5 : 0.22);
-        
-        const rarityScale = currentDrawResult
-            ? (0.2 + currentDrawResult.rarity.stars * 0.05)
-            : 0.4;
-        const radius = Math.min(window.innerWidth, window.innerHeight) * rarityScale * burstFlash * (isMultiMode ? 1.5 : 1);
 
-        // Use category color for some burst glow if available
-        let burstR = 255, burstG = 255, burstB = 220;
-        if (currentDrawResult) {
-            const cat = currentDrawResult.category;
-            burstR = Math.floor(lerp(255, cat.r, 0.3));
-            burstG = Math.floor(lerp(255, cat.g, 0.3));
-            burstB = Math.floor(lerp(220, cat.b, 0.3));
+        const draws = window.currentDrawsList || [currentDrawResult];
+        for (let i = 0; i < fuEndScreenPositions.length; i++) {
+            const pos = fuEndScreenPositions[i];
+            const draw = draws[i] || currentDrawResult;
+            const bx = pos.x;
+            const by = pos.y;
+
+            const rarityScale = draw
+                ? (0.2 + draw.rarity.stars * 0.05)
+                : 0.4;
+            const baseRadius = Math.min(window.innerWidth, window.innerHeight) * rarityScale * burstFlash;
+            const radius = isMultiMode ? baseRadius * 0.5 : baseRadius;
+
+            let burstR = 255, burstG = 255, burstB = 220;
+            if (draw) {
+                const cat = draw.category;
+                burstR = Math.floor(lerp(255, cat.r, 0.3));
+                burstG = Math.floor(lerp(255, cat.g, 0.3));
+                burstB = Math.floor(lerp(220, cat.b, 0.3));
+            }
+
+            const gradient = ctx.createRadialGradient(bx, by, 0, bx, by, radius);
+            gradient.addColorStop(0, `rgba(${burstR}, ${burstG}, ${burstB}, ${burstFlash * 0.8})`);
+            gradient.addColorStop(0.4, `rgba(${burstR}, ${burstG}, ${Math.floor(burstB * 0.8)}, ${burstFlash * 0.4})`);
+            gradient.addColorStop(1, `rgba(${burstR}, ${burstG}, 0, 0)`);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
         }
 
-        const gradient = ctx.createRadialGradient(bx, by, 0, bx, by, radius);
-        gradient.addColorStop(0, `rgba(${burstR}, ${burstG}, ${burstB}, ${burstFlash * 0.8})`);
-        gradient.addColorStop(0.4, `rgba(${burstR}, ${burstG}, ${Math.floor(burstB * 0.8)}, ${burstFlash * 0.4})`);
-        gradient.addColorStop(1, `rgba(${burstR}, ${burstG}, 0, 0)`);
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
         ctx.restore();
     }
 }
