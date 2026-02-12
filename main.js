@@ -462,7 +462,7 @@ function updateDajiToGPU(skipRender) {
         const uv = (p.fontIdx != null && charToUV[p.char + '|' + p.fontIdx]) || charToUV[p.char];
         if (uv) instUV.setXY(i, uv.u, uv.v);
 
-        let scale = cellSize * 0.65;
+        let scale = cellSize * 0.85;
         if (isHovered) scale *= 2.2;
         instScale.setX(i, scale);
     }
