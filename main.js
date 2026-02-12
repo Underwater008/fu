@@ -158,6 +158,28 @@ function getClusterSpread() {
     return baseSpread;
 }
 
+// Responsive grid layout for multi-pull (portrait 2×5, landscape 5×2)
+function getMultiGridLayout() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const portrait = !isLandscape();
+    const multiCols = portrait ? 2 : 5;
+    const multiRows = portrait ? 5 : 2;
+    const gridW = w * (portrait ? 0.90 : 0.85);
+    const gridH = h * (portrait ? 0.62 : 0.55);
+    const scaleFactor = portrait ? 0.38 : 0.35;
+    // Shift grid upward slightly in portrait to leave room for buttons at bottom
+    const gridTopY = portrait ? h * 0.06 : (h - gridH) / 2;
+    const startX = (w - gridW) / 2 + (gridW / multiCols) / 2;
+    const startY = gridTopY + (gridH / multiRows) / 2;
+    const stepX = gridW / multiCols;
+    const stepY = gridH / multiRows;
+    const cardW = stepX - 8;
+    const cardH = stepY - 8;
+    const gridBottom = gridTopY + gridH;
+    return { multiCols, multiRows, gridW, gridH, startX, startY, stepX, stepY, cardW, cardH, scaleFactor, gridBottom };
+}
+
 // Responsive layout params for fortune/arrival overlay text positions
 function getLayout() {
     if (isLandscape()) {
@@ -402,6 +424,7 @@ let currentDrawResult = null;
 let multiDrawResults = null;
 let isMultiMode = false;
 let multiFlipState = null; // { revealedCount, cardElements[] }
+let multiFortuneState = null; // Canvas-integrated multi fortune display
 
 // Force-load all calligraphy fonts with ALL characters used in the app
 const ALL_FONT_CHARS = ALL_LUCKY + '\u00B7\u4E00\u4EBA\u5341\u5927';
@@ -807,6 +830,34 @@ function drawCardAt(cx, cy, cw, ch, alpha, borderColor, fillColor) {
     ctx.restore();
 }
 
+// Lightweight card rect (no blur pass) — for 10-card multi-fortune grid
+function drawMultiCardRect(cx, cy, cw, ch, alpha, borderColor, fillColor) {
+    const cardX = cx - cw / 2;
+    const cardY = cy - ch / 2;
+    const r = 8;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.moveTo(cardX + r, cardY);
+    ctx.lineTo(cardX + cw - r, cardY);
+    ctx.quadraticCurveTo(cardX + cw, cardY, cardX + cw, cardY + r);
+    ctx.lineTo(cardX + cw, cardY + ch - r);
+    ctx.quadraticCurveTo(cardX + cw, cardY + ch, cardX + cw - r, cardY + ch);
+    ctx.lineTo(cardX + r, cardY + ch);
+    ctx.quadraticCurveTo(cardX, cardY + ch, cardX, cardY + ch - r);
+    ctx.lineTo(cardX, cardY + r);
+    ctx.quadraticCurveTo(cardX, cardY, cardX + r, cardY);
+    ctx.closePath();
+    ctx.fillStyle = fillColor || 'rgba(80, 10, 10, 0.5)';
+    ctx.fill();
+    ctx.strokeStyle = borderColor || 'rgba(255, 215, 0, 0.15)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+}
+
 function drawCard(yTop, yBottom, alpha, widthFraction) {
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -957,11 +1008,11 @@ function changeState(newState) {
     }
     if (newState === 'fortune') {
         if (isMultiMode) {
-            // Multi-mode: skip particles, show DOM overlay instead
-            daji3DParticles = [];
-            if (particlesMesh) particlesMesh.count = 0;
+            // Multi-mode: seed particles from morph (seamless transition)
+            buildMultiDajiFromMorph();
             drawToFortuneSeed = null;
-            multiFlipState = null; // Will be initialized by renderMultiFortuneDOM
+            multiFlipState = null;
+            initMultiFortuneState();
             // Clear fireworks
             fwShells.length = 0;
             fwTrail.length = 0;
@@ -1074,17 +1125,16 @@ function initDrawAnimation() {
         drawsToAnimate = multiDrawResults;
     }
 
-    // Grid layout configuration for 10x
-    const multiCols = 5;
-    const multiRows = 2;
-    const scaleFactor = isMultiMode ? 0.35 : 1.0;
+    // Grid layout configuration for 10x (responsive: portrait 2×5, landscape 5×2)
+    const grid = getMultiGridLayout();
+    const multiCols = grid.multiCols;
+    const multiRows = grid.multiRows;
+    const scaleFactor = isMultiMode ? grid.scaleFactor : 1.0;
 
-    const gridW = window.innerWidth * 0.85;
-    const gridH = window.innerHeight * 0.55;
-    const startX = (window.innerWidth - gridW) / 2 + (gridW / multiCols) / 2;
-    const startY = (window.innerHeight - gridH) / 2 + (gridH / multiRows) / 2;
-    const stepX = gridW / multiCols;
-    const stepY = gridH / multiRows;
+    const startX = grid.startX;
+    const startY = grid.startY;
+    const stepX = grid.stepX;
+    const stepY = grid.stepY;
 
     // Pre-compute where each 福 ends up (screen coords) before exploding
     drawsToAnimate.forEach((drawRes, idx) => {
@@ -1181,28 +1231,21 @@ function updateDraw() {
     if (t < DRAW_LAUNCH) {
         const riseT = Math.min(1, t / Math.max(0.001, DRAW_RISE));
         const launchT = easeInOut(riseT);
-        
+
         const draws = window.currentDrawsList || [currentDrawResult];
         const count = draws.length;
 
-        // Grid config for multi (same as renderDrawOverlay)
-        const multiCols = 5;
-        const multiRows = 2;
-        const gridW = window.innerWidth * 0.8;
-        const gridH = window.innerHeight * 0.5;
-        const startX = (window.innerWidth - gridW) / 2 + (gridW / multiCols) / 2;
-        const startY = (window.innerHeight - gridH) / 2 + (gridH / multiRows) / 2;
-        const stepX = gridW / multiCols;
-        const stepY = gridH / multiRows;
+        // Grid config for multi — use responsive layout
+        const grid = getMultiGridLayout();
 
         for (let i = 0; i < count; i++) {
             let cx, cy;
             // Calculate current position of the "Fu"
             if (count > 1) {
-                const c = i % multiCols;
-                const r = Math.floor(i / multiCols);
-                const targetX = startX + c * stepX;
-                const targetY = startY + r * stepY;
+                const c = i % grid.multiCols;
+                const r = Math.floor(i / grid.multiCols);
+                const targetX = grid.startX + c * grid.stepX;
+                const targetY = grid.startY + r * grid.stepY;
                 const originX = window.innerWidth * 0.2 + (i / (count - 1)) * window.innerWidth * 0.6;
                 const originY = window.innerHeight * 0.9;
                 
@@ -1318,10 +1361,7 @@ function updateDraw() {
 
     if (t >= DRAW_SETTLE + 0.3) {
         if (isMultiMode) {
-            // Multi-mode: no particle seeding needed, go straight to DOM overlay
-            console.log('[draw→fortune] Multi-mode transition, multiDrawResults:', multiDrawResults?.length);
-            daji3DParticles = [];
-            if (particlesMesh) particlesMesh.count = 0;
+            // Multi-mode: particles will be seeded in changeState via buildMultiDajiFromMorph
             drawToFortuneSeed = null;
             changeState('fortune');
         } else {
@@ -1355,6 +1395,632 @@ function buildDajiSeedFromMorph() {
         });
     }
     return seeded;
+}
+
+// ============================================================
+// MULTI-FORTUNE: Canvas-integrated particle + card system
+// ============================================================
+
+function buildMultiDajiFromMorph() {
+    daji3DParticles = [];
+    daji3DFromSeed = true;
+    daji3DEntryTime = globalTime;
+
+    let activeCount = 0;
+    for (const p of morphParticles) {
+        if (!p.active) continue;
+        activeCount++;
+        const lum = Math.min(1, p.brightness + 0.08);
+        const char = p.finalChar || selectCharByLuminance(lum);
+        if (char === ' ') continue;
+        const color = lerpColor(lum);
+        daji3DParticles.push({
+            baseX: p.targetX,
+            baseY: p.targetY,
+            origZ: p.targetZ,
+            char,
+            fontIdx: p.fontIdx,
+            r: color.r,
+            g: color.g,
+            b: color.b,
+            alpha: 0.3 + lum * 0.7,
+            lum,
+            phase: p.phase,
+            drawIndex: p.drawIndex,
+            // Reveal animation state
+            fadingOut: false,
+            fadeStartTime: 0,
+            burstVx: 0,
+            burstVy: 0,
+        });
+    }
+    console.log(`[buildMultiDajiFromMorph] morphParticles: ${morphParticles.length}, active: ${activeCount}, daji3DParticles: ${daji3DParticles.length}`);
+}
+
+function initMultiFortuneState() {
+    const grid = getMultiGridLayout();
+
+    const cards = [];
+    for (let i = 0; i < multiDrawResults.length; i++) {
+        const c = i % grid.multiCols;
+        const r = Math.floor(i / grid.multiCols);
+        cards.push({
+            draw: multiDrawResults[i],
+            centerX: grid.startX + c * grid.stepX,
+            centerY: grid.startY + r * grid.stepY,
+            cardW: grid.cardW,
+            cardH: grid.cardH,
+            revealed: false,
+            revealTime: 0,
+        });
+    }
+
+    multiFortuneState = {
+        cards,
+        revealedCount: 0,
+        allRevealedTime: 0,
+        burstParticles: [],
+    };
+
+    // Position floating action buttons below the card grid
+    const actionsEl = document.getElementById('multi-fortune-actions');
+    if (actionsEl) {
+        const bottomSpace = window.innerHeight - grid.gridBottom;
+        actionsEl.style.bottom = Math.max(10, bottomSpace * 0.1) + 'px';
+    }
+}
+
+function updateMultiDajiToGPU(skipRender) {
+    if (!particlesMesh) return 0;
+    if (!daji3DParticles.length) {
+        particlesMesh.count = 0;
+        return 0;
+    }
+
+    const scaleFactor = getMultiGridLayout().scaleFactor;
+    const spread = getClusterSpread() * scaleFactor;
+    const entryT = Math.min(1, (globalTime - daji3DEntryTime) / 0.6);
+    const breatheAmp = spread * 0.06;
+
+    const instColor = particlesMesh.geometry.attributes.instanceColor;
+    const instAlpha = particlesMesh.geometry.attributes.instanceAlpha;
+    const instUV = particlesMesh.geometry.attributes.instanceUV;
+    const instScale = particlesMesh.geometry.attributes.instanceScale;
+
+    const maxCount = instColor.count;
+    const count = Math.min(daji3DParticles.length, maxCount);
+
+    const clusterH = spread * 0.5;
+    const highlightPos = Math.sin(globalTime * 0.8) * 0.3;
+
+    let visibleCount = 0;
+    for (let i = 0; i < count; i++) {
+        const p = daji3DParticles[i];
+
+        // Check if this particle's card has been revealed
+        let alpha = p.alpha * 1.25;
+        alpha = Math.min(0.8, alpha);
+        let extraX = 0, extraY = 0;
+        let colorBoost = 1;
+
+        // Anticipation: particles brighten and pulse before high-rarity reveal
+        if (p.anticipating && !p.fadingOut) {
+            const pulse = 0.7 + Math.sin(globalTime * 12 + p.phase * 2) * 0.3;
+            alpha = Math.min(1.0, alpha * 1.8 * pulse);
+            colorBoost = 1.5;
+        }
+
+        if (p.fadingOut) {
+            const fadeT = Math.min(1, (globalTime - p.fadeStartTime) / 0.7);
+            // Bright flash at start, then fast fade
+            const flashBoost = fadeT < 0.15 ? 1.5 : 1;
+            alpha *= (1 - fadeT) * flashBoost;
+            // Stronger burst outward with easing
+            const burstEase = 1 - Math.pow(1 - fadeT, 2);
+            extraX = p.burstVx * burstEase * spread * 4;
+            extraY = p.burstVy * burstEase * spread * 4;
+            if (fadeT >= 1) continue; // fully faded, skip
+        }
+
+        const z = p.origZ + Math.sin(globalTime * 1.5 + p.phase) * breatheAmp;
+
+        _dummy.position.set(p.baseX + extraX, -(p.baseY + extraY), -z);
+        _dummy.updateMatrix();
+        particlesMesh.setMatrixAt(visibleCount, _dummy.matrix);
+
+        // Metallic gold gradient
+        const yNorm = clusterH > 0 ? p.baseY / clusterH : 0;
+        const gradT = Math.max(0, Math.min(1, (yNorm + 1) * 0.5));
+        const hDist = Math.abs(yNorm - highlightPos);
+        const highlight = Math.max(0, 1 - hDist * 3);
+
+        const metalR = Math.min(255, Math.floor(lerp(255, 180, gradT) + highlight * 55));
+        const metalG = Math.min(255, Math.floor(lerp(225, 130, gradT) + highlight * 40));
+        const metalB = Math.min(255, Math.floor(lerp(50, 10, gradT) + highlight * 50));
+
+        const blendT = Math.min(1, entryT);
+        const gr = lerp(p.r, metalR, blendT) / 255;
+        const gg = lerp(p.g, metalG, blendT) / 255;
+        const gb = lerp(p.b, metalB, blendT) / 255;
+
+        instColor.setXYZ(visibleCount, Math.min(1, gr * colorBoost), Math.min(1, gg * colorBoost), Math.min(1, gb * colorBoost));
+        instAlpha.setX(visibleCount, alpha);
+
+        const uv = (p.fontIdx != null && charToUV[p.char + '|' + p.fontIdx]) || charToUV[p.char];
+        if (uv) instUV.setXY(visibleCount, uv.u, uv.v);
+
+        let scale = cellSize * 0.85 * scaleFactor;
+        instScale.setX(visibleCount, scale);
+        visibleCount++;
+    }
+
+    particlesMesh.count = visibleCount;
+    particlesMesh.instanceMatrix.needsUpdate = true;
+    instColor.needsUpdate = true;
+    instAlpha.needsUpdate = true;
+    instUV.needsUpdate = true;
+    instScale.needsUpdate = true;
+
+    if (!skipRender) renderAndCompositeGL();
+    return visibleCount;
+}
+
+function renderMultiCards() {
+    if (!multiFortuneState) return;
+    const fadeIn = Math.min(1, stateTime / 0.5);
+
+    for (const card of multiFortuneState.cards) {
+        const revealAge = card.revealed ? (globalTime - card.revealTime) : -1;
+        const alpha = fadeIn * (card.revealed ? 0.7 : 0.6);
+        const borderColor = card.revealed
+            ? card.draw.rarity.glow
+            : 'rgba(255, 215, 0, 0.15)';
+        const fillColor = card.revealed
+            ? 'rgba(40, 5, 5, 0.45)'
+            : 'rgba(80, 10, 10, 0.5)';
+
+        // Use lightweight card (no blur pass) for performance with 10 cards
+        drawMultiCardRect(card.centerX, card.centerY, card.cardW, card.cardH, alpha, borderColor, fillColor);
+
+        // REVEAL FLASH: bright white→rarity-color flash that fades quickly
+        if (card.revealed && revealAge < 0.5) {
+            ctx.save();
+            ctx.scale(dpr, dpr);
+            const flashT = revealAge / 0.5;
+            const flashAlpha = (1 - flashT) * 0.7;
+            const x = card.centerX - card.cardW / 2;
+            const y = card.centerY - card.cardH / 2;
+            const rd = 10;
+            ctx.beginPath();
+            ctx.moveTo(x + rd, y);
+            ctx.lineTo(x + card.cardW - rd, y);
+            ctx.quadraticCurveTo(x + card.cardW, y, x + card.cardW, y + rd);
+            ctx.lineTo(x + card.cardW, y + card.cardH - rd);
+            ctx.quadraticCurveTo(x + card.cardW, y + card.cardH, x + card.cardW - rd, y + card.cardH);
+            ctx.lineTo(x + rd, y + card.cardH);
+            ctx.quadraticCurveTo(x, y + card.cardH, x, y + card.cardH - rd);
+            ctx.lineTo(x, y + rd);
+            ctx.quadraticCurveTo(x, y, x + rd, y);
+            ctx.closePath();
+            // White flash → rarity color
+            const flashColor = flashT < 0.3 ? 'white' : card.draw.rarity.color;
+            ctx.globalAlpha = flashAlpha;
+            ctx.fillStyle = flashColor;
+            ctx.shadowColor = card.draw.rarity.color;
+            ctx.shadowBlur = 20 * (1 - flashT);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Draw rarity-colored border glow for revealed cards
+        if (card.revealed) {
+            ctx.save();
+            ctx.scale(dpr, dpr);
+            const x = card.centerX - card.cardW / 2;
+            const y = card.centerY - card.cardH / 2;
+            const glowPulse = revealAge < 1 ? 0.5 + Math.sin(revealAge * Math.PI * 3) * 0.2 : 0.3;
+            ctx.globalAlpha = fadeIn * glowPulse;
+            ctx.shadowColor = card.draw.rarity.color;
+            ctx.shadowBlur = 12 + (revealAge < 0.5 ? (1 - revealAge * 2) * 15 : 0);
+            ctx.strokeStyle = card.draw.rarity.color;
+            ctx.lineWidth = revealAge < 0.3 ? 3 : 1.5;
+            ctx.beginPath();
+            const r = 10;
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + card.cardW - r, y);
+            ctx.quadraticCurveTo(x + card.cardW, y, x + card.cardW, y + r);
+            ctx.lineTo(x + card.cardW, y + card.cardH - r);
+            ctx.quadraticCurveTo(x + card.cardW, y + card.cardH, x + card.cardW - r, y + card.cardH);
+            ctx.lineTo(x + r, y + card.cardH);
+            ctx.quadraticCurveTo(x, y + card.cardH, x, y + card.cardH - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // ANTICIPATION for 5+ star: shake + glow buildup before reveal
+        if (card.anticipating && card.anticipateStart) {
+            const anticAge = globalTime - card.anticipateStart;
+            const anticT = Math.min(1, anticAge / card.anticipateDuration);
+            const stars = card.draw.rarity.stars;
+
+            ctx.save();
+            ctx.scale(dpr, dpr);
+            const x = card.centerX - card.cardW / 2;
+            const y = card.centerY - card.cardH / 2;
+
+            // Shake: increasing intensity
+            const shakeIntensity = anticT * (stars >= 6 ? 6 : 3.5);
+            const shakeX = Math.sin(anticAge * 35) * shakeIntensity;
+            const shakeY = Math.cos(anticAge * 28) * shakeIntensity * 0.6;
+            ctx.translate(shakeX, shakeY);
+
+            // Glow buildup: rarity color glow intensifying around card
+            const glowIntensity = anticT * anticT;
+            const glowSize = 15 + glowIntensity * (stars >= 6 ? 40 : 25);
+            ctx.globalAlpha = glowIntensity * 0.8;
+            ctx.shadowColor = card.draw.rarity.color;
+            ctx.shadowBlur = glowSize;
+            ctx.strokeStyle = card.draw.rarity.color;
+            ctx.lineWidth = 2 + glowIntensity * 3;
+            ctx.beginPath();
+            const rd = 10;
+            ctx.moveTo(x + rd, y);
+            ctx.lineTo(x + card.cardW - rd, y);
+            ctx.quadraticCurveTo(x + card.cardW, y, x + card.cardW, y + rd);
+            ctx.lineTo(x + card.cardW, y + card.cardH - rd);
+            ctx.quadraticCurveTo(x + card.cardW, y + card.cardH, x + card.cardW - rd, y + card.cardH);
+            ctx.lineTo(x + rd, y + card.cardH);
+            ctx.quadraticCurveTo(x, y + card.cardH, x, y + card.cardH - rd);
+            ctx.lineTo(x, y + rd);
+            ctx.quadraticCurveTo(x, y, x + rd, y);
+            ctx.closePath();
+            ctx.stroke();
+
+            // 6-star: inner radiant glow fill
+            if (stars >= 6 && anticT > 0.4) {
+                const innerT = (anticT - 0.4) / 0.6;
+                ctx.globalAlpha = innerT * 0.3;
+                ctx.fillStyle = card.draw.rarity.color;
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        // Draw "福" on unrevealed cards as hint
+        if (!card.revealed && !card.anticipating) {
+            ctx.save();
+            ctx.scale(dpr, dpr);
+            const hintSize = Math.min(card.cardW, card.cardH) * 0.35;
+            ctx.font = `bold ${hintSize}px "Ma Shan Zheng", serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.globalAlpha = fadeIn * 0.2;
+            ctx.fillStyle = CONFIG.glowGold;
+            ctx.fillText('\u798F', card.centerX, card.centerY);
+            ctx.restore();
+        }
+    }
+}
+
+function renderMultiCardText() {
+    if (!multiFortuneState) return;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    for (const card of multiFortuneState.cards) {
+        if (!card.revealed) continue;
+        const revealT = Math.min(1, (globalTime - card.revealTime) / 0.5);
+        if (revealT <= 0) continue;
+
+        const dr = card.draw;
+        const cx = card.centerX;
+        const cy = card.centerY;
+        const cw = card.cardW;
+        const ch = card.cardH;
+
+        // Clip to card bounds
+        ctx.save();
+        const clipX = cx - cw / 2;
+        const clipY = cy - ch / 2;
+        ctx.beginPath();
+        ctx.rect(clipX, clipY, cw, ch);
+        ctx.clip();
+
+        const alpha = revealT;
+        const unit = Math.min(cw, ch); // Base dimension for text sizing
+
+        // Stars
+        const starsStr = '\u2605'.repeat(dr.rarity.stars) + '\u2606'.repeat(6 - dr.rarity.stars);
+        const starsSize = Math.max(7, unit * 0.1);
+        ctx.font = `${starsSize}px "Courier New", monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.globalAlpha = alpha * 0.85;
+        ctx.fillStyle = dr.rarity.color;
+        ctx.shadowColor = dr.rarity.color;
+        ctx.shadowBlur = 4;
+        ctx.fillText(starsStr, cx, cy - ch * 0.35);
+
+        // Main character
+        const charSize = Math.max(14, unit * 0.45);
+        ctx.font = `bold ${charSize}px ${getDajiFont()}, serif`;
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.fillStyle = CONFIG.glowGold;
+        ctx.shadowColor = CONFIG.glowGold;
+        ctx.shadowBlur = charSize * 0.15;
+        ctx.fillText(dr.char, cx, cy - ch * 0.02);
+
+        // Tier label
+        const tierSize = Math.max(6, unit * 0.08);
+        ctx.font = `${tierSize}px "Courier New", monospace`;
+        ctx.globalAlpha = alpha * 0.7;
+        ctx.fillStyle = dr.rarity.color;
+        ctx.shadowBlur = 3;
+        ctx.fillText(dr.rarity.label, cx, cy + ch * 0.22);
+
+        // Blessing phrase
+        const phraseSize = Math.max(6, unit * 0.07);
+        ctx.font = `${phraseSize}px "Courier New", monospace`;
+        ctx.globalAlpha = alpha * 0.6;
+        ctx.fillStyle = CONFIG.glowRed;
+        ctx.shadowColor = CONFIG.glowRed;
+        ctx.shadowBlur = 2;
+        ctx.fillText(dr.blessing.phrase, cx, cy + ch * 0.35);
+
+        ctx.restore();
+    }
+
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    ctx.restore();
+}
+
+function revealCard(index) {
+    if (!multiFortuneState || index < 0 || index >= multiFortuneState.cards.length) return;
+    const card = multiFortuneState.cards[index];
+    if (card.revealed || card.anticipating) return;
+
+    const stars = card.draw.rarity.stars;
+
+    // 5+ star: anticipation phase before reveal
+    if (stars >= 5) {
+        card.anticipating = true;
+        card.anticipateStart = globalTime;
+        card.anticipateDuration = stars >= 6 ? 0.9 : 0.55;
+        // Slow-pulse the particles during anticipation (brighten them)
+        for (const p of daji3DParticles) {
+            if (p.drawIndex === index) p.anticipating = true;
+        }
+        // Delayed actual reveal
+        const delay = card.anticipateDuration * 1000;
+        setTimeout(() => executeReveal(index), delay);
+        return;
+    }
+
+    // Normal reveal (2-4 stars)
+    executeReveal(index);
+}
+
+function executeReveal(index) {
+    if (!multiFortuneState || index < 0 || index >= multiFortuneState.cards.length) return;
+    const card = multiFortuneState.cards[index];
+    if (card.revealed) return;
+
+    const stars = card.draw.rarity.stars;
+    card.revealed = true;
+    card.revealTime = globalTime;
+    card.anticipating = false;
+    multiFortuneState.revealedCount++;
+
+    // Mark matching daji particles as fading out with burst direction
+    for (const p of daji3DParticles) {
+        if (p.drawIndex === index && !p.fadingOut) {
+            p.fadingOut = true;
+            p.anticipating = false;
+            p.fadeStartTime = globalTime;
+            const dx = p.baseX - (card.centerX - window.innerWidth / 2);
+            const dy = p.baseY - (card.centerY - window.innerHeight / 2);
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            // 5+ stars: much stronger outward burst
+            const burstPower = stars >= 6 ? 3.0 : stars >= 5 ? 2.0 : 1.0;
+            p.burstVx = (dx / dist) * (burstPower + Math.random() * burstPower);
+            p.burstVy = (dy / dist) * (burstPower + Math.random() * burstPower);
+        }
+    }
+
+    // Burst sparkle particles — scaled by rarity
+    const burstCount = stars >= 6 ? 120 : stars >= 5 ? 80 : 35 + stars * 5;
+    const burstSpeed = stars >= 6 ? 8 : stars >= 5 ? 6 : 3.5;
+    const burstSize = stars >= 6 ? 5 : stars >= 5 ? 4 : 2.5;
+    for (let i = 0; i < burstCount; i++) {
+        const angle = (Math.PI * 2 * i) / burstCount + (Math.random() - 0.5) * 0.5;
+        const speed = burstSpeed * (0.5 + Math.random());
+        multiFortuneState.burstParticles.push({
+            x: card.centerX,
+            y: card.centerY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            decay: stars >= 5 ? 0.008 + Math.random() * 0.005 : 0.012 + Math.random() * 0.008,
+            size: burstSize + Math.random() * burstSize,
+            color: card.draw.rarity.color,
+        });
+    }
+
+    // 5+ star: add expanding shockwave ring
+    if (stars >= 5) {
+        if (!multiFortuneState.shockwaves) multiFortuneState.shockwaves = [];
+        multiFortuneState.shockwaves.push({
+            x: card.centerX,
+            y: card.centerY,
+            startTime: globalTime,
+            duration: stars >= 6 ? 1.2 : 0.8,
+            maxRadius: Math.max(card.cardW, card.cardH) * (stars >= 6 ? 3.5 : 2.5),
+            color: card.draw.rarity.color,
+            lineWidth: stars >= 6 ? 4 : 2.5,
+        });
+        // 6-star: second delayed shockwave
+        if (stars >= 6) {
+            multiFortuneState.shockwaves.push({
+                x: card.centerX,
+                y: card.centerY,
+                startTime: globalTime + 0.15,
+                duration: 1.0,
+                maxRadius: Math.max(card.cardW, card.cardH) * 2.5,
+                color: CONFIG.glowGold,
+                lineWidth: 2,
+            });
+        }
+    }
+
+    // Screen flash
+    if (stars >= 4) {
+        triggerScreenFlash(stars);
+    }
+
+    if (multiFortuneState.revealedCount >= multiFortuneState.cards.length) {
+        multiFortuneState.allRevealedTime = globalTime;
+        onAllMultiCardsRevealed();
+    }
+}
+
+function onAllMultiCardsRevealed() {
+    // Show action buttons
+    const btnRevealAll = document.getElementById('btn-reveal-all');
+    if (btnRevealAll) btnRevealAll.style.display = 'none';
+    if (btnMultiAgain) btnMultiAgain.style.display = 'block';
+    if (btnMultiSingle) btnMultiSingle.style.display = 'block';
+    if (btnMultiCollection) btnMultiCollection.style.display = 'block';
+}
+
+function renderBurstParticles() {
+    if (!multiFortuneState || !multiFortuneState.burstParticles.length) return;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    let alive = 0;
+    for (let i = 0; i < multiFortuneState.burstParticles.length; i++) {
+        const p = multiFortuneState.burstParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.03; // slight gravity
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+        p.life -= p.decay;
+        if (p.life <= 0) continue;
+
+        ctx.globalAlpha = p.life * 0.8;
+        ctx.fillStyle = p.color;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = p.size * 3;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        ctx.fill();
+
+        multiFortuneState.burstParticles[alive++] = p;
+    }
+    multiFortuneState.burstParticles.length = alive;
+
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    ctx.restore();
+}
+
+function renderShockwaves() {
+    if (!multiFortuneState || !multiFortuneState.shockwaves || !multiFortuneState.shockwaves.length) return;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    let alive = 0;
+    for (let i = 0; i < multiFortuneState.shockwaves.length; i++) {
+        const sw = multiFortuneState.shockwaves[i];
+        const age = globalTime - sw.startTime;
+        if (age < 0) { multiFortuneState.shockwaves[alive++] = sw; continue; }
+        const t = age / sw.duration;
+        if (t >= 1) continue;
+
+        const radius = sw.maxRadius * easeOutQuart(t);
+        const alpha = (1 - t) * 0.7;
+
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = sw.color;
+        ctx.lineWidth = sw.lineWidth * (1 - t * 0.5);
+        ctx.shadowColor = sw.color;
+        ctx.shadowBlur = 15 * (1 - t);
+        ctx.beginPath();
+        ctx.arc(sw.x, sw.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        multiFortuneState.shockwaves[alive++] = sw;
+    }
+    multiFortuneState.shockwaves.length = alive;
+
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    ctx.restore();
+}
+
+function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
+
+function renderMultiHints() {
+    if (!multiFortuneState) return;
+    const L = getLayout();
+
+    if (multiFortuneState.revealedCount < multiFortuneState.cards.length) {
+        // "Tap to Reveal" hint
+        const hintFade = Math.min(1, Math.max(0, (stateTime - 0.8) / 0.5));
+        const pulse = 0.5 + Math.sin(globalTime * 3) * 0.2;
+        const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
+        const hintSubSize = isLandscape() ? Math.min(cellSize * 0.9, window.innerHeight * 0.02) : cellSize * 0.9;
+        drawOverlayText('\u70B9\u51FB\u7FFB\u5F00 \u00B7 Tap to Reveal', L.multiHintY, CONFIG.glowGold, hintFade * pulse, hintSize);
+    } else {
+        // All revealed — show draw again hint after delay
+        const elapsed = globalTime - multiFortuneState.allRevealedTime;
+        if (elapsed > 2.0) {
+            const hintFade = Math.min(1, (elapsed - 2.0) / 0.5);
+            const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;
+            const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
+            const hintSubSize = isLandscape() ? Math.min(cellSize * 0.9, window.innerHeight * 0.02) : cellSize * 0.9;
+            drawOverlayText('\u2191 \u518D\u6765\u5341\u8FDE \u2191', L.multiHintY, CONFIG.glowGold, hintFade * pulse, hintSize);
+            drawOverlayText('Swipe Up to Draw \u00D710', L.multiHintSubY, CONFIG.glowGold, hintFade * pulse, hintSubSize);
+        }
+    }
+}
+
+function hitTestMultiCard(screenX, screenY) {
+    if (!multiFortuneState) return -1;
+    for (let i = 0; i < multiFortuneState.cards.length; i++) {
+        const card = multiFortuneState.cards[i];
+        if (Math.abs(screenX - card.centerX) < card.cardW / 2 &&
+            Math.abs(screenY - card.centerY) < card.cardH / 2) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+function resetMultiFortune() {
+    multiFortuneState = null;
+    multiFlipState = null;
+    isMultiMode = false;
+    multiDrawResults = null;
+    daji3DParticles = [];
+    if (particlesMesh) particlesMesh.count = 0;
+    // Hide DOM buttons
+    const btnRevealAll = document.getElementById('btn-reveal-all');
+    if (btnRevealAll) btnRevealAll.style.display = 'none';
+    if (btnMultiAgain) btnMultiAgain.style.display = 'none';
+    if (btnMultiSingle) btnMultiSingle.style.display = 'none';
+    if (btnMultiCollection) btnMultiCollection.style.display = 'none';
+    // Hide detail popup
+    if (multiDetail) multiDetail.classList.remove('visible');
 }
 
 function renderDrawParticles3D(t) {
@@ -1427,6 +2093,7 @@ function renderDrawParticles3D(t) {
         const renderZ = p.z + breathing * breatheMix;
 
         // In multi-mode, uniformly scale particle size with cluster (same proportions as single)
+        const drawScale = isMultiMode ? getMultiGridLayout().scaleFactor : 1.0;
         glyphs.push({
             x: p.x,
             y: p.y,
@@ -1436,8 +2103,8 @@ function renderDrawParticles3D(t) {
             r: Math.round(r),
             g: Math.round(g),
             b: Math.round(b),
-            alpha: alpha * (isMultiMode ? 0.35 : 1.0),
-            size: size * (isMultiMode ? 0.35 : 1.0),
+            alpha: alpha * drawScale,
+            size: size * drawScale,
             glow: 0.7,
             blur: 0.65,
         });
@@ -1465,16 +2132,9 @@ function renderDrawOverlay() {
         // Single vs Multi Logic
         const draws = window.currentDrawsList || [currentDrawResult];
         const count = draws.length;
-        
-        // Grid config for multi (same as init)
-        const multiCols = 5;
-        const multiRows = 2;
-        const gridW = window.innerWidth * 0.8;
-        const gridH = window.innerHeight * 0.5;
-        const startX = (window.innerWidth - gridW) / 2 + (gridW / multiCols) / 2;
-        const startY = (window.innerHeight - gridH) / 2 + (gridH / multiRows) / 2;
-        const stepX = gridW / multiCols;
-        const stepY = gridH / multiRows;
+
+        // Grid config for multi — use responsive layout
+        const grid = getMultiGridLayout();
 
         if (count > 1) {
             // Multi: 10 福 characters rising from bottom, spreading to their grid positions
@@ -1491,10 +2151,10 @@ function renderDrawOverlay() {
             const fontCount = CALLI_FONTS.length;
 
             for (let i = 0; i < count; i++) {
-                const c = i % multiCols;
-                const r = Math.floor(i / multiCols);
-                const targetX = startX + c * stepX;
-                const targetY = startY + r * stepY;
+                const c = i % grid.multiCols;
+                const r = Math.floor(i / grid.multiCols);
+                const targetX = grid.startX + c * grid.stepX;
+                const targetY = grid.startY + r * grid.stepY;
 
                 // Each 福 rises from bottom center, spreading out to its grid target
                 const bottomX = window.innerWidth / 2;
@@ -1633,14 +2293,15 @@ function updateFortune() {
     if ((currentDrawResult && currentDrawResult.rarity.stars >= 4) || hasTapFireworks()) {
         updateFireworkPhysics();
     }
-    // Auto-cycle font when idle
-    if (!dajiFontTransition && stateTime > 1.5 && globalTime - dajiFontAutoTimer > DAJI_AUTO_INTERVAL) {
+    // Auto-cycle font when idle (single mode only)
+    if (!isMultiMode && !dajiFontTransition && stateTime > 1.5 && globalTime - dajiFontAutoTimer > DAJI_AUTO_INTERVAL) {
         dajiFontAutoTimer = globalTime;
         cycleDajiFont(1);
     }
-    // Safety: ensure multi-mode overlay is shown
-    if (isMultiMode && multiDrawResults && multiDrawResults.length > 1 && !multiFlipState && stateTime > 0.1) {
-        showMultiCardsWithFlip(multiDrawResults);
+    // Multi-mode safety: ensure state exists
+    if (isMultiMode && multiDrawResults && multiDrawResults.length > 1 && !multiFortuneState && stateTime > 0.1) {
+        buildMultiDajiFromMorph();
+        initMultiFortuneState();
     }
 }
 
@@ -1860,11 +2521,20 @@ function renderCharMorph(t, fadeIn, oldFont, newFont) {
 
 // --- Fortune overlay with gacha-specific reveal ---
 function renderFortuneOverlay() {
-    // Multi-mode: DOM overlay, skip all canvas/WebGL rendering
-    if (isMultiMode && multiDrawResults && multiDrawResults.length > 1) {
-        if (!multiFlipState) {
-            showMultiCardsWithFlip(multiDrawResults);
-        }
+    // Multi-mode: canvas-integrated particle + card display
+    if (isMultiMode && multiFortuneState) {
+        // 1. Frosted glass cards (behind particles)
+        renderMultiCards();
+        // 2. GPU particles on top (additive blend)
+        updateMultiDajiToGPU(true);
+        renderAndCompositeGL();
+        // 3. Revealed card text (on top of everything)
+        renderMultiCardText();
+        // 4. Burst sparkles + shockwaves
+        renderBurstParticles();
+        renderShockwaves();
+        // 5. Hints
+        renderMultiHints();
         return;
     }
 
@@ -2358,6 +3028,7 @@ function startMultiPull() {
     currentDrawResult = best;
     isMultiMode = true;
     multiFlipState = null;
+    multiFortuneState = null;
 
     // Reset state for draw animation
     daji3DParticles = [];
@@ -2365,6 +3036,13 @@ function startMultiPull() {
     if (particlesMesh) particlesMesh.count = 0;
     hideTooltip();
     hideHoverDetail();
+
+    // Hide action buttons
+    const btnRevealAll = document.getElementById('btn-reveal-all');
+    if (btnRevealAll) btnRevealAll.style.display = 'none';
+    if (btnMultiAgain) btnMultiAgain.style.display = 'none';
+    if (btnMultiSingle) btnMultiSingle.style.display = 'none';
+    if (btnMultiCollection) btnMultiCollection.style.display = 'none';
 
     changeState('draw');
 }
@@ -2563,11 +3241,11 @@ function hideMultiOverlay() {
     multiDrawResults = null;
 }
 
-// Multi-overlay buttons
+// Multi-fortune action buttons (now floating over canvas)
 if (btnMultiAgain) {
     btnMultiAgain.addEventListener('click', (e) => {
         e.stopPropagation();
-        hideMultiOverlay();
+        resetMultiFortune();
         startMultiPull();
     });
 }
@@ -2575,15 +3253,9 @@ if (btnMultiAgain) {
 if (btnMultiSingle) {
     btnMultiSingle.addEventListener('click', (e) => {
         e.stopPropagation();
-        hideMultiOverlay();
+        resetMultiFortune();
         selectedMode = 'single';
         updateModeSwitchUI();
-
-        isMultiMode = false;
-        daji3DParticles = [];
-        hoveredIdx = -1;
-        if (particlesMesh) particlesMesh.count = 0;
-        hideTooltip();
         changeState('draw');
     });
 }
@@ -2591,54 +3263,28 @@ if (btnMultiSingle) {
 if (btnMultiCollection) {
     btnMultiCollection.addEventListener('click', (e) => {
         e.stopPropagation();
-        hideMultiOverlay();
+        resetMultiFortune();
         showCollectionPanel();
     });
 }
 
-// Reveal All button
+// Reveal All button — now reveals canvas cards
 const btnRevealAll = document.getElementById('btn-reveal-all');
 if (btnRevealAll) {
     btnRevealAll.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!multiFlipState || !multiDrawResults) return;
-        let cumulativeDelay = 0;
-        multiFlipState.cardElements.forEach((card, i) => {
-            if (!card.classList.contains('flipped') &&
-                !card.classList.contains('anticipate-5') &&
-                !card.classList.contains('anticipate-6')) {
-                const stars = parseInt(card.dataset.rarity) || 0;
-                const myDelay = cumulativeDelay;
-                if (stars >= 5) {
-                    // Slow-motion reveal: anticipation → slow flip
-                    const anticClass = 'anticipate-' + stars;
-                    const slowClass = 'slow-flip-' + stars;
-                    const anticDuration = stars >= 6 ? 700 : 500;
-                    setTimeout(() => card.classList.add(anticClass), myDelay);
-                    setTimeout(() => {
-                        card.classList.remove(anticClass);
-                        card.classList.add(slowClass);
-                        void card.offsetHeight; // Force reflow
-                        card.classList.add('flipped');
-                        triggerScreenFlash(stars);
-                        multiFlipState.revealedCount++;
-                        if (multiFlipState.revealedCount >= multiDrawResults.length) {
-                            onAllCardsRevealed();
-                        }
-                    }, myDelay + anticDuration);
-                    cumulativeDelay += anticDuration + 100;
-                } else {
-                    setTimeout(() => {
-                        card.classList.add('flipped');
-                        multiFlipState.revealedCount++;
-                        if (multiFlipState.revealedCount >= multiDrawResults.length) {
-                            onAllCardsRevealed();
-                        }
-                    }, myDelay);
-                    cumulativeDelay += 80;
-                }
+        if (!multiFortuneState || !multiDrawResults) return;
+        let delay = 0;
+        for (let i = 0; i < multiFortuneState.cards.length; i++) {
+            const card = multiFortuneState.cards[i];
+            if (!card.revealed && !card.anticipating) {
+                const idx = i;
+                const stars = card.draw.rarity.stars;
+                setTimeout(() => revealCard(idx), delay);
+                // Add extra time for high-rarity anticipation animations
+                delay += stars >= 6 ? 1100 : stars >= 5 ? 750 : 100;
             }
-        });
+        }
     });
 }
 
@@ -2817,25 +3463,35 @@ if (btnCloseCollection) {
 // ============================================================
 
 function updateUIVisibility() {
-    const multiVisible = multiOverlay && multiOverlay.classList.contains('visible');
+    const multiVisible = (multiOverlay && multiOverlay.classList.contains('visible')) || !!multiFortuneState;
     const collVisible = collectionPanel && collectionPanel.classList.contains('visible');
     const panelOpen = multiVisible || collVisible;
 
-    // Mode Switch: visible in arrival and fortune, hidden during draw and when overlays are open
+    // Mode Switch: visible in arrival and fortune (not multi), hidden during draw and overlays
     if (modeSwitch) {
-        if (!panelOpen && (state === 'arrival' || state === 'fortune') && fontsReady) {
+        if (!panelOpen && (state === 'arrival' || (state === 'fortune' && !isMultiMode)) && fontsReady) {
             modeSwitch.classList.add('visible');
         } else {
             modeSwitch.classList.remove('visible');
         }
     }
 
-    // Collection FAB: visible in arrival and fortune, hidden during draw and when overlays are open
+    // Collection FAB: visible in arrival and fortune (not multi), hidden during draw and overlays
     if (btnCollection) {
-        if (!panelOpen && (state === 'arrival' || state === 'fortune')) {
+        if (!panelOpen && (state === 'arrival' || (state === 'fortune' && !isMultiMode))) {
             btnCollection.classList.add('visible');
         } else {
             btnCollection.classList.remove('visible');
+        }
+    }
+
+    // Reveal All button: visible when multi-fortune cards are showing and not all revealed
+    const btnRevealAll = document.getElementById('btn-reveal-all');
+    if (btnRevealAll) {
+        if (multiFortuneState && multiFortuneState.revealedCount < multiFortuneState.cards.length) {
+            btnRevealAll.style.display = 'block';
+        } else {
+            btnRevealAll.style.display = 'none';
         }
     }
 }
@@ -2847,6 +3503,7 @@ let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
 let touchMoved = false;
 let touchHoldTimer = null;
 let touchLastX = 0, touchLastY = 0;
+let lastTouchEndTime = 0; // Prevent synthesized mouse events on mobile
 
 canvas.addEventListener('touchstart', (e) => {
     const t = e.touches[0];
@@ -2857,7 +3514,7 @@ canvas.addEventListener('touchstart', (e) => {
     touchStartTime = performance.now();
     touchMoved = false;
     if (touchHoldTimer) clearTimeout(touchHoldTimer);
-    if (state === 'fortune') {
+    if (state === 'fortune' && !multiFortuneState) {
         touchHoldTimer = setTimeout(() => {
             if (!touchMoved) updateHover(touchLastX, touchLastY);
         }, 250);
@@ -2872,11 +3529,12 @@ canvas.addEventListener('touchmove', (e) => {
         touchMoved = true;
         if (touchHoldTimer) { clearTimeout(touchHoldTimer); touchHoldTimer = null; }
     }
-    if (state === 'fortune') updateHover(t.clientX, t.clientY);
+    if (state === 'fortune' && !multiFortuneState) updateHover(t.clientX, t.clientY);
 }, { passive: true });
 
 canvas.addEventListener('touchend', (e) => {
     if (touchHoldTimer) { clearTimeout(touchHoldTimer); touchHoldTimer = null; }
+    lastTouchEndTime = performance.now();
     hoveredIdx = -1;
     hideTooltip();
     const endX = e.changedTouches[0].clientX;
@@ -2884,19 +3542,34 @@ canvas.addEventListener('touchend', (e) => {
     const dx = endX - touchStartX;
     const dy = touchStartY - endY;
     const dt = performance.now() - touchStartTime;
-    if (state === 'fortune' && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) && dt < 500) {
+
+    // Multi-fortune card tap detection
+    if (state === 'fortune' && isMultiMode && multiFortuneState && !touchMoved && dt < 300) {
+        const cardIdx = hitTestMultiCard(endX, endY);
+        if (cardIdx >= 0) {
+            const card = multiFortuneState.cards[cardIdx];
+            if (!card.revealed) {
+                revealCard(cardIdx);
+            } else {
+                showMultiDetail(card.draw);
+            }
+            return;
+        }
+    }
+
+    if (state === 'fortune' && !isMultiMode && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) && dt < 500) {
         cycleDajiFont(dx > 0 ? 1 : -1);
     } else if (dy > 50 && dt < 500) {
         handleSwipeUp();
-    } else if (!touchMoved && dt < 300 && (state === 'arrival' || state === 'fortune')) {
-        // Tap → firework burst
+    } else if (!touchMoved && dt < 300 && (state === 'arrival' || (state === 'fortune' && !multiFortuneState))) {
+        // Tap → firework burst (not during multi-fortune card display)
         tapBurstAtScreen(endX, endY);
     }
 }, { passive: true });
 
 // Desktop hover
 canvas.addEventListener('mousemove', (e) => {
-    if (state === 'fortune' && mouseDown) updateHover(e.clientX, e.clientY);
+    if (state === 'fortune' && !multiFortuneState && mouseDown) updateHover(e.clientX, e.clientY);
 });
 canvas.addEventListener('mouseleave', () => {
     hoveredIdx = -1;
@@ -2907,11 +3580,13 @@ canvas.addEventListener('mouseleave', () => {
 let mouseStartX = 0, mouseStartY = 0, mouseDown = false;
 let mouseHoldTimer = null;
 canvas.addEventListener('mousedown', (e) => {
+    // Skip synthesized mouse events from touch (within 500ms of last touch)
+    if (performance.now() - lastTouchEndTime < 500) return;
     mouseStartX = e.clientX;
     mouseStartY = e.clientY;
     mouseDown = true;
     if (mouseHoldTimer) clearTimeout(mouseHoldTimer);
-    if (state === 'fortune') {
+    if (state === 'fortune' && !multiFortuneState) {
         mouseHoldTimer = setTimeout(() => {
             updateHover(e.clientX, e.clientY);
         }, 250);
@@ -2919,11 +3594,29 @@ canvas.addEventListener('mousedown', (e) => {
 });
 canvas.addEventListener('mouseup', (e) => {
     if (mouseHoldTimer) { clearTimeout(mouseHoldTimer); mouseHoldTimer = null; }
+    // Skip synthesized mouse events from touch
+    if (performance.now() - lastTouchEndTime < 500) { mouseDown = false; return; }
     hoveredIdx = -1;
     hideTooltip();
     if (mouseDown) {
         const dy = mouseStartY - e.clientY;
         const dx = Math.abs(e.clientX - mouseStartX);
+
+        // Multi-fortune card click detection
+        if (state === 'fortune' && isMultiMode && multiFortuneState && dy < 20 && dx < 20) {
+            const cardIdx = hitTestMultiCard(e.clientX, e.clientY);
+            if (cardIdx >= 0) {
+                const card = multiFortuneState.cards[cardIdx];
+                if (!card.revealed) {
+                    revealCard(cardIdx);
+                } else {
+                    showMultiDetail(card.draw);
+                }
+                mouseDown = false;
+                return;
+            }
+        }
+
         if (dy > 50) {
             handleSwipeUp();
         } else if (dy < 20 && dx < 20 && (state === 'arrival' || state === 'fortune')) {
@@ -2944,7 +3637,7 @@ window.addEventListener('keydown', (e) => {
         e.preventDefault();
         handleSwipeUp();
     }
-    if (state === 'fortune') {
+    if (state === 'fortune' && !multiFortuneState) {
         if (e.code === 'ArrowLeft') { e.preventDefault(); cycleDajiFont(-1); }
         if (e.code === 'ArrowRight') { e.preventDefault(); cycleDajiFont(1); }
     }
@@ -2960,13 +3653,13 @@ function handleSwipeUp() {
         }
     } else if (state === 'fortune') {
         // Block swipe-up if multi-mode cards not all revealed yet
-        if (isMultiMode && multiFlipState && multiFlipState.revealedCount < (multiDrawResults ? multiDrawResults.length : 10)) {
+        if (isMultiMode && multiFortuneState && multiFortuneState.revealedCount < multiFortuneState.cards.length) {
             return;
         }
 
-        // Hide multi overlay if visible
+        // Clean up multi-fortune state
         if (isMultiMode) {
-            hideMultiOverlay();
+            resetMultiFortune();
         }
 
         // Draw again loop
