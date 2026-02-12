@@ -8,7 +8,7 @@ import fragmentShader from './particleFragment.glsl?raw';
 import {
     performDraw, performMultiDraw,
     saveToCollection, saveMultiToCollection,
-    FULL_CHAR_BLESSINGS,
+    FULL_CHAR_BLESSINGS, RARITY_TIERS,
     BLESSING_CATEGORIES as GACHA_CATEGORIES,
     getCollectionProgress, getCollectionByCategory,
 } from './gacha.js';
@@ -2209,47 +2209,112 @@ function showCollectionPanel() {
     const progress = getCollectionProgress();
     const categories = getCollectionByCategory();
 
-    // Update progress
+    // Update progress / stats
     if (collectionProgress) {
+        collectionProgress.className = 'collection-stats';
         collectionProgress.innerHTML =
-            `<div>${progress.collected} / ${progress.total} \u00B7 ${progress.percentage}%</div>` +
-            `<div class="progress-bar"><div class="progress-fill" style="width:${progress.percentage}%"></div></div>`;
+            `<div class="stat-item">
+                <div class="stat-value">${progress.collected}</div>
+                <div class="stat-label">Collected</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${progress.total}</div>
+                <div class="stat-label">Total</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${progress.percentage}%</div>
+                <div class="stat-label">Completion</div>
+            </div>`;
     }
 
     // Build grid
     if (collectionGrid) {
+        collectionGrid.className = 'collection-content';
         collectionGrid.innerHTML = '';
-        for (const cat of categories) {
-            const catDiv = document.createElement('div');
-            catDiv.className = 'collection-category';
+        
+        // Helper to determine stars from category index (reverse mapped from TIER_CATEGORIES)
+        // 0->6, 7/8->5, 4/5->4, 2/6->3, 1/3->2
+        const getStars = (idx) => {
+            if (idx === 0) return 6;
+            if (idx === 7 || idx === 8) return 5;
+            if (idx === 4 || idx === 5) return 4;
+            if (idx === 2 || idx === 6) return 3;
+            return 2;
+        };
 
-            const nameDiv = document.createElement('div');
-            nameDiv.className = 'collection-category-name';
-            nameDiv.style.color = cat.color;
-            nameDiv.textContent = cat.name + ' \u00B7 ' + cat.nameEn + ' (' + cat.collectedCount + '/' + cat.items.length + ')';
-            catDiv.appendChild(nameDiv);
+        let cardIdx = 0;
+        categories.forEach((cat, idx) => {
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'collection-category-group';
 
-            const charsDiv = document.createElement('div');
-            charsDiv.className = 'collection-chars';
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'collection-category-title';
+            titleDiv.innerHTML = `${cat.name} <span>${cat.nameEn}</span>`;
+            groupDiv.appendChild(titleDiv);
+
+            const gridDiv = document.createElement('div');
+            gridDiv.className = 'collection-grid-new';
+
+            const catStars = getStars(idx);
 
             for (const item of cat.items) {
-                const charDiv = document.createElement('div');
-                charDiv.className = 'collection-char ' + (item.collected ? 'collected' : 'uncollected');
-                charDiv.textContent = item.char;
+                const card = document.createElement('div');
+                const isCollected = item.collected;
+                // Use maxStars if collected, otherwise default to category stars
+                const stars = isCollected ? item.maxStars : catStars;
+                
+                let rarityClass = '';
+                if (stars >= 6) rarityClass = ' r6';
+                else if (stars === 5) rarityClass = ' r5';
+                
+                card.className = `collection-card ${isCollected ? 'collected' : 'uncollected'}${rarityClass}`;
+                
+                // Content
+                const charText = item.char;
+                const charEnText = (item.blessing && item.blessing.charEn) ? item.blessing.charEn : '';
+                const nameText = item.blessing ? item.blessing.phrase : '???';
 
-                if (item.collected && item.maxStars > 0) {
-                    const badge = document.createElement('span');
-                    badge.className = 'star-badge s' + item.maxStars;
-                    badge.textContent = '\u2605'.repeat(Math.min(item.maxStars, 3));
-                    charDiv.appendChild(badge);
+                card.innerHTML = `
+                    <div class="card-inner">
+                        <div class="card-char">${charText}</div>
+                        <div class="card-english">${charEnText}</div>
+                        <div class="card-meta">
+                            <div class="card-name">${nameText}</div>
+                            <div class="card-stars">${'\u2605'.repeat(stars)}</div>
+                        </div>
+                    </div>
+                `;
+
+                // Stagger the entry animation per card
+                const charEl = card.querySelector('.card-char');
+                if (charEl) {
+                    const delay = (cardIdx * 0.04) + 's';
+                    charEl.style.animationDelay = `${delay}, calc(${delay} + 0.6s)`;
                 }
+                cardIdx++;
 
-                charsDiv.appendChild(charDiv);
+                if (isCollected) {
+                    card.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        // Find rarity object from RARITY_TIERS matching stars
+                        const rarity = RARITY_TIERS.find(t => t.stars === stars) || RARITY_TIERS[4]; // default to lowest
+                        
+                        const drawObj = {
+                            char: item.char,
+                            rarity: rarity,
+                            category: cat, // cat has name, nameEn, color from getCollectionByCategory
+                            blessing: item.blessing
+                        };
+                        showMultiDetail(drawObj);
+                    });
+                }
+                
+                gridDiv.appendChild(card);
             }
 
-            catDiv.appendChild(charsDiv);
-            collectionGrid.appendChild(catDiv);
-        }
+            groupDiv.appendChild(gridDiv);
+            collectionGrid.appendChild(groupDiv);
+        });
     }
 
     if (collectionPanel) collectionPanel.classList.add('visible');
