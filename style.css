@@ -199,13 +199,20 @@ canvas {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(60, 5, 5, 0.55);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+    background: rgba(20, 2, 2, 0.94);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
     overflow: hidden;
     padding: 16px 10px;
 }
-#multi-overlay.visible { display: flex; }
+#multi-overlay.visible {
+    display: flex;
+    animation: overlayFadeIn 0.5s ease-out;
+}
+@keyframes overlayFadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
 
 .multi-title {
     font-size: 1.4rem;
@@ -219,87 +226,469 @@ canvas {
 .multi-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 16px;
-    max-width: 800px;
-    width: 94vw;
+    gap: 12px;
+    max-width: 750px;
+    width: 92vw;
     margin: 0 auto;
 }
-
 @media (min-width: 600px) {
-    .multi-grid {
-        gap: 20px;
-        width: 88vw;
-    }
+    .multi-grid { gap: 16px; width: 88vw; }
 }
 
+/* === CARD FLIP SYSTEM === */
 .multi-card {
     position: relative;
-    background: rgba(255, 255, 255, 0.06);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1.5px solid var(--mc-color, #FFD700);
+    perspective: 800px;
+    cursor: pointer;
+    animation: mcSlideIn 0.4s ease-out both;
+}
+@keyframes mcSlideIn {
+    0% { transform: translateY(30px) scale(0.8); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.card-flipper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 0.68;
+    transition: transform 0.7s cubic-bezier(0.4, 0.0, 0.2, 1);
+    transform-style: preserve-3d;
+}
+.multi-card.flipped .card-flipper {
+    transform: rotateY(180deg);
+}
+
+/* Slow-motion flip for high rarity */
+.multi-card.slow-flip-5 .card-flipper {
+    transition: transform 1.3s cubic-bezier(0.16, 0.85, 0.45, 1);
+}
+.multi-card.slow-flip-6 .card-flipper {
+    transition: transform 1.6s cubic-bezier(0.12, 0.9, 0.35, 1);
+}
+
+/* Anticipation shake + glow buildup before flip */
+.multi-card.anticipate-5 {
+    z-index: 10;
+}
+.multi-card.anticipate-5 .card-flipper {
+    animation: cardAnticipate5 0.5s ease-in-out forwards;
+}
+.multi-card.anticipate-5 .card-back {
+    animation: glowBuild5 0.5s ease-in forwards;
+}
+
+.multi-card.anticipate-6 {
+    z-index: 10;
+}
+.multi-card.anticipate-6 .card-flipper {
+    animation: cardAnticipate6 0.7s ease-in-out forwards;
+}
+.multi-card.anticipate-6 .card-back {
+    animation: glowBuild6 0.7s ease-in forwards;
+}
+
+@keyframes cardAnticipate5 {
+    0%   { transform: scale(1); }
+    20%  { transform: translateX(-3px) scale(1.04); }
+    40%  { transform: translateX(3px) scale(1.05); }
+    60%  { transform: translateX(-2px) scale(1.06); }
+    80%  { transform: translateX(2px) scale(1.07); }
+    100% { transform: translateY(-4px) scale(1.08); }
+}
+@keyframes cardAnticipate6 {
+    0%   { transform: scale(1); }
+    12%  { transform: translateY(-3px) scale(1.03); }
+    25%  { transform: translateX(-4px) rotate(-1deg) scale(1.05); }
+    38%  { transform: translateX(4px) rotate(1deg) scale(1.06); }
+    50%  { transform: translateX(-3px) rotate(-0.8deg) scale(1.07); }
+    62%  { transform: translateX(3px) rotate(0.8deg) scale(1.08); }
+    75%  { transform: translateX(-2px) rotate(-0.5deg) scale(1.09); }
+    88%  { transform: translateX(2px) rotate(0.5deg) scale(1.10); }
+    100% { transform: translateY(-6px) scale(1.12); }
+}
+@keyframes glowBuild5 {
+    0%   { box-shadow: 0 0 25px rgba(168,85,247,0.15), inset 0 0 30px rgba(0,0,0,0.3); }
+    100% { box-shadow: 0 0 50px rgba(168,85,247,0.6), 0 0 80px rgba(168,85,247,0.3), inset 0 0 30px rgba(0,0,0,0.3); }
+}
+@keyframes glowBuild6 {
+    0%   { box-shadow: 0 0 25px rgba(255,69,0,0.2), inset 0 0 30px rgba(0,0,0,0.3); }
+    100% { box-shadow: 0 0 60px rgba(255,69,0,0.7), 0 0 100px rgba(255,150,0,0.4), inset 0 0 30px rgba(0,0,0,0.3); }
+}
+
+.card-face {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
     border-radius: 10px;
+    overflow: hidden;
+}
+
+/* --- CARD BACK --- */
+.card-back {
+    background: linear-gradient(145deg, #8B0000, #4A0000 50%, #6B0000);
+    border: 2px solid rgba(255, 215, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow:
+        0 0 20px rgba(255, 215, 0, 0.1),
+        inset 0 0 30px rgba(0, 0, 0, 0.3);
+}
+.card-back-pattern {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background:
+        repeating-linear-gradient(45deg,
+            transparent 0px, transparent 8px,
+            rgba(255, 215, 0, 0.06) 8px, rgba(255, 215, 0, 0.06) 9px),
+        repeating-linear-gradient(-45deg,
+            transparent 0px, transparent 8px,
+            rgba(255, 215, 0, 0.06) 8px, rgba(255, 215, 0, 0.06) 9px);
+    pointer-events: none;
+}
+.card-back-fu {
+    font-size: 2.2rem;
+    color: rgba(255, 215, 0, 0.25);
+    font-family: "Ma Shan Zheng", cursive;
+    text-shadow: 0 0 20px rgba(255, 215, 0, 0.15);
+    z-index: 2;
+}
+.card-back-border {
+    position: absolute;
+    top: 6px; left: 6px; right: 6px; bottom: 6px;
+    border: 1px solid rgba(255, 215, 0, 0.2);
+    border-radius: 6px;
+    pointer-events: none;
+}
+/* Shimmer sweep on card back */
+.card-back::after {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: linear-gradient(
+        45deg,
+        transparent 30%,
+        rgba(255, 215, 0, 0.04) 45%,
+        rgba(255, 215, 0, 0.08) 50%,
+        rgba(255, 215, 0, 0.04) 55%,
+        transparent 70%
+    );
+    animation: cardShimmer 3s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes cardShimmer {
+    0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+    100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+}
+
+/* High rarity card backs */
+.multi-card[data-rarity="6"] .card-back {
+    background: linear-gradient(145deg, #8B1500, #4A0800 50%, #7B1000);
+    border-color: rgba(255, 69, 0, 0.7);
+    box-shadow: 0 0 25px rgba(255, 69, 0, 0.2), inset 0 0 30px rgba(0, 0, 0, 0.3);
+}
+.multi-card[data-rarity="5"] .card-back {
+    background: linear-gradient(145deg, #4A0060, #2A0040 50%, #3A0050);
+    border-color: rgba(168, 85, 247, 0.6);
+    box-shadow: 0 0 25px rgba(168, 85, 247, 0.15), inset 0 0 30px rgba(0, 0, 0, 0.3);
+}
+
+/* Unflipped card hover: gentle lift */
+.multi-card:not(.flipped):hover .card-flipper {
+    transform: translateY(-3px) scale(1.03);
+}
+.multi-card:not(.flipped):hover .card-back {
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.2), inset 0 0 30px rgba(0, 0, 0, 0.3);
+}
+
+/* --- CARD FRONT --- */
+.card-front {
+    transform: rotateY(180deg);
+    background: linear-gradient(160deg,
+        rgba(30, 10, 10, 0.9),
+        rgba(10, 5, 5, 0.97));
+    border: 2px solid var(--mc-color, #FFD700);
+    box-shadow:
+        0 0 20px var(--mc-glow, rgba(255, 215, 0, 0.2)),
+        inset 0 0 20px rgba(0, 0, 0, 0.3);
+}
+.card-front-inner {
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 6px 4px;
-    cursor: pointer;
-    box-shadow: 0 0 16px var(--mc-glow, rgba(255,215,0,0.2));
-    transition: transform 0.2s, box-shadow 0.2s;
-    animation: mcAppear 0.5s ease-out both;
-    overflow: hidden;
+    padding: 8px 4px;
 }
-.multi-card:hover {
-    transform: scale(1.06);
-    box-shadow: 0 0 28px var(--mc-glow, rgba(255,215,0,0.4));
-}
-.multi-card::before {
+/* Corner decorations */
+.card-front::before,
+.card-front::after {
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: radial-gradient(ellipse at center, var(--mc-glow, rgba(255,215,0,0.08)), transparent 70%);
-    pointer-events: none;
+    width: 14px; height: 14px;
+    border-color: var(--mc-color, #FFD700);
+    border-style: solid;
+    opacity: 0.4;
+    z-index: 2;
 }
-@keyframes mcAppear {
-    0% { transform: scale(0) rotateY(90deg); opacity: 0; }
-    100% { transform: scale(1) rotateY(0deg); opacity: 1; }
+.card-front::before { top: 5px; left: 5px; border-width: 1.5px 0 0 1.5px; }
+.card-front::after { bottom: 5px; right: 5px; border-width: 0 1.5px 1.5px 0; }
+
+/* Rarity glow behind card front */
+.card-rarity-glow {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at center,
+        var(--mc-glow, rgba(255, 215, 0, 0.1)),
+        transparent 70%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+}
+.multi-card.flipped .card-rarity-glow { opacity: 1; }
+
+/* Flip burst light */
+.multi-card.flipped .card-flipper::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 120%; height: 120%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle,
+        var(--mc-glow, rgba(255, 215, 0, 0.3)) 0%,
+        transparent 70%);
+    opacity: 0;
+    animation: flipBurst 0.6s ease-out;
+    pointer-events: none;
+    z-index: 3;
+}
+@keyframes flipBurst {
+    0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.5); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
 }
 
+/* === HIGH RARITY FLIP EFFECTS (5-star, 6-star) === */
+
+/* 5-star: purple radiant burst */
+.multi-card.flipped[data-rarity="5"] .card-flipper::after {
+    width: 200%; height: 200%;
+    background: radial-gradient(circle,
+        rgba(168, 85, 247, 0.6) 0%,
+        rgba(168, 85, 247, 0.2) 30%,
+        transparent 70%);
+    animation: flipBurstEpic 0.9s ease-out;
+}
+
+/* 6-star: orange-gold legendary burst */
+.multi-card.flipped[data-rarity="6"] .card-flipper::after {
+    width: 250%; height: 250%;
+    background: radial-gradient(circle,
+        rgba(255, 200, 50, 0.8) 0%,
+        rgba(255, 69, 0, 0.4) 30%,
+        rgba(255, 69, 0, 0.1) 50%,
+        transparent 70%);
+    animation: flipBurstLegendary 1.2s ease-out;
+}
+
+@keyframes flipBurstEpic {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(0.3); }
+    30% { opacity: 0.9; transform: translate(-50%, -50%) scale(1.0); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(2.0); }
+}
+@keyframes flipBurstLegendary {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(0.2); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(0.8); }
+    50% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.2); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(2.5); }
+}
+
+/* High-rarity card front enhanced glow */
+.multi-card.flipped[data-rarity="5"] .card-front {
+    box-shadow:
+        0 0 30px rgba(168, 85, 247, 0.5),
+        0 0 60px rgba(168, 85, 247, 0.2),
+        inset 0 0 20px rgba(0, 0, 0, 0.3);
+}
+.multi-card.flipped[data-rarity="6"] .card-front {
+    box-shadow:
+        0 0 30px rgba(255, 69, 0, 0.5),
+        0 0 60px rgba(255, 69, 0, 0.25),
+        0 0 100px rgba(255, 150, 0, 0.1),
+        inset 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Pulsing border for high rarity after reveal */
+.multi-card.flipped[data-rarity="5"] .card-front {
+    animation: rarityPulse5 2s ease-in-out 0.7s infinite;
+}
+.multi-card.flipped[data-rarity="6"] .card-front {
+    animation: rarityPulse6 2s ease-in-out 0.7s infinite;
+}
+@keyframes rarityPulse5 {
+    0%, 100% {
+        box-shadow:
+            0 0 30px rgba(168, 85, 247, 0.4),
+            0 0 60px rgba(168, 85, 247, 0.15),
+            inset 0 0 20px rgba(0, 0, 0, 0.3);
+    }
+    50% {
+        box-shadow:
+            0 0 40px rgba(168, 85, 247, 0.6),
+            0 0 80px rgba(168, 85, 247, 0.25),
+            inset 0 0 20px rgba(0, 0, 0, 0.3);
+    }
+}
+@keyframes rarityPulse6 {
+    0%, 100% {
+        box-shadow:
+            0 0 30px rgba(255, 69, 0, 0.5),
+            0 0 60px rgba(255, 69, 0, 0.2),
+            0 0 100px rgba(255, 150, 0, 0.08),
+            inset 0 0 20px rgba(0, 0, 0, 0.3);
+    }
+    50% {
+        box-shadow:
+            0 0 45px rgba(255, 69, 0, 0.7),
+            0 0 90px rgba(255, 69, 0, 0.3),
+            0 0 130px rgba(255, 150, 0, 0.12),
+            inset 0 0 20px rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* Screen flash overlay for legendary flips */
+.multi-screen-flash {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 35;
+    pointer-events: none;
+    opacity: 0;
+}
+.multi-screen-flash.flash-5 {
+    background: radial-gradient(circle at center, rgba(168, 85, 247, 0.4), transparent 70%);
+    animation: screenFlash 0.6s ease-out forwards;
+}
+.multi-screen-flash.flash-6 {
+    background: radial-gradient(circle at center, rgba(255, 150, 0, 0.5), rgba(255, 69, 0, 0.2) 40%, transparent 70%);
+    animation: screenFlash 0.8s ease-out forwards;
+}
+@keyframes screenFlash {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* Flipped card hover */
+.multi-card.flipped:hover .card-flipper {
+    transform: rotateY(180deg) translateY(-4px) scale(1.04);
+}
+/* Ensure slow-flip hover also transitions smoothly */
+.multi-card.flipped.slow-flip-5:hover .card-flipper,
+.multi-card.flipped.slow-flip-6:hover .card-flipper {
+    transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+    transform: rotateY(180deg) translateY(-4px) scale(1.04);
+}
+.multi-card.flipped:hover .card-front {
+    box-shadow:
+        0 0 35px var(--mc-glow, rgba(255, 215, 0, 0.4)),
+        0 8px 25px rgba(0, 0, 0, 0.4),
+        inset 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+/* --- CARD CONTENT --- */
 .mc-stars {
-    font-size: 0.45rem;
+    font-size: 0.5rem;
     color: var(--mc-color, #FFD700);
     letter-spacing: 1px;
-    margin-bottom: 2px;
+    margin-bottom: 4px;
     text-shadow: 0 0 6px var(--mc-glow, rgba(255,215,0,0.4));
 }
 .mc-char {
-    font-size: 1.8rem;
+    font-size: 2rem;
     color: #FFF;
-    text-shadow: 0 0 16px var(--mc-glow, rgba(255,215,0,0.5));
-    line-height: 1.2;
-    margin: 2px 0;
+    text-shadow:
+        0 0 4px var(--mc-glow, rgba(255,215,0,0.8)),
+        0 0 14px var(--mc-glow, rgba(255,215,0,0.5)),
+        0 0 30px var(--mc-glow, rgba(255,215,0,0.3));
+    line-height: 1.1;
+    margin: 4px 0;
+}
+.multi-card.flipped .mc-char {
+    animation: revealedCharBreathe 2.5s ease-in-out 0.7s infinite;
+}
+@keyframes revealedCharBreathe {
+    0%, 100% {
+        text-shadow:
+            0 0 4px var(--mc-glow, rgba(255,215,0,0.8)),
+            0 0 14px var(--mc-glow, rgba(255,215,0,0.5)),
+            0 0 30px var(--mc-glow, rgba(255,215,0,0.3));
+        transform: scale(1);
+    }
+    50% {
+        text-shadow:
+            0 0 6px var(--mc-glow, rgba(255,215,0,0.95)),
+            0 0 20px var(--mc-glow, rgba(255,215,0,0.7)),
+            0 0 40px var(--mc-glow, rgba(255,215,0,0.4));
+        transform: scale(1.05);
+    }
 }
 .mc-tier {
-    font-size: 0.35rem;
+    font-size: 0.38rem;
     color: var(--mc-color, #FFD700);
-    opacity: 0.6;
-    letter-spacing: 0.5px;
-    margin-bottom: 1px;
+    opacity: 0.7;
+    letter-spacing: 1px;
+    margin-top: 2px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 .mc-phrase {
-    font-size: 0.4rem;
+    font-size: 0.38rem;
     color: var(--mc-color, #FFD700);
-    opacity: 0.7;
-    margin-top: 2px;
+    opacity: 0.6;
+    margin-top: 3px;
     letter-spacing: 1px;
 }
+
 @media (max-width: 520px) {
     .mc-char { font-size: 1.4rem; }
     .mc-stars { font-size: 0.35rem; }
     .mc-tier { font-size: 0.3rem; }
     .mc-phrase { font-size: 0.3rem; }
+    .card-back-fu { font-size: 1.6rem; }
+}
+
+/* --- HOVER TOOLTIP --- */
+#multi-hover-tip {
+    position: fixed;
+    z-index: 40;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    background: rgba(20, 4, 4, 0.92);
+    border: 1px solid rgba(255, 215, 0, 0.4);
+    border-radius: 8px;
+    padding: 8px 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    max-width: 200px;
+    text-align: center;
+}
+#multi-hover-tip .mht-category {
+    font-size: 0.7rem;
+    color: rgba(255,215,0,0.7);
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+}
+#multi-hover-tip .mht-phrase {
+    font-size: 0.9rem;
+    color: #FFD700;
+    margin-bottom: 2px;
+    letter-spacing: 2px;
+}
+#multi-hover-tip .mht-english {
+    font-size: 0.7rem;
+    color: rgba(255,215,0,0.5);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .multi-actions {

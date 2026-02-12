@@ -144,6 +144,69 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
+// --- Responsive Layout Helpers ---
+function isLandscape() {
+    return window.innerWidth > window.innerHeight * 1.2;
+}
+
+function getClusterSpread() {
+    const baseSpread = Math.min(cols, rows) * 0.40 * cellSize;
+    if (isLandscape()) {
+        // On landscape/desktop, cap spread to keep cluster proportional
+        return Math.min(baseSpread, window.innerHeight * 0.28);
+    }
+    return baseSpread;
+}
+
+// Responsive layout params for fortune/arrival overlay text positions
+function getLayout() {
+    if (isLandscape()) {
+        const maxCharSize = Math.min(cellSize * 5, window.innerHeight * 0.11);
+        return {
+            starsY: 0.06,
+            charY: 0.14,
+            tierY: 0.21,
+            cardTop: 0.02,
+            cardBottom: 0.24,
+            cardWidth: 0.35,
+            categoryY: 0.70,
+            phraseY: 0.77,
+            englishY: 0.82,
+            hintY: 0.90,
+            hintSubY: 0.93,
+            charFontSize: maxCharSize,
+            arrivalTitleY: 0.12,
+            arrivalSubY: 0.17,
+            arrivalHintY: 0.83,
+            arrivalHintSubY: 0.87,
+            arrivalFuSize: Math.min(window.innerHeight * 0.45, window.innerWidth * 0.30),
+            multiHintY: 0.92,
+            multiHintSubY: 0.95,
+        };
+    }
+    return {
+        starsY: 0.08,
+        charY: 0.15,
+        tierY: 0.22,
+        cardTop: 0.04,
+        cardBottom: 0.26,
+        cardWidth: 0.5,
+        categoryY: 0.56,
+        phraseY: 0.66,
+        englishY: 0.72,
+        hintY: 0.85,
+        hintSubY: 0.88,
+        charFontSize: cellSize * 5,
+        arrivalTitleY: 0.15,
+        arrivalSubY: 0.20,
+        arrivalHintY: 0.78,
+        arrivalHintSubY: 0.82,
+        arrivalFuSize: Math.min(window.innerWidth, window.innerHeight) * 0.55,
+        multiHintY: 0.92,
+        multiHintSubY: 0.95,
+    };
+}
+
 // --- Three.js Setup (Hybrid Rendering) ---
 const ATLAS_COLS = 20;
 const ATLAS_ROWS = 20;
@@ -338,10 +401,12 @@ let fontsReady = false;
 let currentDrawResult = null;
 let multiDrawResults = null;
 let isMultiMode = false;
+let multiFlipState = null; // { revealedCount, cardElements[] }
 
-// Force-load all calligraphy fonts
+// Force-load all calligraphy fonts with ALL characters used in the app
+const ALL_FONT_CHARS = ALL_LUCKY + '\u00B7\u4E00\u4EBA\u5341\u5927';
 Promise.all(
-    CALLI_FONTS.map(f => document.fonts.load(`64px ${f}`, '\u798F\u5927\u5409'))
+    CALLI_FONTS.map(f => document.fonts.load(`64px ${f}`, ALL_FONT_CHARS))
 ).then(() => {
     fuShape = sampleCharacterShape('\u798F', 64, chosenFont);
     dajiShape = sampleCharacterShape('\u5927\u5409', 64);
@@ -373,7 +438,7 @@ function initDaji3D(seedParticles) {
 
     // Use current draw shape if available, otherwise fallback
     const shapeSource = (currentDrawShape && currentDrawShape.length > 0) ? currentDrawShape : dajiShape;
-    const spread = Math.min(cols, rows) * 0.40 * cellSize;
+    const spread = getClusterSpread();
     const depth = spread * 0.4;
 
     for (const pt of shapeSource) {
@@ -408,7 +473,7 @@ function updateDajiToGPU(skipRender) {
         return 0;
     }
 
-    const spread = Math.min(cols, rows) * 0.40 * cellSize;
+    const spread = getClusterSpread();
     const entryT = Math.min(1, (globalTime - daji3DEntryTime) / 1.2);
     const zInflate = daji3DFromSeed ? 1 : easeInOut(entryT);
     const blendT = daji3DFromSeed ? Math.min(1, (globalTime - daji3DEntryTime) / 0.6) : 1;
@@ -439,7 +504,7 @@ function updateDajiToGPU(skipRender) {
         _dummy.updateMatrix();
         particlesMesh.setMatrixAt(i, _dummy.matrix);
 
-        let alpha = p.alpha * Math.max(0.2, 1.25);
+        let alpha = p.alpha * 1.25;
         alpha = Math.min(0.8, alpha);
         if (isHovered) alpha = 1.0;
 
@@ -531,7 +596,7 @@ function hideTooltip() {
 function updateHover(clientX, clientY) {
     if (daji3DParticles.length === 0) { hoveredIdx = -1; hideTooltip(); return; }
 
-    const spread = Math.min(cols, rows) * 0.40 * cellSize;
+    const spread = getClusterSpread();
     const entryT = Math.min(1, (globalTime - daji3DEntryTime) / 1.2);
     const zInflate = daji3DFromSeed ? 1 : easeInOut(entryT);
     const blendT = daji3DFromSeed ? Math.min(1, (globalTime - daji3DEntryTime) / 0.6) : 1;
@@ -658,8 +723,8 @@ function drawCalligraphyFu(alpha) {
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    const vmin = Math.min(window.innerWidth, window.innerHeight);
-    const fuSize = vmin * 0.55;
+    const L = getLayout();
+    const fuSize = L.arrivalFuSize;
     const cx = window.innerWidth / 2;
     const cy = window.innerHeight / 2;
 
@@ -891,22 +956,36 @@ function changeState(newState) {
         initDrawAnimation();
     }
     if (newState === 'fortune') {
-        if (drawToFortuneSeed && drawToFortuneSeed.length > 0) {
-            initDaji3D(drawToFortuneSeed);
+        if (isMultiMode) {
+            // Multi-mode: skip particles, show DOM overlay instead
+            daji3DParticles = [];
+            if (particlesMesh) particlesMesh.count = 0;
             drawToFortuneSeed = null;
-        } else {
-            initDaji3D();
-        }
-        // Only launch fireworks for 4+ star draws
-        if (currentDrawResult && currentDrawResult.rarity.stars >= 4) {
-            initFireworks();
-        } else {
-            // Clear any leftover firework state
+            multiFlipState = null; // Will be initialized by renderMultiFortuneDOM
+            // Clear fireworks
             fwShells.length = 0;
             fwTrail.length = 0;
             fwParticles.length = 0;
             fwLaunchTimer = 99999;
             fwLaunchCount = 0;
+        } else {
+            if (drawToFortuneSeed && drawToFortuneSeed.length > 0) {
+                initDaji3D(drawToFortuneSeed);
+                drawToFortuneSeed = null;
+            } else {
+                initDaji3D();
+            }
+            // Only launch fireworks for 4+ star draws
+            if (currentDrawResult && currentDrawResult.rarity.stars >= 4) {
+                initFireworks();
+            } else {
+                // Clear any leftover firework state
+                fwShells.length = 0;
+                fwTrail.length = 0;
+                fwParticles.length = 0;
+                fwLaunchTimer = 99999;
+                fwLaunchCount = 0;
+            }
         }
         // Reset font transition for new fortune display
         dajiFontTransition = null;
@@ -924,11 +1003,14 @@ function updateArrival() {
 
 function renderArrivalOverlay() {
     const fadeIn = Math.min(1, stateTime / 1.0);
+    const L = getLayout();
     drawCalligraphyFu(fadeIn);
 
     const textFade = Math.min(1, stateTime / 1.5);
-    drawOverlayText('\u65B0\u5E74\u7EB3\u798F', 0.15, CONFIG.glowGold, textFade * 0.8, cellSize * 2);
-    drawOverlayText('A Blessing Awaits', 0.20, CONFIG.glowGold, textFade * 0.5, cellSize * 1.1);
+    const titleSize = isLandscape() ? Math.min(cellSize * 2, window.innerHeight * 0.04) : cellSize * 2;
+    const subSize = isLandscape() ? Math.min(cellSize * 1.1, window.innerHeight * 0.025) : cellSize * 1.1;
+    drawOverlayText('\u65B0\u5E74\u7EB3\u798F', L.arrivalTitleY, CONFIG.glowGold, textFade * 0.8, titleSize);
+    drawOverlayText('A Blessing Awaits', L.arrivalSubY, CONFIG.glowGold, textFade * 0.5, subSize);
 
     const hintFade = Math.min(1, Math.max(0, (stateTime - 1.5) / 0.5));
     const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;
@@ -938,14 +1020,16 @@ function renderArrivalOverlay() {
         const decay = 1 - hopPhase / 0.9;
         hopOffset = -Math.abs(Math.sin(hopPhase / 0.9 * Math.PI * 3)) * 0.012 * decay;
     }
-    
+
     // Dynamic text based on mode
     const isMulti = selectedMode === 'multi';
     const mainText = isMulti ? '\u2191  \u4E0A\u6ED1\u5341\u8FDE  \u2191' : '\u2191  \u4E0A\u6ED1\u62BD\u7B7E  \u2191';
     const subText = isMulti ? 'Swipe Up to Draw \u00D710' : 'Swipe Up to Draw Fortune';
 
-    drawOverlayText(mainText, 0.78 + hopOffset, CONFIG.glowGold, hintFade * pulse, cellSize * 1.6);
-    drawOverlayText(subText, 0.82 + hopOffset, CONFIG.glowGold, hintFade * pulse, cellSize * 1.1);
+    const hintSize = isLandscape() ? Math.min(cellSize * 1.6, window.innerHeight * 0.035) : cellSize * 1.6;
+    const hintSubSize = isLandscape() ? Math.min(cellSize * 1.1, window.innerHeight * 0.025) : cellSize * 1.1;
+    drawOverlayText(mainText, L.arrivalHintY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSize);
+    drawOverlayText(subText, L.arrivalHintSubY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSubSize);
 }
 
 // ============================================================
@@ -988,10 +1072,10 @@ function initDrawAnimation() {
     // Grid layout configuration for 10x
     const multiCols = 5;
     const multiRows = 2;
-    const scaleFactor = isMultiMode ? 0.45 : 1.0;
+    const scaleFactor = isMultiMode ? 0.35 : 1.0;
 
-    const gridW = window.innerWidth * 0.8;
-    const gridH = window.innerHeight * 0.5;
+    const gridW = window.innerWidth * 0.85;
+    const gridH = window.innerHeight * 0.55;
     const startX = (window.innerWidth - gridW) / 2 + (gridW / multiCols) / 2;
     const startY = (window.innerHeight - gridH) / 2 + (gridH / multiRows) / 2;
     const stepX = gridW / multiCols;
@@ -1018,11 +1102,11 @@ function initDrawAnimation() {
             targetCenterY = fuEndScreenPositions[idx].y - window.innerHeight / 2;
         }
 
-        // 2. Sample shape — fewer particles per char to reduce density
-        const res = isMultiMode ? 30 : 50;
+        // 2. Sample shape — much fewer particles per char in multi-mode
+        const res = isMultiMode ? 18 : 50;
         const shape = sampleCharacterShape(drawRes.char, res);
 
-        const spread = Math.min(cols, rows) * 0.40 * cellSize * scaleFactor;
+        const spread = getClusterSpread() * scaleFactor;
         const depth = spread * 0.4;
         
         const drawTargets = shape.map(pt => ({
@@ -1228,12 +1312,15 @@ function updateDraw() {
     launchTrail.length = tw;
 
     if (t >= DRAW_SETTLE + 0.3) {
-        const seeded = buildDajiSeedFromMorph();
-        drawToFortuneSeed = seeded.length > 0 ? seeded : null;
-
         if (isMultiMode) {
+            // Multi-mode: no particle seeding needed, go straight to DOM overlay
+            daji3DParticles = [];
+            if (particlesMesh) particlesMesh.count = 0;
+            drawToFortuneSeed = null;
             changeState('fortune');
         } else {
+            const seeded = buildDajiSeedFromMorph();
+            drawToFortuneSeed = seeded.length > 0 ? seeded : null;
             changeState('fortune');
         }
     }
@@ -1283,7 +1370,7 @@ function renderDrawParticles3D(t) {
         });
     }
 
-    const spread = Math.min(cols, rows) * 0.40 * cellSize;
+    const spread = getClusterSpread();
     const breatheAmp = spread * 0.06;
 
     for (const p of morphParticles) {
@@ -1333,6 +1420,8 @@ function renderDrawParticles3D(t) {
         const breathing = Math.sin(globalTime * 1.5 + p.phase) * breatheAmp;
         const renderZ = p.z + breathing * breatheMix;
 
+        // In multi-mode, reduce particle brightness and size
+        const multiDim = isMultiMode ? 0.5 : 1.0;
         glyphs.push({
             x: p.x,
             y: p.y,
@@ -1342,9 +1431,9 @@ function renderDrawParticles3D(t) {
             r: Math.round(r),
             g: Math.round(g),
             b: Math.round(b),
-            alpha,
-            size,
-            glow: 0.7,
+            alpha: alpha * multiDim,
+            size: size * (isMultiMode ? 0.7 : 1.0),
+            glow: 0.7 * multiDim,
             blur: 0.65,
         });
     }
@@ -1382,49 +1471,61 @@ function renderDrawOverlay() {
         const stepX = gridW / multiCols;
         const stepY = gridH / multiRows;
 
-        for (let i = 0; i < count; i++) {
-            let cx, cy, fuSize;
-            
-            if (count > 1) {
-                // Multi
-                const c = i % multiCols;
-                const r = Math.floor(i / multiCols);
-                const targetX = startX + c * stepX;
-                const targetY = startY + r * stepY;
-                
-                // Start from bottom, fanned out
-                const originX = window.innerWidth * 0.2 + (i / (count - 1)) * window.innerWidth * 0.6;
-                const originY = window.innerHeight * 0.9;
-                
-                cx = lerp(originX, targetX, riseEased);
-                cy = lerp(originY, targetY, riseEased);
-                
-                const baseSize = vmin * 0.15; // Smaller for multi
-                fuSize = baseSize * lerp(1, 0.5, shrinkEased); // Shrink less
-                
-            } else {
-                // Single (Original behavior)
-                const baseSize = vmin * 0.55;
-                fuSize = baseSize * lerp(1, DRAW_SHRINK_END_SCALE, shrinkEased);
-                cx = window.innerWidth / 2;
-                cy = window.innerHeight * lerp(0.5, 0.20, riseEased);
-            }
+        if (count > 1) {
+            // Multi: single 福 rising from bottom center
+            const cx = window.innerWidth / 2;
+            const cy = window.innerHeight * lerp(0.7, 0.35, riseEased);
+            const baseSize = isLandscape() ? Math.min(vmin * 0.22, window.innerHeight * 0.18) : vmin * 0.22;
+            const fuSize = baseSize * lerp(1, 0.6, shrinkEased);
 
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
-            // Font morphing: cycle through calligraphy fonts, accelerating as it rises
-            const morphSpeed = 1.2 + riseT * 4.5; // cycles per second, faster near top
+            const morphSpeed = 1.2 + riseT * 4.5;
             const morphPhase = t * morphSpeed;
             const fontCount = CALLI_FONTS.length;
             const rawIdx = (morphPhase % fontCount + fontCount) % fontCount;
             const fontA = Math.floor(rawIdx) % fontCount;
             const fontB = (fontA + 1) % fontCount;
-            const crossFade = rawIdx - Math.floor(rawIdx); // 0→1 blend between A and B
+            const crossFade = rawIdx - Math.floor(rawIdx);
+            const intensity = 1 + riseT * 2.0;
 
+            ctx.font = `${fuSize}px ${CALLI_FONTS[fontA]}, serif`;
+            ctx.globalAlpha = Math.min(1, 0.3 * intensity) * (1 - crossFade);
+            ctx.shadowColor = CONFIG.glowGold;
+            ctx.shadowBlur = fuSize * 0.15 * intensity;
+            ctx.fillStyle = CONFIG.glowGold;
+            ctx.fillText('\u798F', cx, cy);
+            ctx.globalAlpha = (1 - crossFade);
+            ctx.shadowBlur = fuSize * 0.06 * intensity;
+            ctx.fillText('\u798F', cx, cy);
+
+            ctx.font = `${fuSize}px ${CALLI_FONTS[fontB]}, serif`;
+            ctx.globalAlpha = Math.min(1, 0.3 * intensity) * crossFade;
+            ctx.shadowBlur = fuSize * 0.15 * intensity;
+            ctx.fillText('\u798F', cx, cy);
+            ctx.globalAlpha = crossFade;
+            ctx.shadowBlur = fuSize * 0.06 * intensity;
+            ctx.fillText('\u798F', cx, cy);
+        } else {
+            // Single (Original behavior)
+            const cx = window.innerWidth / 2;
+            const cy = window.innerHeight * lerp(0.5, 0.20, riseEased);
+            const baseSize = getLayout().arrivalFuSize;
+            const fuSize = baseSize * lerp(1, DRAW_SHRINK_END_SCALE, shrinkEased);
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const morphSpeed = 1.2 + riseT * 4.5;
+            const morphPhase = t * morphSpeed;
+            const fontCount = CALLI_FONTS.length;
+            const rawIdx = (morphPhase % fontCount + fontCount) % fontCount;
+            const fontA = Math.floor(rawIdx) % fontCount;
+            const fontB = (fontA + 1) % fontCount;
+            const crossFade = rawIdx - Math.floor(rawIdx);
             const intensity = 1 + riseT * 2.5;
 
-            // Draw font A (fading out)
             ctx.font = `${fuSize}px ${CALLI_FONTS[fontA]}, serif`;
             ctx.globalAlpha = Math.min(1, 0.3 * intensity) * (1 - crossFade);
             ctx.shadowColor = CONFIG.glowGold;
@@ -1435,7 +1536,6 @@ function renderDrawOverlay() {
             ctx.shadowBlur = fuSize * 0.08 * intensity;
             ctx.fillText('\u798F', cx, cy);
 
-            // Draw font B (fading in)
             ctx.font = `${fuSize}px ${CALLI_FONTS[fontB]}, serif`;
             ctx.globalAlpha = Math.min(1, 0.3 * intensity) * crossFade;
             ctx.shadowBlur = fuSize * 0.2 * intensity;
@@ -1476,8 +1576,9 @@ function renderDrawOverlay() {
             }
 
             const gradient = ctx.createRadialGradient(bx, by, 0, bx, by, radius);
-            gradient.addColorStop(0, `rgba(${burstR}, ${burstG}, ${burstB}, ${burstFlash * 0.8})`);
-            gradient.addColorStop(0.4, `rgba(${burstR}, ${burstG}, ${Math.floor(burstB * 0.8)}, ${burstFlash * 0.4})`);
+            const flashMul = isMultiMode ? 0.35 : 1.0;
+            gradient.addColorStop(0, `rgba(${burstR}, ${burstG}, ${burstB}, ${burstFlash * 0.8 * flashMul})`);
+            gradient.addColorStop(0.4, `rgba(${burstR}, ${burstG}, ${Math.floor(burstB * 0.8)}, ${burstFlash * 0.4 * flashMul})`);
             gradient.addColorStop(1, `rgba(${burstR}, ${burstG}, 0, 0)`);
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
@@ -1492,7 +1593,7 @@ function renderDrawOverlay() {
 // ============================================================
 function renderDaji(alpha) {
     const shapeSource = (currentDrawShape && currentDrawShape.length > 0) ? currentDrawShape : dajiShape;
-    const dajiGridSize = Math.min(cols, rows) * 0.40;
+    const dajiGridSize = getClusterSpread() / cellSize;
     const centerCol = cols / 2;
     const centerRow = rows / 2;
     for (const pt of shapeSource) {
@@ -1547,13 +1648,14 @@ function drawMorphSparkles(cx, cy, fontSize, t, alpha) {
 function renderCharTitleEntrance(stateT, font) {
     if (!currentDrawResult) return;
     const ch = currentDrawResult.char;
-    const fontSize = cellSize * 5;
+    const L = getLayout();
+    const fontSize = L.charFontSize;
     const entranceDur = 1.3;
     const cx = window.innerWidth / 2;
-    const cy = window.innerHeight * 0.15;
+    const cy = window.innerHeight * L.charY;
 
     if (stateT >= entranceDur) {
-        drawOverlayText(ch, 0.15, CONFIG.glowGold, 0.9, cellSize * 5, font);
+        drawOverlayText(ch, L.charY, CONFIG.glowGold, 0.9, L.charFontSize, font);
         return;
     }
 
@@ -1610,9 +1712,10 @@ function renderCharMorph(t, fadeIn, oldFont, newFont) {
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    const fontSize = cellSize * 5;
+    const L = getLayout();
+    const fontSize = L.charFontSize;
     const cx = window.innerWidth / 2;
-    const cy = window.innerHeight * 0.15;
+    const cy = window.innerHeight * L.charY;
     const baseAlpha = fadeIn * 0.9;
 
     ctx.font = `${fontSize}px ${oldFont}, serif`;
@@ -1733,6 +1836,14 @@ function renderCharMorph(t, fadeIn, oldFont, newFont) {
 
 // --- Fortune overlay with gacha-specific reveal ---
 function renderFortuneOverlay() {
+    // Multi-mode: DOM overlay, skip all canvas/WebGL rendering
+    if (isMultiMode && multiDrawResults && multiDrawResults.length > 1) {
+        if (!multiFlipState) {
+            showMultiCardsWithFlip(multiDrawResults);
+        }
+        return;
+    }
+
     // Combined GPU render: character cluster + fireworks in one pass
     const dajiCount = updateDajiToGPU(true);
 
@@ -1747,138 +1858,12 @@ function renderFortuneOverlay() {
 
     const fadeIn = Math.min(1, stateTime / 0.9);
     const dr = currentDrawResult;
+    const L = getLayout();
 
-    // --- Multi-mode: 5x2 grid of individual cards, each appearing one by one ---
-    if (isMultiMode && multiDrawResults && multiDrawResults.length > 1) {
-        const count = multiDrawResults.length;
-        const mCols = 5;
-        const mRows = 2;
-        const charDelay = 0.15;
-        const charAnimDur = 0.5;
-
-        // Grid sizing
-        const gridPadX = window.innerWidth * 0.06;
-        const gap = Math.min(cellSize * 0.6, 8);
-        const availW = window.innerWidth - gridPadX * 2;
-        const availH = window.innerHeight * 0.75;
-        const cardW = (availW - gap * (mCols - 1)) / mCols;
-        const cardH = (availH - gap * (mRows - 1)) / mRows;
-        const gridStartX = gridPadX + cardW / 2;
-        const gridStartY = window.innerHeight * 0.1 + cardH / 2;
-
-        const font = getDajiFont();
-        const charSize = Math.min(cardW * 0.65, cardH * 0.45);
-        const starsSize = Math.max(8, charSize * 0.22);
-        const tierSize = Math.max(7, charSize * 0.18);
-
-        for (let i = 0; i < count; i++) {
-            const d = multiDrawResults[i];
-            const col = i % mCols;
-            const row = Math.floor(i / mCols);
-            const cx_i = gridStartX + col * (cardW + gap);
-            const cy_i = gridStartY + row * (cardH + gap);
-
-            const charStartTime = 0.3 + i * charDelay;
-            const elapsed = stateTime - charStartTime;
-            if (elapsed <= 0) continue;
-
-            const t = Math.min(1, elapsed / charAnimDur);
-            const alpha = Math.min(1, t * 3);
-
-            // Scale: pop in then settle
-            let scale;
-            if (t < 0.4) {
-                scale = lerp(1.3, 0.97, easeInOut(t / 0.4));
-            } else if (t < 0.7) {
-                scale = lerp(0.97, 1.03, easeInOut((t - 0.4) / 0.3));
-            } else {
-                scale = lerp(1.03, 1.0, easeInOut((t - 0.7) / 0.3));
-            }
-
-            // Parse rarity color for card background
-            const rc = d.rarity.color || '#FFD700';
-            const rR = parseInt(rc.slice(1,3), 16) || 255;
-            const rG = parseInt(rc.slice(3,5), 16) || 215;
-            const rB = parseInt(rc.slice(5,7), 16) || 0;
-
-            // Card with rarity-colored background and border
-            const fillCol = `rgba(${rR}, ${rG}, ${rB}, ${alpha * 0.18})`;
-            const borderCol = `rgba(${rR}, ${rG}, ${rB}, ${alpha * 0.5})`;
-            drawCardAt(cx_i, cy_i, cardW * scale, cardH * scale, alpha * 0.85, borderCol, fillCol);
-
-            // Draw character + stars + tier inside card
-            ctx.save();
-            ctx.scale(dpr, dpr);
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
-            const glowMult = 1 + Math.max(0, 1 - t * 2) * 1.5;
-
-            // Stars above character — gold with bloom
-            const starsY = cy_i - cardH * 0.32 * scale;
-            const starsFull = '\u2605'.repeat(d.rarity.stars);
-            const starsEmpty = '\u2606'.repeat(6 - d.rarity.stars);
-            ctx.font = `${starsSize * scale}px "Courier New", monospace`;
-            // Bloom pass
-            ctx.globalAlpha = alpha * 0.5;
-            ctx.fillStyle = CONFIG.glowGold;
-            ctx.shadowColor = CONFIG.glowGold;
-            ctx.shadowBlur = starsSize * 1.2;
-            ctx.fillText(starsFull + starsEmpty, cx_i, starsY);
-            // Solid pass
-            ctx.globalAlpha = alpha * 0.9;
-            ctx.shadowBlur = starsSize * 0.4;
-            ctx.fillText(starsFull + starsEmpty, cx_i, starsY);
-
-            // Character — gold with strong bloom
-            const charY = cy_i - cardH * 0.02;
-            ctx.font = `${charSize * scale}px ${font}, serif`;
-            // Wide bloom pass
-            ctx.globalAlpha = alpha * 0.3 * glowMult;
-            ctx.fillStyle = CONFIG.glowGold;
-            ctx.shadowColor = CONFIG.glowGold;
-            ctx.shadowBlur = charSize * 0.4 * glowMult;
-            ctx.fillText(d.char, cx_i, charY);
-            // Medium glow pass
-            ctx.globalAlpha = alpha * 0.5 * glowMult;
-            ctx.shadowBlur = charSize * 0.15;
-            ctx.fillText(d.char, cx_i, charY);
-            // Solid pass
-            ctx.globalAlpha = alpha * 0.95;
-            ctx.shadowBlur = charSize * 0.06;
-            ctx.fillText(d.char, cx_i, charY);
-
-            // Tier label below character — gold with bloom
-            const tierY = cy_i + cardH * 0.32 * scale;
-            ctx.font = `${tierSize * scale}px ${font}, serif`;
-            // Bloom pass
-            ctx.globalAlpha = alpha * 0.4;
-            ctx.fillStyle = CONFIG.glowGold;
-            ctx.shadowColor = CONFIG.glowGold;
-            ctx.shadowBlur = tierSize * 1.0;
-            ctx.fillText(d.rarity.label, cx_i, tierY);
-            // Solid pass
-            ctx.globalAlpha = alpha * 0.85;
-            ctx.shadowBlur = tierSize * 0.3;
-            ctx.fillText(d.rarity.label, cx_i, tierY);
-
-            ctx.shadowBlur = 0;
-            ctx.shadowColor = 'transparent';
-            ctx.restore();
-        }
-
-        // --- Hint to draw again (multi-specific, skip shared text below) ---
-        if (stateTime > 2.5) {
-            const hintFade = Math.min(1, (stateTime - 2.5) / 0.5);
-            const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;
-            drawOverlayText('\u2191 \u518D\u6765\u5341\u8FDE \u2191', 0.92, CONFIG.glowGold, hintFade * pulse, cellSize * 1.2);
-            drawOverlayText('Swipe Up to Draw \u00D710', 0.95, CONFIG.glowGold, hintFade * pulse, cellSize * 0.9);
-        }
-        return; // Skip single-mode text rendering below
-    } else {
-        // --- Single mode ---
+    // --- Single mode ---
+    {
         const topCardFade = Math.min(1, Math.max(0, (stateTime - 0.3) / 0.6));
-        drawCard(0.04, 0.26, topCardFade * 0.8, 0.5);
+        drawCard(L.cardTop, L.cardBottom, topCardFade * 0.8, L.cardWidth);
 
         // --- Single character title with font cycling ---
         if (dajiFontTransition) {
@@ -1886,37 +1871,42 @@ function renderFortuneOverlay() {
             const tt = (globalTime - dajiFontTransition.startTime) / transDur;
             if (tt >= 1) {
                 dajiFontTransition = null;
-                drawOverlayText(dr.char, 0.15, CONFIG.glowGold, fadeIn * 0.9, cellSize * 5, getDajiFont());
+                drawOverlayText(dr.char, L.charY, CONFIG.glowGold, fadeIn * 0.9, L.charFontSize, getDajiFont());
             } else {
                 renderCharMorph(tt, fadeIn, dajiFontTransition.oldFont, getDajiFont());
             }
         } else if (stateTime < 1.5) {
             renderCharTitleEntrance(stateTime, getDajiFont());
         } else {
-            drawOverlayText(dr.char, 0.15, CONFIG.glowGold, fadeIn * 0.9, cellSize * 5, getDajiFont());
+            drawOverlayText(dr.char, L.charY, CONFIG.glowGold, fadeIn * 0.9, L.charFontSize, getDajiFont());
         }
 
         // --- Stars line ---
         const starsFade = Math.min(1, Math.max(0, (stateTime - 0.3) / 0.6));
         const starsFull = '\u2605'.repeat(dr.rarity.stars);
         const starsEmpty = '\u2606'.repeat(6 - dr.rarity.stars);
-        drawOverlayText(starsFull + starsEmpty, 0.08, dr.rarity.color, starsFade * 0.85, cellSize * 1.4);
+        const starsSize = isLandscape() ? Math.min(cellSize * 1.4, window.innerHeight * 0.03) : cellSize * 1.4;
+        drawOverlayText(starsFull + starsEmpty, L.starsY, dr.rarity.color, starsFade * 0.85, starsSize);
 
         // --- Tier label ---
         const tierFade = Math.min(1, Math.max(0, (stateTime - 0.5) / 0.7));
         const tierLabel = dr.rarity.label + ' \u00B7 ' + dr.rarity.labelEn;
-        drawOverlayText(tierLabel, 0.22, dr.rarity.color, tierFade * 0.7, cellSize * 1.0);
+        const tierSize = isLandscape() ? Math.min(cellSize * 1.0, window.innerHeight * 0.022) : cellSize * 1.0;
+        drawOverlayText(tierLabel, L.tierY, dr.rarity.color, tierFade * 0.7, tierSize);
     }
 
     // --- Category ---
     const catFade = Math.min(1, Math.max(0, (stateTime - 0.7) / 0.7));
     const catLabel = '[ ' + dr.category.name + ' ]';
-    drawOverlayText(catLabel, 0.56, dr.category.color, catFade * 0.6, cellSize * 1.2);
+    const catSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.026) : cellSize * 1.2;
+    drawOverlayText(catLabel, L.categoryY, dr.category.color, catFade * 0.6, catSize);
 
     // --- Blessing phrase + english ---
     const blessFade = Math.min(1, Math.max(0, (stateTime - 0.5) / 0.9));
-    drawOverlayText(dr.blessing.phrase, 0.66, CONFIG.glowRed, blessFade * 0.7, cellSize * 1.5);
-    drawOverlayText(dr.blessing.english, 0.72, CONFIG.glowGold, blessFade * 0.5, cellSize * 1);
+    const phraseSize = isLandscape() ? Math.min(cellSize * 1.5, window.innerHeight * 0.032) : cellSize * 1.5;
+    const engSize = isLandscape() ? Math.min(cellSize * 1, window.innerHeight * 0.022) : cellSize * 1;
+    drawOverlayText(dr.blessing.phrase, L.phraseY, CONFIG.glowRed, blessFade * 0.7, phraseSize);
+    drawOverlayText(dr.blessing.english, L.englishY, CONFIG.glowGold, blessFade * 0.5, engSize);
 
     // --- Hint to draw again ---
     if (stateTime > 2.5) {
@@ -1927,8 +1917,10 @@ function renderFortuneOverlay() {
         const mainText = isMulti ? '\u2191 \u518D\u6765\u5341\u8FDE \u2191' : '\u2191 \u518D\u62BD\u4E00\u6B21 \u2191';
         const subText = isMulti ? 'Swipe Up to Draw \u00D710' : 'Swipe Up to Draw Again';
 
-        drawOverlayText(mainText, 0.85, CONFIG.glowGold, hintFade * pulse, cellSize * 1.2);
-        drawOverlayText(subText, 0.88, CONFIG.glowGold, hintFade * pulse, cellSize * 0.9);
+        const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
+        const hintSubSize = isLandscape() ? Math.min(cellSize * 0.9, window.innerHeight * 0.02) : cellSize * 0.9;
+        drawOverlayText(mainText, L.hintY, CONFIG.glowGold, hintFade * pulse, hintSize);
+        drawOverlayText(subText, L.hintSubY, CONFIG.glowGold, hintFade * pulse, hintSubSize);
     }
 }
 
@@ -2307,41 +2299,171 @@ function startMultiPull() {
     }
     currentDrawResult = best;
     isMultiMode = true;
+    multiFlipState = null;
 
     // Reset state for draw animation
     daji3DParticles = [];
     hoveredIdx = -1;
     if (particlesMesh) particlesMesh.count = 0;
     hideTooltip();
+    hideHoverDetail();
 
     changeState('draw');
 }
 
-function showMultiResults(draws) {
+// --- Screen flash for high rarity card flips ---
+function triggerScreenFlash(stars) {
+    const flash = document.createElement('div');
+    flash.className = 'multi-screen-flash flash-' + stars;
+    document.body.appendChild(flash);
+    flash.addEventListener('animationend', () => flash.remove());
+}
+
+// --- Hover tooltip element ---
+const multiHoverTip = document.createElement('div');
+multiHoverTip.id = 'multi-hover-tip';
+multiHoverTip.innerHTML = `
+    <div class="mht-category"></div>
+    <div class="mht-phrase"></div>
+    <div class="mht-english"></div>
+`;
+document.body.appendChild(multiHoverTip);
+
+function showHoverDetail(cardEl, draw) {
+    multiHoverTip.querySelector('.mht-category').textContent = draw.category.name;
+    multiHoverTip.querySelector('.mht-phrase').textContent = draw.blessing.phrase;
+    multiHoverTip.querySelector('.mht-english').textContent = draw.blessing.english;
+
+    const rect = cardEl.getBoundingClientRect();
+    let left = rect.left + rect.width / 2 - 100;
+    let top = rect.top - 70;
+    if (top < 8) top = rect.bottom + 8;
+    left = Math.max(8, Math.min(window.innerWidth - 208, left));
+
+    multiHoverTip.style.left = left + 'px';
+    multiHoverTip.style.top = top + 'px';
+    multiHoverTip.style.opacity = '1';
+}
+
+function hideHoverDetail() {
+    multiHoverTip.style.opacity = '0';
+}
+
+function showMultiCardsWithFlip(draws) {
     if (!draws || !draws.length) return;
 
+    multiFlipState = { revealedCount: 0, cardElements: [] };
     multiGrid.innerHTML = '';
+
     draws.forEach((draw, i) => {
         const card = document.createElement('div');
         card.className = 'multi-card';
+        card.dataset.index = i;
+        card.dataset.rarity = draw.rarity.stars;
         card.style.setProperty('--mc-color', draw.rarity.color);
         card.style.setProperty('--mc-glow', draw.rarity.glow);
-        card.style.animationDelay = (i * 0.08) + 's';
+        card.style.animationDelay = (i * 0.06) + 's';
+
+        const flipper = document.createElement('div');
+        flipper.className = 'card-flipper';
+
+        // Card back
+        const back = document.createElement('div');
+        back.className = 'card-face card-back';
+        back.innerHTML = `
+            <div class="card-back-pattern"></div>
+            <div class="card-back-fu">\u798F</div>
+            <div class="card-back-border"></div>
+        `;
+
+        // Card front
+        const front = document.createElement('div');
+        front.className = 'card-face card-front';
+        front.style.setProperty('--mc-color', draw.rarity.color);
+        front.style.setProperty('--mc-glow', draw.rarity.glow);
 
         const starsStr = '\u2605'.repeat(draw.rarity.stars) + '\u2606'.repeat(6 - draw.rarity.stars);
+        front.innerHTML = `
+            <div class="card-front-inner">
+                <div class="mc-stars">${starsStr}</div>
+                <div class="mc-char">${draw.char}</div>
+                <div class="mc-tier">${draw.rarity.label}</div>
+                <div class="mc-phrase">${draw.blessing.phrase}</div>
+            </div>
+            <div class="card-rarity-glow"></div>
+        `;
 
-        card.innerHTML =
-            `<div class="mc-stars">${starsStr}</div>` +
-            `<div class="mc-tier">${draw.rarity.label}</div>` +
-            `<div class="mc-char">${draw.char}</div>` +
-            `<div class="mc-phrase">${draw.blessing.phrase}</div>`;
+        flipper.appendChild(back);
+        flipper.appendChild(front);
+        card.appendChild(flipper);
 
-        card.addEventListener('click', () => showMultiDetail(draw));
+        // Click handler
+        card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (card.classList.contains('flipped')) {
+                showMultiDetail(draw);
+                return;
+            }
+            // Prevent double-click during anticipation
+            if (card.classList.contains('anticipate-5') || card.classList.contains('anticipate-6')) return;
+
+            const stars = draw.rarity.stars;
+            if (stars >= 5) {
+                // Slow-motion: anticipation shake → slow flip → screen flash
+                const anticClass = 'anticipate-' + stars;
+                const slowClass = 'slow-flip-' + stars;
+                card.classList.add(anticClass);
+                const anticDuration = stars >= 6 ? 700 : 500;
+                setTimeout(() => {
+                    card.classList.remove(anticClass);
+                    card.classList.add(slowClass);
+                    // Force reflow so browser registers the base transform before flipping
+                    void card.offsetHeight;
+                    card.classList.add('flipped');
+                    triggerScreenFlash(stars);
+                    multiFlipState.revealedCount++;
+                    if (multiFlipState.revealedCount >= draws.length) {
+                        onAllCardsRevealed();
+                    }
+                }, anticDuration);
+            } else {
+                card.classList.add('flipped');
+                multiFlipState.revealedCount++;
+                if (multiFlipState.revealedCount >= draws.length) {
+                    onAllCardsRevealed();
+                }
+            }
+        });
+
+        // Hover for revealed cards
+        card.addEventListener('mouseenter', () => {
+            if (card.classList.contains('flipped')) {
+                showHoverDetail(card, draw);
+            }
+        });
+        card.addEventListener('mouseleave', () => {
+            hideHoverDetail();
+        });
+
         multiGrid.appendChild(card);
+        multiFlipState.cardElements.push(card);
     });
 
     multiOverlay.classList.add('visible');
+    updateMultiActionsVisibility(false);
     updateUIVisibility();
+}
+
+function onAllCardsRevealed() {
+    updateMultiActionsVisibility(true);
+}
+
+function updateMultiActionsVisibility(allRevealed) {
+    const btnRevealAll = document.getElementById('btn-reveal-all');
+    if (btnRevealAll) btnRevealAll.style.display = allRevealed ? 'none' : 'block';
+    if (btnMultiAgain) btnMultiAgain.style.display = allRevealed ? 'block' : 'none';
+    if (btnMultiSingle) btnMultiSingle.style.display = allRevealed ? 'block' : 'none';
+    if (btnMultiCollection) btnMultiCollection.style.display = allRevealed ? 'block' : 'none';
 }
 
 function showMultiDetail(draw) {
@@ -2375,9 +2497,10 @@ function hideMultiDetail() {
 function hideMultiOverlay() {
     multiOverlay.classList.remove('visible');
     multiDetail.classList.remove('visible');
+    hideHoverDetail();
+    multiFlipState = null;
     isMultiMode = false;
     multiDrawResults = null;
-    // Don't reset selectedMode here, let user keep toggle preference
 }
 
 // Multi-overlay buttons
@@ -2393,10 +2516,9 @@ if (btnMultiSingle) {
     btnMultiSingle.addEventListener('click', (e) => {
         e.stopPropagation();
         hideMultiOverlay();
-        // Force single mode for this specific action
         selectedMode = 'single';
         updateModeSwitchUI();
-        
+
         isMultiMode = false;
         daji3DParticles = [];
         hoveredIdx = -1;
@@ -2411,6 +2533,52 @@ if (btnMultiCollection) {
         e.stopPropagation();
         hideMultiOverlay();
         showCollectionPanel();
+    });
+}
+
+// Reveal All button
+const btnRevealAll = document.getElementById('btn-reveal-all');
+if (btnRevealAll) {
+    btnRevealAll.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!multiFlipState || !multiDrawResults) return;
+        let cumulativeDelay = 0;
+        multiFlipState.cardElements.forEach((card, i) => {
+            if (!card.classList.contains('flipped') &&
+                !card.classList.contains('anticipate-5') &&
+                !card.classList.contains('anticipate-6')) {
+                const stars = parseInt(card.dataset.rarity) || 0;
+                const myDelay = cumulativeDelay;
+                if (stars >= 5) {
+                    // Slow-motion reveal: anticipation → slow flip
+                    const anticClass = 'anticipate-' + stars;
+                    const slowClass = 'slow-flip-' + stars;
+                    const anticDuration = stars >= 6 ? 700 : 500;
+                    setTimeout(() => card.classList.add(anticClass), myDelay);
+                    setTimeout(() => {
+                        card.classList.remove(anticClass);
+                        card.classList.add(slowClass);
+                        void card.offsetHeight; // Force reflow
+                        card.classList.add('flipped');
+                        triggerScreenFlash(stars);
+                        multiFlipState.revealedCount++;
+                        if (multiFlipState.revealedCount >= multiDrawResults.length) {
+                            onAllCardsRevealed();
+                        }
+                    }, myDelay + anticDuration);
+                    cumulativeDelay += anticDuration + 100;
+                } else {
+                    setTimeout(() => {
+                        card.classList.add('flipped');
+                        multiFlipState.revealedCount++;
+                        if (multiFlipState.revealedCount >= multiDrawResults.length) {
+                            onAllCardsRevealed();
+                        }
+                    }, myDelay);
+                    cumulativeDelay += 80;
+                }
+            }
+        });
     });
 }
 
@@ -2719,12 +2887,22 @@ function handleSwipeUp() {
             changeState('draw');
         }
     } else if (state === 'fortune') {
+        // Block swipe-up if multi-mode cards not all revealed yet
+        if (isMultiMode && multiFlipState && multiFlipState.revealedCount < (multiDrawResults ? multiDrawResults.length : 10)) {
+            return;
+        }
+
+        // Hide multi overlay if visible
+        if (isMultiMode) {
+            hideMultiOverlay();
+        }
+
         // Draw again loop
         daji3DParticles = [];
         hoveredIdx = -1;
         if (particlesMesh) particlesMesh.count = 0;
         hideTooltip();
-        
+
         if (selectedMode === 'multi') {
             startMultiPull();
         } else {
