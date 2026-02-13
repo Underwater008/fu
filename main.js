@@ -1664,9 +1664,8 @@ function renderArrivalOverlay() {
 
     const textFade = Math.min(1, stateTime / 1.5);
     const titleSize = isLandscape() ? Math.min(cellSize * 2, window.innerHeight * 0.04) : cellSize * 2;
-    const subSize = isLandscape() ? Math.min(cellSize * 1.1, window.innerHeight * 0.025) : cellSize * 1.1;
     drawOverlayText('\u65B0\u5E74\u7EB3\u798F', L.arrivalTitleY, CONFIG.glowGold, textFade * 0.8, titleSize);
-    drawOverlayText('A Blessing Awaits', L.arrivalSubY, CONFIG.glowGold, textFade * 0.5, subSize);
+    drawOverlayText('A Blessing Awaits', L.arrivalSubY, CONFIG.glowGold, textFade * 0.8, titleSize);
 
     const hintFade = Math.min(1, Math.max(0, (stateTime - 1.5) / 0.5));
     const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;

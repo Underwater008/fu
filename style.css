@@ -1532,25 +1532,42 @@ canvas {
     z-index: 2;
 }
 
-.collection-header h1 {
+.collection-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: nowrap;
+}
+
+.collection-title-en {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 1.2rem;
+    font-size: 1.22rem;
     font-weight: 600;
     color: #FFD700;
-    margin: 0 auto 8px;
-    line-height: 1.3;
+    margin: 0;
+    line-height: 1.08;
     text-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
-    letter-spacing: 5px;
+    letter-spacing: 3.6px;
     text-transform: uppercase;
+    white-space: nowrap;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
 }
-.collection-header h2 {
+.collection-title-en span {
+    display: block;
+}
+
+.collection-title-row h2 {
     font-family: "Ma Shan Zheng", cursive;
-    font-size: 1.8rem;
-    letter-spacing: 6px;
+    font-size: 1.2rem;
+    letter-spacing: 2px;
     color: #FFD700;
     text-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
-    margin-top: 4px;
+    margin: 0;
     font-weight: normal;
+    white-space: nowrap;
 }
 
 .collection-stats {
@@ -1817,7 +1834,7 @@ canvas {
     left: 0;
     right: 0;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     padding: 0 24px;
     pointer-events: none; /* Let clicks pass to grid */
     z-index: 10;
@@ -1826,11 +1843,11 @@ canvas {
     margin: 0;
     pointer-events: auto;
     background: linear-gradient(135deg,
-        rgba(255, 255, 255, 0.1) 0%,
-        rgba(255, 255, 255, 0.04) 100%);
+        rgba(0, 0, 0, 0.28) 0%,
+        rgba(0, 0, 0, 0.12) 100%);
     backdrop-filter: blur(16px) saturate(1.4);
     -webkit-backdrop-filter: blur(16px) saturate(1.4);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
     box-shadow:
         0 4px 20px rgba(0, 0, 0, 0.25),
         inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -1843,25 +1860,69 @@ canvas {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    font-weight: 600;
+    text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.8),
+        0 0 10px rgba(255, 215, 0, 0.28);
+}
+
+.collection-actions .btn-action.btn-secondary {
+    color: rgba(255, 215, 0, 0.95);
+    border-color: rgba(255, 215, 0, 0.45);
 }
 
 /* ============================================================
    MONETIZATION UI — Auth bar, Login modal, Rewards panel
    ============================================================ */
 
-/* --- Account Section (bottom actions area) --- */
+/* --- Account Section (collection header) --- */
 .collection-account {
     display: flex;
     align-items: center;
-    /* content-sized, aligned left by parent's space-between */
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 24px;
 }
 .auth-logged-out-row {
     display: flex;
+    justify-content: center;
 }
 .auth-logged-in-row {
     display: flex;
     align-items: center;
     gap: 10px;
+    justify-content: center;
+}
+
+#collection-panel .collection-header #btn-login {
+    min-height: 50px;
+    padding: 0 22px;
+    border-radius: 22px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    color: #7a1200;
+    text-shadow: none;
+    background: linear-gradient(135deg,
+        rgba(255, 240, 188, 0.98) 0%,
+        rgba(255, 216, 122, 0.95) 100%);
+    border: 1px solid rgba(255, 226, 155, 0.98);
+    box-shadow:
+        0 4px 14px rgba(0, 0, 0, 0.22),
+        0 0 14px rgba(255, 215, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+#collection-panel .collection-header #btn-login:hover {
+    background: linear-gradient(135deg,
+        rgba(255, 246, 206, 1) 0%,
+        rgba(255, 226, 145, 0.98) 100%);
+    border-color: rgba(255, 233, 170, 1);
+    color: #5f0e00;
+}
+
+#collection-panel .collection-header #btn-login:active {
+    transform: translateY(0) scale(0.98);
 }
 
 /* --- Floating Draw Counter (bottom, near controls) --- */
