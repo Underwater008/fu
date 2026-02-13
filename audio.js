@@ -18,8 +18,9 @@ let isMuted = false;
 let bgmStarted = false;
 
 // Audio Files
-const FILE_INST = 'audio/inst.mp3';
-const FILE_VOCAL = 'audio/vocal.mp3';
+// Use Vite-resolved asset URLs so production builds include these files.
+const FILE_INST = new URL('./audio/inst.mp3', import.meta.url).href;
+const FILE_VOCAL = new URL('./audio/vocal.mp3', import.meta.url).href;
 const BGM_VOLUME = 0.2;
 
 // Settings
