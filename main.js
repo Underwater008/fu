@@ -4452,14 +4452,12 @@ for (const ev of audioTriggerEvents) {
 
 // Mute button
 const btnMute = document.getElementById('btn-mute');
-const muteIcon = document.getElementById('mute-icon');
 if (btnMute) {
     btnMute.addEventListener('click', (e) => {
         e.stopPropagation();
         ensureAudio();
         const muted = toggleMute();
         btnMute.classList.toggle('muted', muted);
-        muteIcon.textContent = muted ? '\u{1F507}' : '\u{1F50A}';
     });
 }
 

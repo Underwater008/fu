@@ -14,39 +14,69 @@ body {
 /* ============ MUTE BUTTON ============ */
 .mute-btn {
     position: fixed;
-    top: 12px;
-    right: 12px;
+    top: 20px;
+    right: 20px;
     z-index: 40;
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
-    border: 1px solid rgba(255, 215, 0, 0.25);
-    background: rgba(0, 0, 0, 0.35);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    
+    /* Clean Glassmorphism */
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.25s ease;
-    opacity: 0.6;
+    
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    color: rgba(255, 215, 0, 0.9); /* Gold */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     padding: 0;
 }
+
 .mute-btn:hover {
-    opacity: 1;
-    background: rgba(0, 0, 0, 0.5);
-    border-color: rgba(255, 215, 0, 0.5);
+    background: rgba(255, 215, 0, 0.15);
+    border-color: rgba(255, 215, 0, 0.4);
+    color: #FFD700;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.15);
 }
+
+.mute-btn:active {
+    transform: translateY(0) scale(0.96);
+}
+
 .mute-btn .mute-icon {
-    font-size: 1.1rem;
-    line-height: 1;
+    width: 22px;
+    height: 22px;
+    pointer-events: none;
 }
+
+.mute-btn .icon-muted {
+    display: none;
+}
+
 .mute-btn.muted {
-    opacity: 0.35;
-    border-color: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.4);
+    background: rgba(0, 0, 0, 0.2);
+    box-shadow: none;
 }
-.mute-btn.muted .mute-icon {
-    opacity: 0.5;
+.mute-btn.muted:hover {
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.mute-btn.muted .icon-sound {
+    display: none;
+}
+.mute-btn.muted .icon-muted {
+    display: block;
 }
 
 canvas {
