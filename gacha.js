@@ -143,6 +143,49 @@ export function performMultiDraw() {
     return draws;
 }
 
+// --- Pity-Aware Draw Functions ---
+
+function forceRarity(tierIdx) {
+    const tier = RARITY_TIERS[tierIdx];
+    const catIndices = TIER_CATEGORIES[tierIdx];
+    const catIdx = catIndices[Math.floor(Math.random() * catIndices.length)];
+    const category = BLESSING_CATEGORIES[catIdx];
+    const chars = [...category.chars];
+    const char = chars[Math.floor(Math.random() * chars.length)];
+    const blessing = FULL_CHAR_BLESSINGS[char] || { phrase: char + '运亨通', english: 'Fortune and blessings upon you' };
+    return { char, rarity: tier, tierIndex: tierIdx, category, blessing };
+}
+
+export function performDrawWithPity(pityCounter) {
+    // Guaranteed 6★ at 90 pity
+    if (pityCounter >= 89) {
+        return forceRarity(0);
+    }
+    // Guaranteed 5★+ at 50 pity
+    if (pityCounter >= 49) {
+        const roll = Math.random();
+        if (roll < 0.5) return forceRarity(0);
+        return forceRarity(1);
+    }
+    return performDraw();
+}
+
+export function performMultiDrawWithPity(pityCounter) {
+    const draws = [];
+    let pity = pityCounter;
+    for (let i = 0; i < 10; i++) {
+        const draw = performDrawWithPity(pity);
+        draws.push(draw);
+        if (draw.tierIndex <= 1) {
+            pity = 0; // reset pity on 5★+
+        } else {
+            pity++;
+        }
+    }
+    draws.sort((a, b) => a.tierIndex - b.tierIndex);
+    return { draws, newPityCounter: pity };
+}
+
 // --- Collection Management (localStorage) ---
 
 const COLLECTION_KEY = 'fu_gacha_collection';
