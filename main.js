@@ -165,8 +165,8 @@ function getMultiGridLayout() {
     const portrait = !isLandscape();
     const multiCols = portrait ? 2 : 5;
     const multiRows = portrait ? 5 : 2;
-    const gridW = w * (portrait ? 0.90 : 0.85);
-    const gridH = h * (portrait ? 0.62 : 0.55);
+    const gridW = w * (portrait ? 0.92 : 0.85);
+    const gridH = h * (portrait ? 0.72 : 0.55);
     const scaleFactor = portrait ? 0.38 : 0.35;
     // Shift grid upward slightly in portrait to leave room for buttons at bottom
     const gridTopY = portrait ? h * 0.06 : (h - gridH) / 2;
@@ -202,8 +202,8 @@ function getLayout() {
             arrivalHintY: 0.83,
             arrivalHintSubY: 0.87,
             arrivalFuSize: Math.min(window.innerHeight * 0.45, window.innerWidth * 0.30),
-            multiHintY: 0.92,
-            multiHintSubY: 0.95,
+            multiHintY: 0.85,
+            multiHintSubY: 0.88,
         };
     }
     return {
@@ -224,8 +224,8 @@ function getLayout() {
         arrivalHintY: 0.78,
         arrivalHintSubY: 0.82,
         arrivalFuSize: Math.min(window.innerWidth, window.innerHeight) * 0.55,
-        multiHintY: 0.92,
-        multiHintSubY: 0.95,
+        multiHintY: 0.85,
+        multiHintSubY: 0.88,
     };
 }
 
@@ -1461,13 +1461,6 @@ function initMultiFortuneState() {
         allRevealedTime: 0,
         burstParticles: [],
     };
-
-    // Position floating action buttons below the card grid
-    const actionsEl = document.getElementById('multi-fortune-actions');
-    if (actionsEl) {
-        const bottomSpace = window.innerHeight - grid.gridBottom;
-        actionsEl.style.bottom = Math.max(10, bottomSpace * 0.1) + 'px';
-    }
 }
 
 function updateMultiDajiToGPU(skipRender) {
@@ -1744,7 +1737,7 @@ function renderMultiCardText() {
         ctx.fillStyle = dr.rarity.color;
         ctx.shadowColor = dr.rarity.color;
         ctx.shadowBlur = 4;
-        ctx.fillText(starsStr, cx, cy - ch * 0.35);
+        ctx.fillText(starsStr, cx, cy - ch * 0.39);
 
         // Main character
         const charSize = Math.max(14, unit * 0.45);
@@ -1753,7 +1746,7 @@ function renderMultiCardText() {
         ctx.fillStyle = CONFIG.glowGold;
         ctx.shadowColor = CONFIG.glowGold;
         ctx.shadowBlur = charSize * 0.15;
-        ctx.fillText(dr.char, cx, cy - ch * 0.02);
+        ctx.fillText(dr.char, cx, cy - ch * 0.07);
 
         // Tier label
         const tierSize = Math.max(6, unit * 0.08);
@@ -1761,7 +1754,7 @@ function renderMultiCardText() {
         ctx.globalAlpha = alpha * 0.7;
         ctx.fillStyle = dr.rarity.color;
         ctx.shadowBlur = 3;
-        ctx.fillText(dr.rarity.label, cx, cy + ch * 0.22);
+        ctx.fillText(dr.rarity.label, cx, cy + ch * 0.26);
 
         // Blessing phrase
         const phraseSize = Math.max(6, unit * 0.07);
@@ -1770,7 +1763,7 @@ function renderMultiCardText() {
         ctx.fillStyle = CONFIG.glowRed;
         ctx.shadowColor = CONFIG.glowRed;
         ctx.shadowBlur = 2;
-        ctx.fillText(dr.blessing.phrase, cx, cy + ch * 0.35);
+        ctx.fillText(dr.blessing.phrase, cx, cy + ch * 0.39);
 
         ctx.restore();
     }
@@ -1833,51 +1826,6 @@ function executeReveal(index) {
         }
     }
 
-    // Burst sparkle particles — scaled by rarity
-    const burstCount = stars >= 6 ? 120 : stars >= 5 ? 80 : 35 + stars * 5;
-    const burstSpeed = stars >= 6 ? 8 : stars >= 5 ? 6 : 3.5;
-    const burstSize = stars >= 6 ? 5 : stars >= 5 ? 4 : 2.5;
-    for (let i = 0; i < burstCount; i++) {
-        const angle = (Math.PI * 2 * i) / burstCount + (Math.random() - 0.5) * 0.5;
-        const speed = burstSpeed * (0.5 + Math.random());
-        multiFortuneState.burstParticles.push({
-            x: card.centerX,
-            y: card.centerY,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            life: 1,
-            decay: stars >= 5 ? 0.008 + Math.random() * 0.005 : 0.012 + Math.random() * 0.008,
-            size: burstSize + Math.random() * burstSize,
-            color: card.draw.rarity.color,
-        });
-    }
-
-    // 5+ star: add expanding shockwave ring
-    if (stars >= 5) {
-        if (!multiFortuneState.shockwaves) multiFortuneState.shockwaves = [];
-        multiFortuneState.shockwaves.push({
-            x: card.centerX,
-            y: card.centerY,
-            startTime: globalTime,
-            duration: stars >= 6 ? 1.2 : 0.8,
-            maxRadius: Math.max(card.cardW, card.cardH) * (stars >= 6 ? 3.5 : 2.5),
-            color: card.draw.rarity.color,
-            lineWidth: stars >= 6 ? 4 : 2.5,
-        });
-        // 6-star: second delayed shockwave
-        if (stars >= 6) {
-            multiFortuneState.shockwaves.push({
-                x: card.centerX,
-                y: card.centerY,
-                startTime: globalTime + 0.15,
-                duration: 1.0,
-                maxRadius: Math.max(card.cardW, card.cardH) * 2.5,
-                color: CONFIG.glowGold,
-                lineWidth: 2,
-            });
-        }
-    }
-
     // Screen flash
     if (stars >= 4) {
         triggerScreenFlash(stars);
@@ -1893,81 +1841,11 @@ function onAllMultiCardsRevealed() {
     // Show action buttons
     const btnRevealAll = document.getElementById('btn-reveal-all');
     if (btnRevealAll) btnRevealAll.style.display = 'none';
-    if (btnMultiAgain) btnMultiAgain.style.display = 'block';
+
     if (btnMultiSingle) btnMultiSingle.style.display = 'block';
     if (btnMultiCollection) btnMultiCollection.style.display = 'block';
 }
 
-function renderBurstParticles() {
-    if (!multiFortuneState || !multiFortuneState.burstParticles.length) return;
-
-    ctx.save();
-    ctx.scale(dpr, dpr);
-
-    let alive = 0;
-    for (let i = 0; i < multiFortuneState.burstParticles.length; i++) {
-        const p = multiFortuneState.burstParticles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += 0.03; // slight gravity
-        p.vx *= 0.98;
-        p.vy *= 0.98;
-        p.life -= p.decay;
-        if (p.life <= 0) continue;
-
-        ctx.globalAlpha = p.life * 0.8;
-        ctx.fillStyle = p.color;
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = p.size * 3;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
-        ctx.fill();
-
-        multiFortuneState.burstParticles[alive++] = p;
-    }
-    multiFortuneState.burstParticles.length = alive;
-
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
-    ctx.restore();
-}
-
-function renderShockwaves() {
-    if (!multiFortuneState || !multiFortuneState.shockwaves || !multiFortuneState.shockwaves.length) return;
-
-    ctx.save();
-    ctx.scale(dpr, dpr);
-
-    let alive = 0;
-    for (let i = 0; i < multiFortuneState.shockwaves.length; i++) {
-        const sw = multiFortuneState.shockwaves[i];
-        const age = globalTime - sw.startTime;
-        if (age < 0) { multiFortuneState.shockwaves[alive++] = sw; continue; }
-        const t = age / sw.duration;
-        if (t >= 1) continue;
-
-        const radius = sw.maxRadius * easeOutQuart(t);
-        const alpha = (1 - t) * 0.7;
-
-        ctx.globalAlpha = alpha;
-        ctx.strokeStyle = sw.color;
-        ctx.lineWidth = sw.lineWidth * (1 - t * 0.5);
-        ctx.shadowColor = sw.color;
-        ctx.shadowBlur = 15 * (1 - t);
-        ctx.beginPath();
-        ctx.arc(sw.x, sw.y, radius, 0, Math.PI * 2);
-        ctx.stroke();
-
-        multiFortuneState.shockwaves[alive++] = sw;
-    }
-    multiFortuneState.shockwaves.length = alive;
-
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
-    ctx.restore();
-}
-
-function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
 
 function renderMultiHints() {
     if (!multiFortuneState) return;
@@ -1980,17 +1858,6 @@ function renderMultiHints() {
         const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
         const hintSubSize = isLandscape() ? Math.min(cellSize * 0.9, window.innerHeight * 0.02) : cellSize * 0.9;
         drawOverlayText('\u70B9\u51FB\u7FFB\u5F00 \u00B7 Tap to Reveal', L.multiHintY, CONFIG.glowGold, hintFade * pulse, hintSize);
-    } else {
-        // All revealed — show draw again hint after delay
-        const elapsed = globalTime - multiFortuneState.allRevealedTime;
-        if (elapsed > 2.0) {
-            const hintFade = Math.min(1, (elapsed - 2.0) / 0.5);
-            const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;
-            const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
-            const hintSubSize = isLandscape() ? Math.min(cellSize * 0.9, window.innerHeight * 0.02) : cellSize * 0.9;
-            drawOverlayText('\u2191 \u518D\u6765\u5341\u8FDE \u2191', L.multiHintY, CONFIG.glowGold, hintFade * pulse, hintSize);
-            drawOverlayText('Swipe Up to Draw \u00D710', L.multiHintSubY, CONFIG.glowGold, hintFade * pulse, hintSubSize);
-        }
     }
 }
 
@@ -2016,9 +1883,10 @@ function resetMultiFortune() {
     // Hide DOM buttons
     const btnRevealAll = document.getElementById('btn-reveal-all');
     if (btnRevealAll) btnRevealAll.style.display = 'none';
-    if (btnMultiAgain) btnMultiAgain.style.display = 'none';
+
     if (btnMultiSingle) btnMultiSingle.style.display = 'none';
     if (btnMultiCollection) btnMultiCollection.style.display = 'none';
+    if (btnMultiAgain) btnMultiAgain.style.display = 'none';
     // Hide detail popup
     if (multiDetail) multiDetail.classList.remove('visible');
 }
@@ -2530,10 +2398,7 @@ function renderFortuneOverlay() {
         renderAndCompositeGL();
         // 3. Revealed card text (on top of everything)
         renderMultiCardText();
-        // 4. Burst sparkles + shockwaves
-        renderBurstParticles();
-        renderShockwaves();
-        // 5. Hints
+        // 4. Hints
         renderMultiHints();
         return;
     }
@@ -2993,9 +2858,9 @@ const multiOverlay = document.getElementById('multi-overlay');
 const multiGrid = document.getElementById('multi-grid');
 const multiDetail = document.getElementById('multi-detail');
 const detailCard = document.getElementById('detail-card');
-const btnMultiAgain = document.getElementById('btn-multi-again');
 const btnMultiSingle = document.getElementById('btn-multi-single');
 const btnMultiCollection = document.getElementById('btn-multi-collection');
+const btnMultiAgain = document.getElementById('btn-multi-again');
 
 let selectedMode = 'single'; // 'single' or 'multi'
 
@@ -3040,11 +2905,29 @@ function startMultiPull() {
     // Hide action buttons
     const btnRevealAll = document.getElementById('btn-reveal-all');
     if (btnRevealAll) btnRevealAll.style.display = 'none';
-    if (btnMultiAgain) btnMultiAgain.style.display = 'none';
+
     if (btnMultiSingle) btnMultiSingle.style.display = 'none';
     if (btnMultiCollection) btnMultiCollection.style.display = 'none';
+    if (btnMultiAgain) btnMultiAgain.style.display = 'none';
 
     changeState('draw');
+}
+// ... (triggerScreenFlash, etc.)
+
+// ... (showMultiCardsWithFlip calls updateMultiActionsVisibility)
+
+function onAllCardsRevealed() {
+    updateMultiActionsVisibility(true);
+}
+
+function updateMultiActionsVisibility(allRevealed) {
+    const btnRevealAll = document.getElementById('btn-reveal-all');
+    if (btnRevealAll) btnRevealAll.style.display = allRevealed ? 'none' : 'block';
+    
+    // Show action buttons when revealed
+    if (btnMultiSingle) btnMultiSingle.style.display = allRevealed ? 'block' : 'none';
+    if (btnMultiCollection) btnMultiCollection.style.display = allRevealed ? 'block' : 'none';
+    if (btnMultiAgain) btnMultiAgain.style.display = allRevealed ? 'block' : 'none';
 }
 
 // --- Screen flash for high rarity card flips ---
@@ -3191,17 +3074,9 @@ function showMultiCardsWithFlip(draws) {
     updateUIVisibility();
 }
 
-function onAllCardsRevealed() {
-    updateMultiActionsVisibility(true);
-}
+// (Duplicate onAllCardsRevealed removed)
 
-function updateMultiActionsVisibility(allRevealed) {
-    const btnRevealAll = document.getElementById('btn-reveal-all');
-    if (btnRevealAll) btnRevealAll.style.display = allRevealed ? 'none' : 'block';
-    if (btnMultiAgain) btnMultiAgain.style.display = allRevealed ? 'block' : 'none';
-    if (btnMultiSingle) btnMultiSingle.style.display = allRevealed ? 'block' : 'none';
-    if (btnMultiCollection) btnMultiCollection.style.display = allRevealed ? 'block' : 'none';
-}
+// (Duplicate updateMultiActionsVisibility removed)
 
 function showMultiDetail(draw) {
     const detailStars = document.getElementById('detail-stars');
@@ -3242,14 +3117,6 @@ function hideMultiOverlay() {
 }
 
 // Multi-fortune action buttons (now floating over canvas)
-if (btnMultiAgain) {
-    btnMultiAgain.addEventListener('click', (e) => {
-        e.stopPropagation();
-        resetMultiFortune();
-        startMultiPull();
-    });
-}
-
 if (btnMultiSingle) {
     btnMultiSingle.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -3260,10 +3127,20 @@ if (btnMultiSingle) {
     });
 }
 
+if (btnMultiAgain) {
+    btnMultiAgain.addEventListener('click', (e) => {
+        e.stopPropagation();
+        startMultiPull();
+    });
+}
+
 if (btnMultiCollection) {
     btnMultiCollection.addEventListener('click', (e) => {
         e.stopPropagation();
-        resetMultiFortune();
+        // Hide multi action buttons while collection is open (don't reset state)
+        if (btnMultiSingle) btnMultiSingle.style.display = 'none';
+        if (btnMultiCollection) btnMultiCollection.style.display = 'none';
+        if (btnMultiAgain) btnMultiAgain.style.display = 'none';
         showCollectionPanel();
     });
 }
@@ -3440,6 +3317,9 @@ if (btnDrawFromCollection) {
     btnDrawFromCollection.addEventListener('click', (e) => {
         e.stopPropagation();
         hideCollectionPanel();
+        if (isMultiMode) {
+            resetMultiFortune();
+        }
         if (state === 'fortune' || state === 'arrival') {
             isMultiMode = false;
             daji3DParticles = [];
@@ -3455,6 +3335,12 @@ if (btnCloseCollection) {
     btnCloseCollection.addEventListener('click', (e) => {
         e.stopPropagation();
         hideCollectionPanel();
+        // Restore multi action buttons if returning to multi-draw results
+        if (isMultiMode && multiFortuneState && multiFortuneState.allRevealedTime) {
+        
+            if (btnMultiSingle) btnMultiSingle.style.display = 'block';
+            if (btnMultiCollection) btnMultiCollection.style.display = 'block';
+        }
     });
 }
 
