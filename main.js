@@ -377,6 +377,27 @@ function getLayout() {
     };
 }
 
+function getSwipeHintText(isMulti) {
+    return {
+        mainText: isMulti ? '\u2191  Swipe Up to Draw \u00D710  \u2191' : '\u2191  Swipe Up to Draw Fortune  \u2191',
+        subText: isMulti ? '\u4E0A\u6ED1\u5341\u8FDE' : '\u4E0A\u6ED1\u62BD\u7B7E',
+    };
+}
+
+function getSwipeHintSizes() {
+    return {
+        hintSize: isLandscape() ? Math.min(cellSize * 1.6, window.innerHeight * 0.035) : cellSize * 1.6,
+        hintSubSize: isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.027) : cellSize * 1.2,
+    };
+}
+
+function getSwipeHintHopOffset() {
+    const hopPhase = globalTime % 3.0;
+    if (hopPhase >= 0.9) return 0;
+    const decay = 1 - hopPhase / 0.9;
+    return -Math.abs(Math.sin((hopPhase / 0.9) * Math.PI * 3)) * 0.012 * decay;
+}
+
 // --- Three.js Setup (Hybrid Rendering) ---
 const ATLAS_COLS = 20;
 const ATLAS_ROWS = 20;
@@ -1612,20 +1633,11 @@ function renderArrivalOverlay() {
 
     const hintFade = Math.min(1, Math.max(0, (stateTime - 1.5) / 0.5));
     const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;
-    const hopPhase = globalTime % 3.0;
-    let hopOffset = 0;
-    if (hopPhase < 0.9) {
-        const decay = 1 - hopPhase / 0.9;
-        hopOffset = -Math.abs(Math.sin(hopPhase / 0.9 * Math.PI * 3)) * 0.012 * decay;
-    }
+    const hopOffset = getSwipeHintHopOffset();
 
     // Dynamic text based on mode
-    const isMulti = selectedMode === 'multi';
-    const mainText = isMulti ? '\u2191  \u4E0A\u6ED1\u5341\u8FDE  \u2191' : '\u2191  \u4E0A\u6ED1\u62BD\u7B7E  \u2191';
-    const subText = isMulti ? 'Swipe Up to Draw \u00D710' : 'Swipe Up to Draw Fortune';
-
-    const hintSize = isLandscape() ? Math.min(cellSize * 1.6, window.innerHeight * 0.035) : cellSize * 1.6;
-    const hintSubSize = isLandscape() ? Math.min(cellSize * 1.1, window.innerHeight * 0.025) : cellSize * 1.1;
+    const { mainText, subText } = getSwipeHintText(selectedMode === 'multi');
+    const { hintSize, hintSubSize } = getSwipeHintSizes();
     drawOverlayText(mainText, L.arrivalHintY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSize);
     drawOverlayText(subText, L.arrivalHintSubY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSubSize);
 }
@@ -2712,14 +2724,6 @@ function renderMultiCardText() {
         ctx.shadowBlur = charSize * 0.15;
         ctx.fillText(dr.char, cx, cy - ch * 0.07);
 
-        // Tier label
-        const tierSize = Math.max(6, unit * 0.08);
-        ctx.font = `${tierSize}px "Courier New", monospace`;
-        ctx.globalAlpha = alpha * 0.7;
-        ctx.fillStyle = dr.rarity.color;
-        ctx.shadowBlur = 3;
-        ctx.fillText(dr.rarity.label, cx, cy + ch * 0.26);
-
         // Blessing phrase
         const phraseSize = Math.max(6, unit * 0.07);
         ctx.font = `${phraseSize}px "Courier New", monospace`;
@@ -2899,12 +2903,12 @@ function onAllMultiCardsRevealed() {
 function renderMultiHints() {
     if (!multiFortuneState) return;
     const L = getLayout();
+    const { hintSize, hintSubSize } = getSwipeHintSizes();
 
     if (multiFortuneState.revealedCount < multiFortuneState.cards.length) {
         // "Tap to Reveal" hint
         const hintFade = Math.min(1, Math.max(0, (stateTime - 0.8) / 0.5));
         const pulse = 0.5 + Math.sin(globalTime * 3) * 0.2;
-        const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
         drawOverlayText('\u70B9\u51FB\u7FFB\u5F00 \u00B7 Tap to Reveal', L.multiHintY, CONFIG.glowGold, hintFade * pulse, hintSize);
     } else {
         // Swipe-up hint after all revealed (same as single draw)
@@ -2912,14 +2916,10 @@ function renderMultiHints() {
         if (revealAge > 1.0) {
             const hintFade = Math.min(1, (revealAge - 1.0) / 0.5);
             const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;
-            const isMulti = selectedMode === 'multi';
-            const mainText = isMulti ? '\u2191 \u518D\u6765\u5341\u8FDE \u2191' : '\u2191 \u518D\u62BD\u4E00\u6B21 \u2191';
-            const subText = isMulti ? 'Swipe Up to Draw \u00D710' : 'Swipe Up to Draw Again';
-            const singleHintLift = 0.03;
-            const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
-            const hintSubSize = isLandscape() ? Math.min(cellSize * 0.9, window.innerHeight * 0.02) : cellSize * 0.9;
-            drawOverlayText(mainText, L.hintY - singleHintLift, CONFIG.glowGold, hintFade * pulse, hintSize);
-            drawOverlayText(subText, L.hintSubY - singleHintLift, CONFIG.glowGold, hintFade * pulse, hintSubSize);
+            const hopOffset = getSwipeHintHopOffset();
+            const { mainText, subText } = getSwipeHintText(true);
+            drawOverlayText(mainText, L.arrivalHintY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSize);
+            drawOverlayText(subText, L.arrivalHintSubY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSubSize);
         }
     }
 }
@@ -2939,8 +2939,8 @@ function hitTestMultiCard(screenX, screenY) {
 function hitTestMultiHint(screenX, screenY) {
     if (!multiFortuneState) return false;
     const L = getLayout();
+    const { hintSize } = getSwipeHintSizes();
     const hintY = L.multiHintY * window.innerHeight;
-    const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
     const hitH = hintSize * 2;
     const hitW = window.innerWidth * 0.6;
     return Math.abs(screenX - window.innerWidth / 2) < hitW / 2 &&
@@ -3745,7 +3745,7 @@ function renderFortuneOverlay() {
         renderAndCompositeGL();
     }
     
-    // 5. Draw Text (Character, Tier, Phrase) on top
+    // 5. Draw Text (Character + Blessing) on top
     if (dajiFontTransition) {
         const transDur = 1.2;
         const tt = (globalTime - dajiFontTransition.startTime) / transDur;
@@ -3761,34 +3761,22 @@ function renderFortuneOverlay() {
         drawOverlayText(dr.char, L.charY, CONFIG.glowGold, fadeIn * 0.9, L.charFontSize, getDajiFont());
     }
 
-    // --- Tier label (two lines: Chinese + English) ---
+    // --- Top card subtitle (use blessing text, not rarity tier) ---
     const tierFade = Math.min(1, Math.max(0, (stateTime - 0.5) / 0.7));
     const tierSizeCn = isLandscape() ? Math.min(cellSize * 1.1, window.innerHeight * 0.025) : cellSize * 1.1;
     const tierSizeEn = isLandscape() ? Math.min(cellSize * 0.8, window.innerHeight * 0.018) : cellSize * 0.8;
-    drawOverlayText3D(dr.rarity.label, L.tierY, dr.rarity.color, tierFade * 0.8, tierSizeCn);
-    drawOverlayText3D(dr.rarity.labelEn, L.tierEnY, dr.rarity.color, tierFade * 0.55, tierSizeEn);
-
-    // --- Blessing phrase + english ---
-    const blessFade = Math.min(1, Math.max(0, (stateTime - 0.5) / 0.9));
-    const phraseSize = isLandscape() ? Math.min(cellSize * 1.5, window.innerHeight * 0.032) : cellSize * 1.5;
-    const engSize = isLandscape() ? Math.min(cellSize * 1, window.innerHeight * 0.022) : cellSize * 1;
-    drawOverlayText3D(dr.blessing.phrase, L.phraseY, CONFIG.glowRed, blessFade * 0.7, phraseSize);
-    drawOverlayText3D(dr.blessing.english, L.englishY, CONFIG.glowGold, blessFade * 0.5, engSize);
+    drawOverlayText3D(dr.blessing.phrase, L.tierY, CONFIG.glowRed, tierFade * 0.8, tierSizeCn);
+    drawOverlayText3D(dr.blessing.english, L.tierEnY, CONFIG.glowGold, tierFade * 0.55, tierSizeEn);
 
     // --- Hint to draw again ---
     if (stateTime > 2.5) {
         const hintFade = Math.min(1, (stateTime - 2.5) / 0.5);
         const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;
-
-        const isMulti = selectedMode === 'multi';
-        const mainText = isMulti ? '\u2191 \u518D\u6765\u5341\u8FDE \u2191' : '\u2191 \u518D\u62BD\u4E00\u6B21 \u2191';
-        const subText = isMulti ? 'Swipe Up to Draw \u00D710' : 'Swipe Up to Draw Again';
-        const singleHintLift = 0.03;
-
-        const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
-        const hintSubSize = isLandscape() ? Math.min(cellSize * 0.9, window.innerHeight * 0.02) : cellSize * 0.9;
-        drawOverlayText(mainText, L.hintY - singleHintLift, CONFIG.glowGold, hintFade * pulse, hintSize);
-        drawOverlayText(subText, L.hintSubY - singleHintLift, CONFIG.glowGold, hintFade * pulse, hintSubSize);
+        const hopOffset = getSwipeHintHopOffset();
+        const { mainText, subText } = getSwipeHintText(false);
+        const { hintSize, hintSubSize } = getSwipeHintSizes();
+        drawOverlayText(mainText, L.arrivalHintY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSize);
+        drawOverlayText(subText, L.arrivalHintSubY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSubSize);
     }
 }
 
@@ -4325,7 +4313,6 @@ function showMultiCardsWithFlip(draws) {
             <div class="card-front-inner">
                 <div class="mc-stars">${starsStr}</div>
                 <div class="mc-char">${draw.char}</div>
-                <div class="mc-tier">${draw.rarity.label}</div>
                 <div class="mc-phrase">${draw.blessing.phrase}</div>
             </div>
             <div class="card-rarity-glow"></div>
@@ -4400,7 +4387,6 @@ function showMultiDetail(draw) {
     const detailSoundBtn = document.getElementById('btn-detail-sound');
     const detailPhrase = document.getElementById('detail-phrase');
     const detailEnglish = document.getElementById('detail-english');
-    const detailTier = document.getElementById('detail-tier');
     const detailMeaning = document.getElementById('detail-meaning');
 
     detailCard.style.setProperty('--card-color', draw.rarity.color);
@@ -4421,10 +4407,6 @@ function showMultiDetail(draw) {
     // Idiom
     detailPhrase.textContent = draw.blessing ? draw.blessing.phrase : '';
     detailEnglish.textContent = draw.blessing ? draw.blessing.english : '';
-
-    // Tier label
-    detailTier.textContent = draw.rarity.label + ' \u00B7 ' + draw.rarity.labelEn;
-    detailTier.style.color = draw.rarity.color;
 
     // Meaning section — bilingual explanation
     if (detailMeaning && draw.blessing) {
