@@ -4602,23 +4602,49 @@ function showCollectionPanel() {
     const progress = getCollectionProgress();
     const categories = getCollectionByCategory();
 
-    // Update progress / stats
+    // Update progress with ring + stats
     if (collectionProgress) {
-        collectionProgress.className = 'collection-stats';
+        collectionProgress.className = 'collection-progress-area';
+        const r = 38, circ = 2 * Math.PI * r;
+        const offset = circ - (circ * progress.percentage / 100);
         collectionProgress.innerHTML =
-            `<div class="stat-item">
-                <div class="stat-value">${progress.collected}</div>
-                <div class="stat-label">Collected</div>
+            `<div class="progress-ring-wrap">
+                <svg viewBox="0 0 90 90">
+                    <defs>
+                        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="rgba(255,180,0,0.7)"/>
+                            <stop offset="50%" stop-color="#FFD700"/>
+                            <stop offset="100%" stop-color="rgba(255,240,160,1)"/>
+                        </linearGradient>
+                    </defs>
+                    <circle class="progress-ring-bg" cx="45" cy="45" r="${r}"/>
+                    <circle class="progress-ring-glow" cx="45" cy="45" r="${r}"
+                        stroke-dasharray="${circ}" stroke-dashoffset="${circ}"/>
+                    <circle class="progress-ring-fill" cx="45" cy="45" r="${r}"
+                        stroke-dasharray="${circ}" stroke-dashoffset="${circ}"/>
+                </svg>
+                <div class="progress-ring-center">
+                    <span class="progress-pct">${progress.percentage}<span class="progress-pct-sign">%</span></span>
+                </div>
             </div>
-            <div class="stat-item">
-                <div class="stat-value">${progress.total}</div>
-                <div class="stat-label">Total</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">${progress.percentage}%</div>
-                <div class="stat-label">Complete</div>
+            <div class="progress-stats">
+                <div>
+                    <div class="stat-row">
+                        <span class="stat-row-value">${progress.collected}</span>
+                        <span class="stat-row-divider">/</span>
+                        <span class="stat-row-total">${progress.total}</span>
+                    </div>
+                    <div class="stat-row-label">Collected</div>
+                </div>
             </div>`;
-        // Add progress bar after stats
+        // Animate ring fill after paint
+        requestAnimationFrame(() => {
+            const fillCircle = collectionProgress.querySelector('.progress-ring-fill');
+            const glowCircle = collectionProgress.querySelector('.progress-ring-glow');
+            if (fillCircle) fillCircle.style.strokeDashoffset = offset;
+            if (glowCircle) glowCircle.style.strokeDashoffset = offset;
+        });
+        // Thin accent bar
         let bar = collectionProgress.parentElement.querySelector('.collection-progress-bar');
         if (!bar) {
             bar = document.createElement('div');
@@ -4651,7 +4677,9 @@ function showCollectionPanel() {
 
             const titleDiv = document.createElement('div');
             titleDiv.className = 'collection-category-title';
-            titleDiv.innerHTML = `${cat.nameEn} <span>${cat.name}</span>`;
+            const catStarsForTitle = getStars(idx);
+            const collectedInCat = cat.items.filter(it => it.collected).length;
+            titleDiv.innerHTML = `<span class="cat-stars">${'\u2605'.repeat(catStarsForTitle)}</span>${cat.nameEn} <span>${cat.name}</span><span class="collection-category-count">${collectedInCat}/${cat.items.length}</span>`;
             groupDiv.appendChild(titleDiv);
 
             const gridDiv = document.createElement('div');

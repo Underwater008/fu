@@ -136,11 +136,38 @@ export function performDraw() {
     return { char, rarity: tier, tierIndex: tierIdx, category, blessing };
 }
 
+// Shuffle draws for suspense: best card lands near the end, rest are random.
+// Mimics gacha games where the rare card is a dramatic late reveal.
+function shuffleDrawsWithSuspense(draws) {
+    // Fisher-Yates shuffle
+    const arr = [...draws];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+
+    // Find the best (lowest tierIndex = highest rarity) card
+    let bestIdx = 0;
+    for (let i = 1; i < arr.length; i++) {
+        if (arr[i].tierIndex < arr[bestIdx].tierIndex) bestIdx = i;
+    }
+
+    // Only relocate if it's 4★+ (tierIndex <= 2) — no need for commons
+    if (arr[bestIdx].tierIndex <= 2) {
+        // Move best card to one of the last 3 positions (index 7, 8, or 9)
+        const targetPos = 7 + Math.floor(Math.random() * 3);
+        if (bestIdx !== targetPos) {
+            [arr[bestIdx], arr[targetPos]] = [arr[targetPos], arr[bestIdx]];
+        }
+    }
+
+    return arr;
+}
+
 export function performMultiDraw() {
     const draws = [];
     for (let i = 0; i < 10; i++) draws.push(performDraw());
-    draws.sort((a, b) => a.tierIndex - b.tierIndex);
-    return draws;
+    return shuffleDrawsWithSuspense(draws);
 }
 
 // --- Pity-Aware Draw Functions ---
@@ -182,8 +209,8 @@ export function performMultiDrawWithPity(pityCounter) {
             pity++;
         }
     }
-    draws.sort((a, b) => a.tierIndex - b.tierIndex);
-    return { draws, newPityCounter: pity };
+    const shuffled = shuffleDrawsWithSuspense(draws);
+    return { draws: shuffled, newPityCounter: pity };
 }
 
 // --- Collection Management (localStorage) ---
