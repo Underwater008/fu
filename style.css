@@ -119,6 +119,36 @@ body {
     transform: scale(0.96);
 }
 
+.start-seal-link {
+    position: absolute;
+    left: 50%;
+    bottom: max(16px, calc(12px + env(safe-area-inset-bottom)));
+    width: clamp(42px, 8vw, 56px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: translateX(-50%);
+    opacity: 0.88;
+    transition: transform 0.25s ease, opacity 0.25s ease, filter 0.25s ease;
+}
+
+.start-seal-link:hover {
+    opacity: 1;
+    filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.25));
+    transform: translateX(-50%) translateY(-2px) scale(1.03);
+}
+
+.start-seal-link:active {
+    transform: translateX(-50%) scale(0.97);
+}
+
+.start-seal-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
+}
+
 .start-ornament-top,
 .start-ornament-bottom {
     display: none;
