@@ -1208,6 +1208,7 @@ let stateTime = 0;
 let globalTime = 0;
 let stateStartGlobal = 0;
 let drawToFortuneSeed = null;
+let fortuneUseDrawMorph = false;
 
 function changeState(newState) {
     state = newState;
@@ -1241,7 +1242,13 @@ function changeState(newState) {
             fwLaunchCount = 0;
         } else {
             if (currentDrawResult) playSfxReveal(currentDrawResult.rarity.stars);
-            if (drawToFortuneSeed && drawToFortuneSeed.length > 0) {
+            if (fortuneUseDrawMorph) {
+                // Keep using morphParticles directly; avoid rebuilding into a new cluster.
+                daji3DParticles = [];
+                hoveredIdx = -1;
+                hideTooltip();
+                drawToFortuneSeed = null;
+            } else if (drawToFortuneSeed && drawToFortuneSeed.length > 0) {
                 initDaji3D(drawToFortuneSeed);
                 drawToFortuneSeed = null;
             } else {
@@ -1332,6 +1339,8 @@ let morphParticles = [];
 let launchTrail = [];
 let burstFlash = 0;
 let fuEndScreenPositions = []; // screen-coord positions where each 福 ends up before exploding
+let drawBurstTriggered = false;
+let drawReformFinalized = false;
 
 // --- Cinematic Camera System ---
 const cam = { x: 0, y: 0, scale: 1, shake: 0, focusX: 0, focusY: 0 };
@@ -1553,6 +1562,9 @@ function initDrawAnimation() {
     morphParticles = [];
     launchTrail = [];
     burstFlash = 0;
+    drawBurstTriggered = false;
+    drawReformFinalized = false;
+    fortuneUseDrawMorph = false;
     fuEndScreenPositions = [];
     drawToFortuneSeed = null;
     meteorParticles = [];
@@ -1781,9 +1793,13 @@ function updateDraw() {
     }
 
     // --- BURST FLASH ---
+    // Trigger once when launch ends so low FPS can't skip particle activation.
+    if (!drawBurstTriggered && t >= DRAW_LAUNCH) {
+        drawBurstTriggered = true;
+        for (const p of morphParticles) p.active = true;
+    }
     if (t >= DRAW_LAUNCH && t < DRAW_LAUNCH + 0.15) {
         burstFlash = 1 - (t - DRAW_LAUNCH) / 0.15;
-        for (const p of morphParticles) p.active = true;
     } else if (t >= DRAW_LAUNCH + 0.15) {
         burstFlash = 0;
     }
@@ -1838,6 +1854,18 @@ function updateDraw() {
         }
     }
 
+    // Ensure reform is fully complete before transitioning to fortune.
+    if (!drawReformFinalized && t >= DRAW_SETTLE) {
+        drawReformFinalized = true;
+        for (const p of morphParticles) {
+            if (!p.active) continue;
+            p.x = p.targetX;
+            p.y = p.targetY;
+            p.z = p.targetZ;
+            p.char = p.finalChar;
+        }
+    }
+
     // --- Update trail sparks ---
     const worldBottom = (rows * 0.5 + 2) * cellSize;
     let tw = 0;
@@ -1859,8 +1887,9 @@ function updateDraw() {
             drawToFortuneSeed = null;
             changeState('fortune');
         } else {
-            const seeded = buildDajiSeedFromMorph();
-            drawToFortuneSeed = seeded.length > 0 ? seeded : null;
+            // Keep reformed draw particles as-is in fortune (no rebuild/snap).
+            fortuneUseDrawMorph = true;
+            drawToFortuneSeed = null;
             changeState('fortune');
         }
     }
@@ -3232,6 +3261,50 @@ function appendStarsToGPU(startIdx, starsCount, centerY, colorHex, elapsedTime) 
     return idx;
 }
 
+// Reuse draw-phase reformed particles directly in fortune (single mode).
+function appendStaticMorphToGPU(startIdx = 0) {
+    if (!particlesMesh) return startIdx;
+
+    const instColor = particlesMesh.geometry.attributes.instanceColor;
+    const instAlpha = particlesMesh.geometry.attributes.instanceAlpha;
+    const instUV = particlesMesh.geometry.attributes.instanceUV;
+    const instScale = particlesMesh.geometry.attributes.instanceScale;
+    const maxCount = instColor.count;
+
+    let idx = startIdx;
+    for (const p of morphParticles) {
+        if (!p.active || idx >= maxCount) continue;
+
+        const lum = Math.min(1, p.brightness + 0.08);
+        const color = lerpColor(lum);
+        const char = (p.char && p.char !== ' ')
+            ? p.char
+            : ((p.finalChar && p.finalChar !== ' ') ? p.finalChar : '\u00B7');
+
+        _dummy.position.set(p.x, -p.y, -p.z);
+        _dummy.updateMatrix();
+        particlesMesh.setMatrixAt(idx, _dummy.matrix);
+
+        instColor.setXYZ(idx, color.r / 255, color.g / 255, color.b / 255);
+        instAlpha.setX(idx, 0.3 + lum * 0.7);
+
+        const uv = (p.fontIdx != null && charToUV[char + '|' + p.fontIdx]) || charToUV[char];
+        if (uv) instUV.setXY(idx, uv.u, uv.v);
+
+        instScale.setX(idx, cellSize * 1.1);
+        idx++;
+    }
+
+    particlesMesh.count = idx;
+    particlesMesh.instanceMatrix.needsUpdate = true;
+    instColor.needsUpdate = true;
+    instAlpha.needsUpdate = true;
+    instUV.needsUpdate = true;
+    instScale.needsUpdate = true;
+
+    return idx;
+}
+
 // --- Fortune overlay with gacha-specific reveal ---
 function renderFortuneOverlay() {
     // Multi-mode: canvas-integrated particle + card display
@@ -3288,7 +3361,7 @@ function renderFortuneOverlay() {
     }
 
     // 2. Update GPU particles (skip render)
-    let gpuIdx = updateDajiToGPU(true);
+    let gpuIdx = fortuneUseDrawMorph ? appendStaticMorphToGPU(0) : updateDajiToGPU(true);
 
     // 3. Add Stars as GPU particles (stamped in one by one)
     if (cardFade > 0.01 && stateTime > 0.4) {
