@@ -13,10 +13,9 @@ body {
 
 /* ============ MUTE BUTTON ============ */
 .mute-btn {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 40;
+    pointer-events: auto;
+    position: static;
+    flex-shrink: 0;
     width: 42px;
     height: 42px;
     border-radius: 50%;

@@ -138,7 +138,6 @@ let ppChromatic = 0;       // chromatic aberration strength (0 = off)
 let ppBloomStrength = 0.12; // current bloom strength
 let ppBloomTarget = 0.12;  // target bloom strength (lerps)
 let ppShockwaves = [];     // { cx, cy, startTime, duration, maxRadius, strength }
-let lightPillars = [];     // { x, y, startTime, duration, color }
 let speedLinesActive = false;
 
 // --- Chromatic Aberration Shader ---
@@ -1406,66 +1405,6 @@ function renderSpeedLines() {
     ctx.restore();
 }
 
-// --- Light Pillar (6-star reveal) ---
-function renderLightPillars() {
-    if (!lightPillars.length) return;
-
-    ctx.save();
-    ctx.scale(dpr, dpr);
-    ctx.globalCompositeOperation = 'lighter';
-
-    let alive = 0;
-    for (let i = 0; i < lightPillars.length; i++) {
-        const p = lightPillars[i];
-        const age = globalTime - p.startTime;
-        if (age > p.duration) continue;
-        lightPillars[alive++] = p;
-
-        const flashIn = Math.min(1, age / 0.12);
-        const sustain = age > p.duration * 0.3
-            ? Math.max(0, 1 - (age - p.duration * 0.3) / (p.duration * 0.7))
-            : 1;
-        const alpha = flashIn * sustain;
-
-        const baseW = 24 + Math.sin(age * 9) * 4;
-        const pillarH = window.innerHeight;
-
-        // Upward beam
-        const gradUp = ctx.createLinearGradient(p.x, p.y, p.x, 0);
-        gradUp.addColorStop(0, p.color);
-        gradUp.addColorStop(0.4, p.color);
-        gradUp.addColorStop(1, 'transparent');
-        ctx.globalAlpha = alpha * 0.45;
-        ctx.fillStyle = gradUp;
-        ctx.fillRect(p.x - baseW / 2, 0, baseW, p.y);
-
-        // Downward beam
-        const gradDown = ctx.createLinearGradient(p.x, p.y, p.x, pillarH);
-        gradDown.addColorStop(0, p.color);
-        gradDown.addColorStop(0.5, 'transparent');
-        ctx.fillStyle = gradDown;
-        ctx.fillRect(p.x - baseW / 2, p.y, baseW, pillarH - p.y);
-
-        // Bright center line
-        const cw = 3 + Math.sin(age * 14) * 1.5;
-        ctx.globalAlpha = alpha * 0.7;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(p.x - cw / 2, 0, cw, pillarH);
-
-        // Horizontal flare at card center
-        const flareW = baseW * 4 * (1 - Math.min(1, age / 0.3));
-        if (flareW > 2) {
-            ctx.globalAlpha = alpha * 0.3 * (1 - Math.min(1, age / 0.3));
-            ctx.fillStyle = p.color;
-            ctx.fillRect(p.x - flareW / 2, p.y - 3, flareW, 6);
-        }
-    }
-    lightPillars.length = alive;
-
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.restore();
-}
-
 // --- Meteor Shower (rarity color tell) ---
 let meteorParticles = [];
 let bestStarsInBatch = 0; // Highest rarity in multi draw
@@ -2022,7 +1961,6 @@ function initMultiFortuneState() {
     };
     // Reset post-processing state
     ppShockwaves = [];
-    lightPillars = [];
     ppChromatic = 0;
     ppBloomTarget = 0.12;
 }
@@ -2554,8 +2492,6 @@ function finishReveal(index) {
         }
     }
 
-    // Light pillar removed per user request
-
     // BURST particles outward from center
     const cardWorldCX = card.centerX - window.innerWidth / 2;
     const cardWorldCY = card.centerY - window.innerHeight / 2;
@@ -2678,7 +2614,6 @@ function resetMultiFortune() {
     godRayAlpha = 0;
     // Reset post-processing effects
     ppShockwaves = [];
-    lightPillars = [];
     ppChromatic = 0;
     ppBloomTarget = 0.12;
     ppBloomStrength = 0.12;
@@ -3304,8 +3239,6 @@ function renderFortuneOverlay() {
         // 2. GPU particles on top (additive blend + bloom + post-fx)
         updateMultiDajiToGPU(true);
         renderAndCompositeGL();
-        // 3. Light pillars (additive, on top of particles)
-        renderLightPillars();
         // 4. Revealed card text (on top of everything)
         renderMultiCardText();
         // 5. Hints
@@ -3782,7 +3715,6 @@ function appendFireworksToGPU(startIdx) {
 // MULTI-PULL (10-pull) SYSTEM
 // ============================================================
 
-// const btnMultiPull = document.getElementById('btn-multi-pull'); // Removed
 const modeSwitch = document.getElementById('mode-switch');
 const multiOverlay = document.getElementById('multi-overlay');
 const multiGrid = document.getElementById('multi-grid');
@@ -4013,10 +3945,6 @@ function showMultiCardsWithFlip(draws) {
     updateMultiActionsVisibility(false);
     updateUIVisibility();
 }
-
-// (Duplicate onAllCardsRevealed removed)
-
-// (Duplicate updateMultiActionsVisibility removed)
 
 function showMultiDetail(draw) {
     const detailStars = document.getElementById('detail-stars');

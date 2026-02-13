@@ -1,242 +1,145 @@
 // ============================================================
-// audio.js — Festive BGM Generator (Web Audio API, no copyright)
-// Generates a Chinese pentatonic-style ambient loop
+// audio.js — Festive BGM (YouTube) & SFX (Web Audio API)
 // ============================================================
 
 let audioCtx = null;
-let masterGain = null;
-let bgmGain = null;
 let sfxGain = null;
 let isMuted = false;
 let bgmStarted = false;
-let bgmTimers = [];
 
-// Chinese pentatonic scale frequencies (C4-based: gong, shang, jue, zhi, yu)
-const PENTATONIC = [
-    261.63, 293.66, 329.63, 392.00, 440.00, // C4 D4 E4 G4 A4
-    523.25, 587.33, 659.25, 783.99, 880.00, // C5 D5 E5 G5 A5
-];
+// --- YouTube Player State ---
+let ytPlayer = null;
+let ytReady = false;
+const VIDEO_ID = '-NA4IJbjhB8'; 
 
-// Melody patterns (indices into PENTATONIC) — festive, bright phrases
-const MELODY_PHRASES = [
-    [4, 3, 2, 0, 2, 3, 4, 4],
-    [5, 4, 3, 2, 3, 4, 5, 7],
-    [7, 6, 5, 4, 5, 4, 3, 2],
-    [0, 2, 4, 5, 4, 3, 2, 0],
-    [3, 4, 5, 7, 5, 4, 3, 2],
-    [5, 5, 4, 3, 4, 5, 7, 5],
-    [2, 3, 4, 5, 7, 5, 4, 3],
-    [9, 7, 5, 4, 5, 7, 5, 4],
-];
+// Load YouTube IFrame API
+function loadYouTubeAPI() {
+    if (window.YT) return; // Already loaded
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
-// Note durations in beats (mixed rhythm for musicality)
-const RHYTHM_PATTERNS = [
-    [1, 1, 1, 1, 1, 1, 1, 1],
-    [1.5, 0.5, 1, 1, 1.5, 0.5, 1, 1],
-    [1, 1, 1.5, 0.5, 1, 1, 1, 1],
-    [2, 1, 1, 1, 1, 1, 1, 0],
-];
+    window.onYouTubeIframeAPIReady = () => {
+        ytPlayer = new YT.Player('youtube-bgm', {
+            height: '1',
+            width: '1',
+            videoId: VIDEO_ID,
+            playerVars: {
+                'playsinline': 1,
+                'controls': 0,
+                'disablekb': 1,
+                'fs': 0,
+                'loop': 1,
+                'playlist': VIDEO_ID, // Required for loop to work
+                'origin': window.location.origin // Fixes the "postMessage" origin mismatch error
+            },
+            events: {
+                'onReady': onPlayerReady,
+                'onStateChange': onPlayerStateChange,
+                'onError': onPlayerError
+            }
+        });
+    };
+}
 
+function onPlayerReady(event) {
+    ytReady = true;
+    event.target.setVolume(25); // Set BGM volume (0-100)
+    if (isMuted) {
+        event.target.mute();
+    }
+    if (bgmStarted) {
+        event.target.playVideo();
+    }
+}
+
+function onPlayerError(event) {
+    console.error('YouTube Player Error:', event.data);
+}
+
+function onPlayerStateChange(event) {
+    // 0 = Ended, 1 = Playing, 2 = Paused, 3 = Buffering, 5 = Cued
+    if (event.data === 0) { // Ended
+        event.target.playVideo();
+    } else if (event.data === 2) { // Paused
+        // If it paused but we expect it to be playing, force resume
+        if (bgmStarted && !isMuted) {
+            event.target.playVideo();
+        }
+    }
+}
+
+// Initialize Audio Context for SFX and Load YouTube API
 export function initAudio() {
-    if (audioCtx) return;
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-    masterGain = audioCtx.createGain();
-    masterGain.gain.value = 1.0;
-    masterGain.connect(audioCtx.destination);
-
-    bgmGain = audioCtx.createGain();
-    bgmGain.gain.value = 0.18; // BGM volume — soft background
-    bgmGain.connect(masterGain);
-
-    sfxGain = audioCtx.createGain();
-    sfxGain.gain.value = 0.3;
-    sfxGain.connect(masterGain);
+    // SFX Setup
+    if (!audioCtx) {
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            sfxGain = audioCtx.createGain();
+            sfxGain.gain.value = 0.3;
+            sfxGain.connect(audioCtx.destination);
+        } catch (e) {
+            console.warn('Web Audio API not supported or blocked', e);
+        }
+    }
+    
+    // BGM Setup
+    loadYouTubeAPI();
 }
 
 export function resumeAudio() {
     if (audioCtx && audioCtx.state === 'suspended') {
-        audioCtx.resume();
+        audioCtx.resume().catch(() => {
+            // Ignore auto-play errors; we will try again on next interaction
+        });
     }
-}
-
-// --- Play a single note with envelope ---
-function playNote(freq, startTime, duration, volume = 0.15, type = 'sine') {
-    if (!audioCtx || !bgmGain) return;
-
-    const osc = audioCtx.createOscillator();
-    const env = audioCtx.createGain();
-
-    osc.type = type;
-    osc.frequency.value = freq;
-
-    // Gentle attack/decay envelope
-    const attack = 0.05;
-    const decay = duration * 0.3;
-    const sustain = volume * 0.6;
-    const release = Math.min(0.4, duration * 0.4);
-
-    env.gain.setValueAtTime(0, startTime);
-    env.gain.linearRampToValueAtTime(volume, startTime + attack);
-    env.gain.linearRampToValueAtTime(sustain, startTime + attack + decay);
-    env.gain.setValueAtTime(sustain, startTime + duration - release);
-    env.gain.linearRampToValueAtTime(0, startTime + duration);
-
-    osc.connect(env);
-    env.connect(bgmGain);
-
-    osc.start(startTime);
-    osc.stop(startTime + duration + 0.05);
-}
-
-// --- Play a warm pad chord ---
-function playPad(freqs, startTime, duration, volume = 0.04) {
-    if (!audioCtx || !bgmGain) return;
-
-    for (const freq of freqs) {
-        // Slightly detuned pair for warmth
-        for (const detune of [-3, 0, 3]) {
-            const osc = audioCtx.createOscillator();
-            const env = audioCtx.createGain();
-
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            osc.detune.value = detune;
-
-            env.gain.setValueAtTime(0, startTime);
-            env.gain.linearRampToValueAtTime(volume, startTime + 0.8);
-            env.gain.setValueAtTime(volume, startTime + duration - 1.2);
-            env.gain.linearRampToValueAtTime(0, startTime + duration);
-
-            osc.connect(env);
-            env.connect(bgmGain);
-
-            osc.start(startTime);
-            osc.stop(startTime + duration + 0.1);
-        }
+    // Also try to play video if it was supposed to be playing
+    if (bgmStarted && ytReady && ytPlayer && ytPlayer.playVideo) {
+         ytPlayer.playVideo();
     }
-}
-
-// --- Plucked string sound (guzheng-like) ---
-function playPluck(freq, startTime, duration, volume = 0.12) {
-    if (!audioCtx || !bgmGain) return;
-
-    // Use triangle wave + fast decay for plucked sound
-    const osc = audioCtx.createOscillator();
-    const osc2 = audioCtx.createOscillator();
-    const env = audioCtx.createGain();
-    const filter = audioCtx.createBiquadFilter();
-
-    osc.type = 'triangle';
-    osc.frequency.value = freq;
-    osc2.type = 'sine';
-    osc2.frequency.value = freq * 2; // harmonic
-
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(freq * 6, startTime);
-    filter.frequency.exponentialRampToValueAtTime(freq * 1.5, startTime + duration * 0.7);
-
-    // Sharp attack, exponential decay
-    env.gain.setValueAtTime(0, startTime);
-    env.gain.linearRampToValueAtTime(volume, startTime + 0.01);
-    env.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-
-    const merger = audioCtx.createGain();
-    merger.gain.value = 1.0;
-
-    osc.connect(merger);
-    osc2.connect(audioCtx.createGain()); // separate gain for harmonic
-    const harmGain = audioCtx.createGain();
-    harmGain.gain.value = 0.3;
-    osc2.connect(harmGain);
-    harmGain.connect(merger);
-
-    merger.connect(filter);
-    filter.connect(env);
-    env.connect(bgmGain);
-
-    osc.start(startTime);
-    osc2.start(startTime);
-    osc.stop(startTime + duration + 0.1);
-    osc2.stop(startTime + duration + 0.1);
-}
-
-// --- Schedule one full loop of BGM ---
-function scheduleBGMLoop() {
-    if (!audioCtx || !bgmGain || isMuted) return;
-
-    const bpm = 72;
-    const beatDur = 60 / bpm;
-    const now = audioCtx.currentTime + 0.1;
-
-    // Pick random melody phrase and rhythm
-    const phraseIdx = Math.floor(Math.random() * MELODY_PHRASES.length);
-    const rhythmIdx = Math.floor(Math.random() * RHYTHM_PATTERNS.length);
-    const phrase = MELODY_PHRASES[phraseIdx];
-    const rhythm = RHYTHM_PATTERNS[rhythmIdx];
-
-    // Pad chord: root + 5th of the phrase's first note
-    const rootIdx = phrase[0] % 5;
-    const padRoot = PENTATONIC[rootIdx];
-    const padFifth = PENTATONIC[(rootIdx + 2) % 5] * (rootIdx + 2 >= 5 ? 1 : 1);
-    const loopBeats = rhythm.reduce((a, b) => a + b, 0);
-    const loopDuration = loopBeats * beatDur;
-
-    // Background pad
-    playPad([padRoot * 0.5, padFifth * 0.5], now, loopDuration + 1, 0.025);
-
-    // Melody notes (plucked guzheng style)
-    let t = now;
-    for (let i = 0; i < phrase.length; i++) {
-        const dur = rhythm[i] * beatDur;
-        if (dur > 0) {
-            const freq = PENTATONIC[phrase[i]];
-            playPluck(freq, t, dur * 0.9, 0.08 + Math.random() * 0.04);
-
-            // Occasional octave doubling for brightness
-            if (Math.random() < 0.2) {
-                playNote(freq * 2, t + 0.02, dur * 0.5, 0.02, 'sine');
-            }
-        }
-        t += dur;
-    }
-
-    // Add gentle bell/chime accent on first beat
-    playNote(PENTATONIC[phrase[0]] * 2, now, beatDur * 2, 0.03, 'sine');
-
-    // Schedule next loop (with slight pause between phrases)
-    const nextDelay = (loopDuration + 1.5 + Math.random() * 1.0) * 1000;
-    const timer = setTimeout(() => scheduleBGMLoop(), nextDelay);
-    bgmTimers.push(timer);
 }
 
 export function startBGM() {
-    if (bgmStarted || !audioCtx) return;
     bgmStarted = true;
+    if (ytReady && ytPlayer && ytPlayer.playVideo) {
+        ytPlayer.playVideo();
+    }
     resumeAudio();
-    scheduleBGMLoop();
 }
 
 export function stopBGM() {
     bgmStarted = false;
-    for (const t of bgmTimers) clearTimeout(t);
-    bgmTimers = [];
+    if (ytReady && ytPlayer && ytPlayer.pauseVideo) {
+        ytPlayer.pauseVideo();
+    }
 }
 
 export function toggleMute() {
     isMuted = !isMuted;
-    if (masterGain) {
-        masterGain.gain.linearRampToValueAtTime(
-            isMuted ? 0 : 1.0,
-            audioCtx.currentTime + 0.15
-        );
+    
+    // Mute SFX
+    if (audioCtx) {
+        // We can't mute the context easily without affecting everything, 
+        // so we just mute the sfxGain or use a master gain if we had one.
+        // Re-implementing master gain logic briefly for SFX:
+        if (sfxGain) {
+             sfxGain.gain.setTargetAtTime(isMuted ? 0 : 0.3, audioCtx.currentTime, 0.1);
+        }
     }
-    if (isMuted) {
-        stopBGM();
-    } else if (!bgmStarted) {
-        bgmStarted = true;
-        scheduleBGMLoop();
+
+    // Mute BGM
+    if (ytReady && ytPlayer) {
+        if (isMuted) {
+            ytPlayer.mute();
+        } else {
+            ytPlayer.unMute();
+            // Ensure volume is reset (sometimes unMute sets it to default)
+            ytPlayer.setVolume(25);
+            if (bgmStarted) ytPlayer.playVideo();
+        }
     }
+    
     return isMuted;
 }
 
