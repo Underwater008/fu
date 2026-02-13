@@ -3990,7 +3990,6 @@ const btnCollection = document.getElementById('btn-collection');
 const collectionPanel = document.getElementById('collection-panel');
 const collectionGrid = document.getElementById('collection-grid');
 const collectionProgress = document.getElementById('collection-progress');
-const btnDrawFromCollection = document.getElementById('btn-draw-from-collection');
 const btnCloseCollection = document.getElementById('btn-close-collection');
 
 function showCollectionPanel() {
@@ -4013,6 +4012,15 @@ function showCollectionPanel() {
                 <div class="stat-value">${progress.percentage}%</div>
                 <div class="stat-label">Complete <span class="btn-zh">\u5B8C\u6210</span></div>
             </div>`;
+        // Add progress bar after stats
+        let bar = collectionProgress.parentElement.querySelector('.collection-progress-bar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.className = 'collection-progress-bar';
+            bar.innerHTML = '<div class="collection-progress-fill"></div>';
+            collectionProgress.parentElement.appendChild(bar);
+        }
+        bar.querySelector('.collection-progress-fill').style.width = `${progress.percentage}%`;
     }
 
     // Build grid
@@ -4118,24 +4126,6 @@ if (btnCollection) {
     btnCollection.addEventListener('click', (e) => {
         e.stopPropagation();
         showCollectionPanel();
-    });
-}
-
-if (btnDrawFromCollection) {
-    btnDrawFromCollection.addEventListener('click', (e) => {
-        e.stopPropagation();
-        hideCollectionPanel();
-        if (isMultiMode) {
-            resetMultiFortune();
-        }
-        if (state === 'fortune' || state === 'arrival') {
-            isMultiMode = false;
-            daji3DParticles = [];
-            hoveredIdx = -1;
-            if (particlesMesh) particlesMesh.count = 0;
-            hideTooltip();
-            changeState('draw');
-        }
     });
 }
 
