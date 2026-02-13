@@ -4021,15 +4021,15 @@ function showCollectionPanel() {
         collectionProgress.innerHTML =
             `<div class="stat-item">
                 <div class="stat-value">${progress.collected}</div>
-                <div class="stat-label">Collected <span class="btn-zh">\u5DF2\u6536\u96C6</span></div>
+                <div class="stat-label">Collected</div>
             </div>
             <div class="stat-item">
                 <div class="stat-value">${progress.total}</div>
-                <div class="stat-label">Total <span class="btn-zh">\u603B\u8BA1</span></div>
+                <div class="stat-label">Total</div>
             </div>
             <div class="stat-item">
                 <div class="stat-value">${progress.percentage}%</div>
-                <div class="stat-label">Complete <span class="btn-zh">\u5B8C\u6210</span></div>
+                <div class="stat-label">Complete</div>
             </div>`;
         // Add progress bar after stats
         let bar = collectionProgress.parentElement.querySelector('.collection-progress-bar');
@@ -4064,7 +4064,7 @@ function showCollectionPanel() {
 
             const titleDiv = document.createElement('div');
             titleDiv.className = 'collection-category-title';
-            titleDiv.innerHTML = `${cat.name} <span>${cat.nameEn}</span>`;
+            titleDiv.innerHTML = `${cat.nameEn} <span>${cat.name}</span>`;
             groupDiv.appendChild(titleDiv);
 
             const gridDiv = document.createElement('div');
