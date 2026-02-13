@@ -18,7 +18,7 @@ import {
 } from './gacha.js';
 import {
     initAudio, resumeAudio, startBGM, toggleMute, isBGMMuted,
-    playSfxDraw, playSfxReveal,
+    playSfxDraw, playSfxReveal, switchToVocal, switchToInst
 } from './audio.js';
 import { getUser, onAuthChange, restoreSession, updateDraws } from './auth.js';
 import { claimDailyLogin, getPityCounter, incrementPity, resetPity } from './rewards.js';
@@ -1217,8 +1217,10 @@ function changeState(newState) {
     if (newState === 'draw') {
         playSfxDraw();
         initDrawAnimation();
+        switchToVocal();
     }
     if (newState === 'fortune') {
+        switchToInst(); // Switch back to instrumental when results appear
         if (isMultiMode) {
             // Multi-mode: seed particles from morph (seamless transition)
             buildMultiDajiFromMorph();
