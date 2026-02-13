@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -16,10 +16,15 @@
 <body>
     <canvas id="c"></canvas>
 
+    <!-- Audio mute toggle -->
+    <button id="btn-mute" class="mute-btn" title="Toggle Sound">
+        <span class="mute-icon" id="mute-icon">&#128266;</span>
+    </button>
+
     <!-- Bottom Controls -->
     <div class="bottom-controls">
-        <button id="btn-collection" class="collection-fab">COLLECTION</button>
-        
+        <button id="btn-collection" class="collection-fab">COLLECTION <span class="btn-zh">图鉴</span></button>
+
         <div id="mode-switch" class="mode-switch">
             <div class="switch-track"></div>
             <div class="switch-option active" data-mode="single">×1</div>
@@ -35,36 +40,49 @@
 
     <!-- Multi-fortune floating action buttons -->
     <div class="multi-fortune-actions" id="multi-fortune-actions">
-        <button class="btn-action btn-primary" id="btn-reveal-all" style="display:none">REVEAL ALL</button>
-        <button class="btn-action btn-primary" id="btn-multi-again" style="display:none">DRAW x10</button>
-        <button class="btn-action btn-secondary" id="btn-multi-single" style="display:none">SINGLE (x1)</button>
-        <button class="btn-action btn-secondary" id="btn-multi-collection" style="display:none">COLLECTION</button>
+        <button class="btn-action btn-primary" id="btn-reveal-all" style="display:none">REVEAL ALL <span class="btn-zh">全部翻开</span></button>
+        <button class="btn-action btn-primary" id="btn-multi-again" style="display:none">DRAW ×10 <span class="btn-zh">十连抽</span></button>
+        <button class="btn-action btn-secondary" id="btn-multi-single" style="display:none">SINGLE ×1 <span class="btn-zh">单抽</span></button>
+        <button class="btn-action btn-secondary" id="btn-multi-collection" style="display:none">COLLECTION <span class="btn-zh">图鉴</span></button>
     </div>
 
-    <!-- Multi-pull detail popup -->
+    <!-- Detail popup (shared by multi-pull, single-pull, collection) -->
     <div id="multi-detail">
         <div class="detail-card" id="detail-card">
             <div class="detail-tier" id="detail-tier"></div>
             <div class="detail-stars" id="detail-stars"></div>
             <div class="detail-category" id="detail-category"></div>
             <div class="detail-character" id="detail-character"></div>
+            <div class="detail-char-en" id="detail-char-en"></div>
+            <div class="detail-char-speak" id="detail-char-speak" title="Listen to pronunciation">
+                <span class="speak-icon">&#128264;</span>
+            </div>
             <div class="detail-divider"></div>
-            <div class="detail-phrase" id="detail-phrase"></div>
-            <div class="detail-english" id="detail-english"></div>
+            <div class="detail-idiom-section">
+                <div class="detail-idiom-label">Idiom <span class="btn-zh">成语</span></div>
+                <div class="detail-phrase-row">
+                    <div class="detail-phrase" id="detail-phrase"></div>
+                    <button class="speak-btn" id="detail-phrase-speak" title="Listen to idiom">&#128264;</button>
+                </div>
+                <div class="detail-english" id="detail-english"></div>
+            </div>
+            <div class="detail-meaning-section" id="detail-meaning-section">
+                <div class="detail-meaning-label">Meaning <span class="btn-zh">寓意</span></div>
+                <div class="detail-meaning" id="detail-meaning"></div>
+            </div>
         </div>
     </div>
 
     <!-- Collection panel -->
     <div id="collection-panel">
         <div class="collection-header">
-            <h1>COLLECTION</h1>
-            <h2>图鉴</h2>
+            <h1>COLLECTION <span class="header-zh">图鉴</span></h1>
             <div id="collection-progress" class="collection-progress"></div>
         </div>
         <div id="collection-grid" class="collection-grid"></div>
         <div class="collection-actions">
-            <button class="btn-action" id="btn-draw-from-collection">DRAW AGAIN</button>
-            <button class="btn-action btn-secondary" id="btn-close-collection">CLOSE</button>
+            <button class="btn-action" id="btn-draw-from-collection">DRAW AGAIN <span class="btn-zh">再抽一次</span></button>
+            <button class="btn-action btn-secondary" id="btn-close-collection">CLOSE <span class="btn-zh">关闭</span></button>
         </div>
     </div>
 
