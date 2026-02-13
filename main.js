@@ -2823,10 +2823,11 @@ function renderMultiHints() {
             const isMulti = selectedMode === 'multi';
             const mainText = isMulti ? '\u2191 \u518D\u6765\u5341\u8FDE \u2191' : '\u2191 \u518D\u62BD\u4E00\u6B21 \u2191';
             const subText = isMulti ? 'Swipe Up to Draw \u00D710' : 'Swipe Up to Draw Again';
+            const singleHintLift = isMulti ? 0 : 0.03;
             const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
             const hintSubSize = isLandscape() ? Math.min(cellSize * 0.9, window.innerHeight * 0.02) : cellSize * 0.9;
-            drawOverlayText(mainText, L.hintY, CONFIG.glowGold, hintFade * pulse, hintSize);
-            drawOverlayText(subText, L.hintSubY, CONFIG.glowGold, hintFade * pulse, hintSubSize);
+            drawOverlayText(mainText, L.hintY - singleHintLift, CONFIG.glowGold, hintFade * pulse, hintSize);
+            drawOverlayText(subText, L.hintSubY - singleHintLift, CONFIG.glowGold, hintFade * pulse, hintSubSize);
         }
     }
 }
@@ -3588,7 +3589,7 @@ function renderFortuneOverlay() {
         drawCard(L.cardTop, L.cardBottom, cardFade * 0.85, L.cardWidth);
 
         // Traditional Chinese ornamental frame with subtle rarity aura.
-        drawChineseOrnamentalBorder(cardX, cardY, cardW, cardH, cardFade * 0.95, dr.rarity.color);
+        drawChineseOrnamentalBorder(cardX, cardY, cardW, cardH, cardFade * 0.95, dr.rarity.color, dr.rarity.stars);
     }
 
     // 2. Update GPU particles (skip render)
@@ -3644,11 +3645,12 @@ function renderFortuneOverlay() {
         const isMulti = selectedMode === 'multi';
         const mainText = isMulti ? '\u2191 \u518D\u6765\u5341\u8FDE \u2191' : '\u2191 \u518D\u62BD\u4E00\u6B21 \u2191';
         const subText = isMulti ? 'Swipe Up to Draw \u00D710' : 'Swipe Up to Draw Again';
+        const singleHintLift = isMulti ? 0 : 0.03;
 
         const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
         const hintSubSize = isLandscape() ? Math.min(cellSize * 0.9, window.innerHeight * 0.02) : cellSize * 0.9;
-        drawOverlayText(mainText, L.hintY, CONFIG.glowGold, hintFade * pulse, hintSize);
-        drawOverlayText(subText, L.hintSubY, CONFIG.glowGold, hintFade * pulse, hintSubSize);
+        drawOverlayText(mainText, L.hintY - singleHintLift, CONFIG.glowGold, hintFade * pulse, hintSize);
+        drawOverlayText(subText, L.hintSubY - singleHintLift, CONFIG.glowGold, hintFade * pulse, hintSubSize);
     }
 }
 
@@ -4257,15 +4259,16 @@ function showMultiDetail(draw) {
     const detailCategory = document.getElementById('detail-category');
     const detailCharacter = document.getElementById('detail-character');
     const detailCharEn = document.getElementById('detail-char-en');
-    const detailCharSpeak = document.getElementById('detail-char-speak');
+    const detailSoundBtn = document.getElementById('btn-detail-sound');
     const detailPhrase = document.getElementById('detail-phrase');
-    const detailPhraseSpeak = document.getElementById('detail-phrase-speak');
     const detailEnglish = document.getElementById('detail-english');
     const detailTier = document.getElementById('detail-tier');
     const detailMeaning = document.getElementById('detail-meaning');
 
     detailCard.style.setProperty('--card-color', draw.rarity.color);
     detailCard.style.setProperty('--card-glow', draw.rarity.glow);
+    for (let i = 1; i <= 6; i++) detailCard.classList.remove('stars-' + i);
+    detailCard.classList.add('stars-' + Math.max(1, Math.min(6, draw.rarity.stars || 1)));
 
     detailStars.textContent = '\u2605'.repeat(draw.rarity.stars) + '\u2606'.repeat(6 - draw.rarity.stars);
     detailStars.style.color = draw.rarity.color;
@@ -4292,13 +4295,11 @@ function showMultiDetail(draw) {
         detailMeaning.innerHTML = '<span style="color:rgba(255,215,0,0.5)">' + meaningCn + '</span><br>' + meaningEn;
     }
 
-    // TTS: Character pronunciation
-    if (detailCharSpeak) {
-        detailCharSpeak.onclick = () => speakText(draw.char, 'zh-CN', detailCharSpeak);
-    }
-    // TTS: Idiom pronunciation
-    if (detailPhraseSpeak) {
-        detailPhraseSpeak.onclick = () => speakText(draw.blessing ? draw.blessing.phrase : '', 'zh-CN', detailPhraseSpeak);
+    // TTS: Character pronunciation (button under the detail card)
+    if (detailSoundBtn) {
+        detailSoundBtn.classList.remove('playing');
+        detailSoundBtn.title = `Listen: ${draw.char}`;
+        detailSoundBtn.onclick = () => speakText(draw.char, 'zh-CN', detailSoundBtn);
     }
 
     multiDetail.classList.add('visible');
@@ -4324,6 +4325,9 @@ function speakText(text, lang, btnEl) {
 }
 
 function hideMultiDetail() {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    const detailSoundBtn = document.getElementById('btn-detail-sound');
+    if (detailSoundBtn) detailSoundBtn.classList.remove('playing');
     multiDetail.classList.remove('visible');
 }
 
