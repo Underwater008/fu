@@ -33,6 +33,22 @@ initMusicSystem();
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
+const IS_COARSE_POINTER = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+const DRAW_LAUNCH_PROFILE = IS_COARSE_POINTER
+    ? {
+        morphSpeedMul: 0.72,
+        intensityMul: 0.84,
+        blurMul: 0.62,
+        trailSpawnMul: 0.58,
+        outerGlow: false,
+    }
+    : {
+        morphSpeedMul: 1.0,
+        intensityMul: 1.0,
+        blurMul: 1.0,
+        trailSpawnMul: 1.0,
+        outerGlow: true,
+    };
 
 // --- Configuration ---
 const CONFIG = {
@@ -107,6 +123,32 @@ function cycleDajiFont(dir) {
 // --- Math ---
 function lerp(a, b, t) { return a + (b - a) * t; }
 function easeInOut(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
+
+const FU_GLYPH = '\u798F';
+const FU_METRIC_TEST_SIZE = 256;
+const fuVisualOffsetRatioByFont = new Map();
+
+function getFuVisualOffsetRatio(fontFamily) {
+    if (fuVisualOffsetRatioByFont.has(fontFamily)) return fuVisualOffsetRatioByFont.get(fontFamily);
+
+    const metricCanvas = document.createElement('canvas');
+    const metricCtx = metricCanvas.getContext('2d');
+    metricCtx.font = `${FU_METRIC_TEST_SIZE}px ${fontFamily}, serif`;
+    metricCtx.textAlign = 'center';
+    metricCtx.textBaseline = 'alphabetic';
+    const m = metricCtx.measureText(FU_GLYPH);
+
+    const ascent = m.actualBoundingBoxAscent || FU_METRIC_TEST_SIZE * 0.5;
+    const descent = m.actualBoundingBoxDescent || FU_METRIC_TEST_SIZE * 0.5;
+    const ratio = (ascent - descent) / (2 * FU_METRIC_TEST_SIZE);
+
+    fuVisualOffsetRatioByFont.set(fontFamily, ratio);
+    return ratio;
+}
+
+function getFuVisualCenterY(baseY, fontFamily, fontSize) {
+    return baseY + getFuVisualOffsetRatio(fontFamily) * fontSize;
+}
 
 // --- 3D Projection ---
 const SCENE_FOV = 500;
@@ -884,11 +926,7 @@ function drawCalligraphyFu(alpha) {
     ctx.textBaseline = 'alphabetic';
     ctx.font = `${fuSize}px ${chosenFont}, serif`;
 
-    // Measure actual bounding box to compute true visual center
-    const m = ctx.measureText('\u798F');
-    const ascent = m.actualBoundingBoxAscent;
-    const descent = m.actualBoundingBoxDescent;
-    const visualCy = cy + (ascent - descent) / 2;
+    const visualCy = getFuVisualCenterY(cy, chosenFont, fuSize);
 
     // Outer glow layer
     ctx.globalAlpha = alpha * 0.3;
@@ -2088,7 +2126,7 @@ function updateDraw() {
                 cy = fuPos.y;
             }
 
-            if (Math.random() < (count > 1 ? 0.3 : 0.6)) { // Less dense per trail for multi
+            if (Math.random() < (count > 1 ? 0.3 : 0.6) * DRAW_LAUNCH_PROFILE.trailSpawnMul) { // Less dense per trail for multi
                 launchTrail.push({
                     x: cx + (Math.random() - 0.5) * cellSize * 4,
                     y: cy + cellSize * (0.9 + Math.random() * 2.2),
@@ -3101,7 +3139,7 @@ function renderDrawOverlay() {
             ctx.fillStyle = CONFIG.glowGold;
             ctx.shadowColor = CONFIG.glowGold;
 
-            const morphSpeed = 1.2 + riseT * 4.5;
+            const morphSpeed = (1.2 + riseT * 4.5) * DRAW_LAUNCH_PROFILE.morphSpeedMul;
             const morphPhase = t * morphSpeed;
             const fontCount = CALLI_FONTS.length;
 
@@ -3123,24 +3161,32 @@ function renderDrawOverlay() {
                 const fontA = Math.floor(rawIdx) % fontCount;
                 const fontB = (fontA + 1) % fontCount;
                 const crossFade = rawIdx - Math.floor(rawIdx);
-                const intensity = 1 + riseT * 1.8;
+                const intensity = (1 + riseT * 1.8) * DRAW_LAUNCH_PROFILE.intensityMul;
                 const alphaScale = 0.8;
+                const fontAName = CALLI_FONTS[fontA];
+                const fontBName = CALLI_FONTS[fontB];
+                const cyA = getFuVisualCenterY(cy, fontAName, fuSize);
+                const cyB = getFuVisualCenterY(cy, fontBName, fuSize);
 
-                ctx.font = `${fuSize}px ${CALLI_FONTS[fontA]}, serif`;
-                ctx.globalAlpha = Math.min(1, 0.25 * intensity) * (1 - crossFade) * alphaScale;
-                ctx.shadowBlur = fuSize * 0.12 * intensity;
-                ctx.fillText('\u798F', cx, cy);
+                ctx.font = `${fuSize}px ${fontAName}, serif`;
+                if (DRAW_LAUNCH_PROFILE.outerGlow) {
+                    ctx.globalAlpha = Math.min(1, 0.25 * intensity) * (1 - crossFade) * alphaScale;
+                    ctx.shadowBlur = fuSize * 0.12 * intensity * DRAW_LAUNCH_PROFILE.blurMul;
+                    ctx.fillText('\u798F', cx, cyA);
+                }
                 ctx.globalAlpha = (1 - crossFade) * alphaScale;
-                ctx.shadowBlur = fuSize * 0.05 * intensity;
-                ctx.fillText('\u798F', cx, cy);
+                ctx.shadowBlur = fuSize * 0.05 * intensity * DRAW_LAUNCH_PROFILE.blurMul;
+                ctx.fillText('\u798F', cx, cyA);
 
-                ctx.font = `${fuSize}px ${CALLI_FONTS[fontB]}, serif`;
-                ctx.globalAlpha = Math.min(1, 0.25 * intensity) * crossFade * alphaScale;
-                ctx.shadowBlur = fuSize * 0.12 * intensity;
-                ctx.fillText('\u798F', cx, cy);
+                ctx.font = `${fuSize}px ${fontBName}, serif`;
+                if (DRAW_LAUNCH_PROFILE.outerGlow) {
+                    ctx.globalAlpha = Math.min(1, 0.25 * intensity) * crossFade * alphaScale;
+                    ctx.shadowBlur = fuSize * 0.12 * intensity * DRAW_LAUNCH_PROFILE.blurMul;
+                    ctx.fillText('\u798F', cx, cyB);
+                }
                 ctx.globalAlpha = crossFade * alphaScale;
-                ctx.shadowBlur = fuSize * 0.05 * intensity;
-                ctx.fillText('\u798F', cx, cy);
+                ctx.shadowBlur = fuSize * 0.05 * intensity * DRAW_LAUNCH_PROFILE.blurMul;
+                ctx.fillText('\u798F', cx, cyB);
             }
         } else {
             // Single (Original behavior)
@@ -3152,32 +3198,40 @@ function renderDrawOverlay() {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
-            const morphSpeed = 1.2 + riseT * 4.5;
+            const morphSpeed = (1.2 + riseT * 4.5) * DRAW_LAUNCH_PROFILE.morphSpeedMul;
             const morphPhase = t * morphSpeed;
             const fontCount = CALLI_FONTS.length;
             const rawIdx = (morphPhase % fontCount + fontCount) % fontCount;
             const fontA = Math.floor(rawIdx) % fontCount;
             const fontB = (fontA + 1) % fontCount;
             const crossFade = rawIdx - Math.floor(rawIdx);
-            const intensity = 1 + riseT * 2.5;
+            const intensity = (1 + riseT * 2.5) * DRAW_LAUNCH_PROFILE.intensityMul;
+            const fontAName = CALLI_FONTS[fontA];
+            const fontBName = CALLI_FONTS[fontB];
+            const cyA = getFuVisualCenterY(cy, fontAName, fuSize);
+            const cyB = getFuVisualCenterY(cy, fontBName, fuSize);
 
-            ctx.font = `${fuSize}px ${CALLI_FONTS[fontA]}, serif`;
-            ctx.globalAlpha = Math.min(1, 0.3 * intensity) * (1 - crossFade);
+            ctx.font = `${fuSize}px ${fontAName}, serif`;
             ctx.shadowColor = CONFIG.glowGold;
-            ctx.shadowBlur = fuSize * 0.2 * intensity;
             ctx.fillStyle = CONFIG.glowGold;
-            ctx.fillText('\u798F', cx, cy);
+            if (DRAW_LAUNCH_PROFILE.outerGlow) {
+                ctx.globalAlpha = Math.min(1, 0.3 * intensity) * (1 - crossFade);
+                ctx.shadowBlur = fuSize * 0.2 * intensity * DRAW_LAUNCH_PROFILE.blurMul;
+                ctx.fillText('\u798F', cx, cyA);
+            }
             ctx.globalAlpha = (1 - crossFade);
-            ctx.shadowBlur = fuSize * 0.08 * intensity;
-            ctx.fillText('\u798F', cx, cy);
+            ctx.shadowBlur = fuSize * 0.08 * intensity * DRAW_LAUNCH_PROFILE.blurMul;
+            ctx.fillText('\u798F', cx, cyA);
 
-            ctx.font = `${fuSize}px ${CALLI_FONTS[fontB]}, serif`;
-            ctx.globalAlpha = Math.min(1, 0.3 * intensity) * crossFade;
-            ctx.shadowBlur = fuSize * 0.2 * intensity;
-            ctx.fillText('\u798F', cx, cy);
+            ctx.font = `${fuSize}px ${fontBName}, serif`;
+            if (DRAW_LAUNCH_PROFILE.outerGlow) {
+                ctx.globalAlpha = Math.min(1, 0.3 * intensity) * crossFade;
+                ctx.shadowBlur = fuSize * 0.2 * intensity * DRAW_LAUNCH_PROFILE.blurMul;
+                ctx.fillText('\u798F', cx, cyB);
+            }
             ctx.globalAlpha = crossFade;
-            ctx.shadowBlur = fuSize * 0.08 * intensity;
-            ctx.fillText('\u798F', cx, cy);
+            ctx.shadowBlur = fuSize * 0.08 * intensity * DRAW_LAUNCH_PROFILE.blurMul;
+            ctx.fillText('\u798F', cx, cyB);
         }
 
         ctx.shadowBlur = 0;
