@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -66,8 +66,8 @@
 
     <!-- Bottom Controls -->
     <div class="bottom-controls">
-        <button id="btn-collection" class="collection-fab">COLLECTION</button>
-        
+        <button id="btn-collection" class="collection-fab">COLLECTION <span class="btn-zh">图鉴</span></button>
+
         <div id="mode-switch" class="mode-switch">
             <div class="switch-track"></div>
             <div class="switch-option active" data-mode="single">×1</div>
@@ -95,13 +95,17 @@
         <button class="btn-action btn-secondary" id="btn-multi-collection" style="display:none">COLLECTION</button>
     </div>
 
-    <!-- Multi-pull detail popup -->
+    <!-- Detail popup (shared by multi-pull, single-pull, collection) -->
     <div id="multi-detail">
         <div class="detail-card" id="detail-card">
             <div class="detail-tier" id="detail-tier"></div>
             <div class="detail-stars" id="detail-stars"></div>
             <div class="detail-category" id="detail-category"></div>
             <div class="detail-character" id="detail-character"></div>
+            <div class="detail-char-en" id="detail-char-en"></div>
+            <div class="detail-char-speak" id="detail-char-speak" title="Listen to pronunciation">
+                <span class="speak-icon">&#128264;</span>
+            </div>
             <div class="detail-divider"></div>
             <div class="detail-phrase" id="detail-phrase"></div>
             <div class="detail-english" id="detail-english"></div>
@@ -115,8 +119,7 @@
     <!-- Collection panel -->
     <div id="collection-panel">
         <div class="collection-header">
-            <h1>COLLECTION</h1>
-            <h2>图鉴</h2>
+            <h1>COLLECTION <span class="header-zh">图鉴</span></h1>
             <div id="collection-progress" class="collection-progress"></div>
             <!-- Account section (inside collection) -->
             <div id="collection-account" class="collection-account">
@@ -131,8 +134,8 @@
         </div>
         <div id="collection-grid" class="collection-grid"></div>
         <div class="collection-actions">
-            <button class="btn-action" id="btn-draw-from-collection">DRAW AGAIN</button>
-            <button class="btn-action btn-secondary" id="btn-close-collection">CLOSE</button>
+            <button class="btn-action" id="btn-draw-from-collection">DRAW AGAIN <span class="btn-zh">再抽一次</span></button>
+            <button class="btn-action btn-secondary" id="btn-close-collection">CLOSE <span class="btn-zh">关闭</span></button>
         </div>
     </div>
 
