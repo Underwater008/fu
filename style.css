@@ -1522,7 +1522,7 @@ canvas {
 
 .collection-header {
     flex-shrink: 0;
-    padding: 40px 24px 28px;
+    padding: 40px 16px 28px;
     background: linear-gradient(to bottom, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01) 60%, transparent);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
@@ -1535,8 +1535,9 @@ canvas {
 .collection-title-row {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 16px;
+    justify-content: space-between;
+    width: min(100%, 560px);
+    gap: 20px;
     flex-wrap: nowrap;
 }
 
@@ -1568,6 +1569,7 @@ canvas {
     margin: 0;
     font-weight: normal;
     white-space: nowrap;
+    text-align: right;
 }
 
 .collection-stats {
