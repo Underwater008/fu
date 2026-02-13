@@ -222,11 +222,11 @@ function wireShareButtons() {
 // Show/hide single fortune share button
 export function showSingleFortuneActions() {
   const el = document.getElementById('single-fortune-actions');
-  if (el) el.style.display = 'flex';
+  if (el) el.classList.add('visible');
 }
 export function hideSingleFortuneActions() {
   const el = document.getElementById('single-fortune-actions');
-  if (el) el.style.display = 'none';
+  if (el) el.classList.remove('visible');
 }
 
 // Show share button in multi-fortune actions
