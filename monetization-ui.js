@@ -7,10 +7,20 @@ import { createGift, canGift } from './gifting.js';
 import { CONFIG } from './config.js';
 import { RARITY_TIERS } from './gacha.js';
 
+// Track current draw result for share buttons
+let _currentDrawResult = null;
+let _currentDetailDraw = null;
+
+export function setCurrentDrawResult(drawResult) {
+  _currentDrawResult = drawResult;
+}
+
 // --- Init ---
 export function initMonetizationUI() {
   wireAuthButtons();
   wireRewardsPanel();
+  wireShareButtons();
+  wireDetailActions();
   renderPurchaseBundles();
 
   // Set initial auth state
@@ -186,6 +196,117 @@ function updateShareCooldown() {
   const mins = Math.floor(remaining / 60000);
   const secs = Math.floor((remaining % 60000) / 1000);
   cooldownEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// --- Share Result Buttons (fortune screen) ---
+function wireShareButtons() {
+  const btnShareSingle = document.getElementById('btn-share-single');
+  const btnShareMulti = document.getElementById('btn-share-multi');
+
+  const handleShare = async () => {
+    if (!_currentDrawResult) return;
+    try {
+      await shareResult(_currentDrawResult);
+    } catch (e) {
+      if (e.name !== 'AbortError') console.warn('Share failed:', e);
+    }
+  };
+
+  if (btnShareSingle) btnShareSingle.addEventListener('click', handleShare);
+  if (btnShareMulti) btnShareMulti.addEventListener('click', handleShare);
+}
+
+// Show/hide single fortune share button
+export function showSingleFortuneActions() {
+  const el = document.getElementById('single-fortune-actions');
+  if (el) el.style.display = 'flex';
+}
+export function hideSingleFortuneActions() {
+  const el = document.getElementById('single-fortune-actions');
+  if (el) el.style.display = 'none';
+}
+
+// Show share button in multi-fortune actions
+export function showMultiShareButton() {
+  const btn = document.getElementById('btn-share-multi');
+  if (btn) btn.style.display = '';
+}
+export function hideMultiShareButton() {
+  const btn = document.getElementById('btn-share-multi');
+  if (btn) btn.style.display = 'none';
+}
+
+// --- Detail Popup Actions (share + gift from collection) ---
+function wireDetailActions() {
+  const btnShare = document.getElementById('btn-detail-share');
+  const btnGift = document.getElementById('btn-detail-gift');
+
+  if (btnShare) {
+    btnShare.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!_currentDetailDraw) return;
+      try {
+        await shareResult(_currentDetailDraw);
+      } catch (e) {
+        if (e.name !== 'AbortError') console.warn('Share failed:', e);
+      }
+    });
+  }
+
+  if (btnGift) {
+    btnGift.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!_currentDetailDraw) return;
+      const user = getUser();
+      if (!user) return;
+
+      try {
+        btnGift.disabled = true;
+        btnGift.textContent = 'Sending...';
+        const result = await createGift(
+          _currentDetailDraw.char,
+          _currentDetailDraw.rarity.stars,
+          _currentDetailDraw.category.name
+        );
+        // Share the gift URL
+        if (navigator.share) {
+          await navigator.share({
+            title: `A gift from 福 Fortune Gacha!`,
+            text: `I'm gifting you ${_currentDetailDraw.char}!`,
+            url: result.url,
+          });
+        } else {
+          await navigator.clipboard.writeText(result.url);
+        }
+        btnGift.textContent = 'Sent!';
+        setTimeout(() => {
+          btnGift.textContent = 'Gift';
+          btnGift.disabled = false;
+        }, 2000);
+      } catch (err) {
+        btnGift.textContent = err.message === 'No duplicate to gift' ? 'No duplicate' : 'Failed';
+        setTimeout(() => {
+          btnGift.textContent = 'Gift';
+          btnGift.disabled = false;
+        }, 2000);
+      }
+    });
+  }
+}
+
+// Called by main.js when detail popup opens
+export function setDetailDraw(drawObj, collectionItem) {
+  _currentDetailDraw = drawObj;
+  const btnGift = document.getElementById('btn-detail-gift');
+  if (btnGift) {
+    // Show gift button only if user has duplicates of this character
+    if (collectionItem && collectionItem.count > 1) {
+      btnGift.style.display = '';
+      btnGift.textContent = `Gift (×${collectionItem.count - 1})`;
+    } else {
+      btnGift.style.display = 'none';
+    }
+  }
 }
 
 // --- Purchase Bundles ---

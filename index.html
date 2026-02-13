@@ -88,9 +88,15 @@
         <div id="multi-grid" class="multi-grid"></div>
     </div>
 
+    <!-- Single fortune share button (floating) -->
+    <div id="single-fortune-actions" class="single-fortune-actions" style="display:none">
+        <button class="btn-action btn-share-result" id="btn-share-single">SHARE</button>
+    </div>
+
     <!-- Multi-fortune floating action buttons -->
     <div class="multi-fortune-actions" id="multi-fortune-actions">
         <button class="btn-action btn-primary" id="btn-reveal-all" style="display:none">REVEAL ALL</button>
+        <button class="btn-action btn-share-result" id="btn-share-multi" style="display:none">SHARE</button>
         <button class="btn-action btn-primary" id="btn-multi-again" style="display:none">DRAW x10</button>
         <button class="btn-action btn-secondary" id="btn-multi-single" style="display:none">SINGLE (x1)</button>
         <button class="btn-action btn-secondary" id="btn-multi-collection" style="display:none">COLLECTION</button>
@@ -106,6 +112,10 @@
             <div class="detail-divider"></div>
             <div class="detail-phrase" id="detail-phrase"></div>
             <div class="detail-english" id="detail-english"></div>
+            <div class="detail-actions">
+                <button class="btn-detail-action" id="btn-detail-share">Share</button>
+                <button class="btn-detail-action btn-detail-gift" id="btn-detail-gift" style="display:none">Gift</button>
+            </div>
         </div>
     </div>
 

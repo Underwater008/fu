@@ -1226,55 +1226,87 @@ canvas {
    MONETIZATION UI — Auth bar, Login modal, Rewards panel
    ============================================================ */
 
-/* --- Auth Bar (top-right, glassmorphism) --- */
+/* --- Auth Bar (top-right, frosted glass) --- */
 .auth-bar {
     position: fixed;
-    top: 12px;
+    top: env(safe-area-inset-top, 12px);
     right: 12px;
     z-index: 1000;
     display: flex;
     align-items: center;
     gap: 8px;
+    padding-top: 12px;
 }
 .auth-section {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: linear-gradient(135deg, rgba(40, 0, 0, 0.5), rgba(20, 0, 0, 0.7));
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 215, 0, 0.25);
-    border-radius: 20px;
-    padding: 6px 14px;
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.08) 0%,
+        rgba(255, 255, 255, 0.03) 50%,
+        rgba(255, 215, 0, 0.04) 100%);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 24px;
+    padding: 6px 16px;
+    box-shadow:
+        0 4px 24px rgba(0, 0, 0, 0.25),
+        0 0 1px rgba(255, 255, 255, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .btn-auth {
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 215, 0, 0.05));
-    border: 1px solid rgba(255, 215, 0, 0.4);
-    color: #FFD700;
-    padding: 5px 14px;
-    border-radius: 14px;
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.12) 0%,
+        rgba(255, 255, 255, 0.04) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: rgba(255, 255, 255, 0.9);
+    padding: 6px 16px;
+    border-radius: 16px;
     font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.25s ease;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 .btn-auth:hover {
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.25), rgba(255, 215, 0, 0.1));
-    box-shadow: 0 0 12px rgba(255, 215, 0, 0.2);
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.18) 0%,
+        rgba(255, 215, 0, 0.08) 100%);
+    border-color: rgba(255, 215, 0, 0.3);
+    color: #FFD700;
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.2),
+        0 0 12px rgba(255, 215, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+}
+.btn-auth:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 .btn-auth.btn-small {
-    padding: 3px 10px;
+    padding: 4px 12px;
     font-size: 10px;
-    opacity: 0.7;
+    opacity: 0.6;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+.btn-auth.btn-small:hover {
+    opacity: 1;
 }
 .auth-email {
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(255, 255, 255, 0.7);
     font-size: 11px;
     max-width: 100px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    letter-spacing: 0.2px;
 }
 
 /* --- Draw Counter Badge --- */
@@ -1502,5 +1534,93 @@ canvas {
     background: rgba(34, 197, 94, 0.15);
     padding: 2px 6px;
     border-radius: 6px;
+}
+
+/* --- Share Result Button (fortune screen) --- */
+.single-fortune-actions {
+    position: fixed;
+    bottom: 120px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    z-index: 800;
+    pointer-events: none;
+}
+.single-fortune-actions > * {
+    pointer-events: auto;
+}
+.btn-share-result {
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.1) 0%,
+        rgba(255, 255, 255, 0.04) 50%,
+        rgba(255, 215, 0, 0.06) 100%) !important;
+    backdrop-filter: blur(16px) saturate(1.4) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(1.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+    padding: 8px 24px !important;
+    border-radius: 20px !important;
+    font-size: 12px !important;
+    font-weight: 500;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow:
+        0 4px 20px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.btn-share-result:hover {
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.16) 0%,
+        rgba(255, 215, 0, 0.1) 100%) !important;
+    border-color: rgba(255, 215, 0, 0.3) !important;
+    color: #FFD700 !important;
+    box-shadow:
+        0 4px 24px rgba(0, 0, 0, 0.25),
+        0 0 16px rgba(255, 215, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+/* --- Detail popup action buttons --- */
+.detail-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.btn-detail-action {
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.1) 0%,
+        rgba(255, 255, 255, 0.04) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.8);
+    padding: 6px 18px;
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn-detail-action:hover {
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.16) 0%,
+        rgba(255, 215, 0, 0.08) 100%);
+    border-color: rgba(255, 215, 0, 0.3);
+    color: #FFD700;
+}
+.btn-detail-gift {
+    border-color: rgba(255, 130, 180, 0.3);
+    color: rgba(255, 130, 180, 0.9);
+}
+.btn-detail-gift:hover {
+    border-color: rgba(255, 130, 180, 0.5);
+    color: #FF82B4;
+    box-shadow: 0 0 12px rgba(255, 130, 180, 0.15);
 }
 

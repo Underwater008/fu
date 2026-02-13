@@ -17,7 +17,8 @@ import { claimDailyLogin, getPityCounter, incrementPity, resetPity } from './rew
 import { initAds } from './ads.js';
 import { getPaymentResult } from './payments.js';
 import { claimGift, getGiftTokenFromUrl, returnExpiredGifts } from './gifting.js';
-import { initMonetizationUI } from './monetization-ui.js';
+import { initMonetizationUI, setCurrentDrawResult, showSingleFortuneActions, hideSingleFortuneActions, showMultiShareButton, hideMultiShareButton, setDetailDraw } from './monetization-ui.js';
+import { loadCollection } from './gacha.js';
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -1054,6 +1055,22 @@ function changeState(newState) {
         dajiFontTransition = null;
         dajiFontAutoTimer = globalTime;
     }
+
+    // Share button visibility
+    if (newState === 'fortune') {
+        setCurrentDrawResult(currentDrawResult);
+        if (isMultiMode) {
+            hideSingleFortuneActions();
+            showMultiShareButton();
+        } else {
+            showSingleFortuneActions();
+            hideMultiShareButton();
+        }
+    } else {
+        hideSingleFortuneActions();
+        hideMultiShareButton();
+    }
+
     updateUIVisibility();
 }
 
@@ -3155,6 +3172,10 @@ function showMultiDetail(draw) {
     detailTier.style.color = draw.rarity.color;
 
     multiDetail.classList.add('visible');
+
+    // Pass to monetization UI for share/gift buttons
+    const coll = loadCollection();
+    setDetailDraw(draw, coll[draw.char] || null);
 }
 
 function hideMultiDetail() {
