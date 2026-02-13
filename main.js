@@ -6,12 +6,18 @@ import * as THREE from 'three';
 import vertexShader from './particleVertex.glsl?raw';
 import fragmentShader from './particleFragment.glsl?raw';
 import {
-    performDraw, performMultiDraw,
+    performDrawWithPity, performMultiDrawWithPity,
     saveToCollection, saveMultiToCollection,
     FULL_CHAR_BLESSINGS, RARITY_TIERS,
     BLESSING_CATEGORIES as GACHA_CATEGORIES,
     getCollectionProgress, getCollectionByCategory,
 } from './gacha.js';
+import { getUser, onAuthChange, restoreSession, updateDraws } from './auth.js';
+import { claimDailyLogin, getPityCounter, incrementPity, resetPity } from './rewards.js';
+import { initAds } from './ads.js';
+import { getPaymentResult } from './payments.js';
+import { claimGift, getGiftTokenFromUrl, returnExpiredGifts } from './gifting.js';
+import { initMonetizationUI } from './monetization-ui.js';
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -1124,8 +1130,14 @@ function initDrawAnimation() {
 
     // Perform the gacha draw (or use pre-set multi draw result)
     if (!isMultiMode) {
-        currentDrawResult = performDraw();
+        const pity = getPityCounter();
+        currentDrawResult = performDrawWithPity(pity);
         saveToCollection(currentDrawResult);
+        if (currentDrawResult.tierIndex <= 1) {
+            resetPity();
+        } else {
+            incrementPity();
+        }
         drawsToAnimate = [currentDrawResult];
     } else {
         drawsToAnimate = multiDrawResults;
@@ -2919,8 +2931,14 @@ function updateModeSwitchUI() {
 }
 
 function startMultiPull() {
-    multiDrawResults = performMultiDraw();
+    const pity = getPityCounter();
+    const { draws, newPityCounter } = performMultiDrawWithPity(pity);
+    multiDrawResults = draws;
     saveMultiToCollection(multiDrawResults);
+    const user = getUser();
+    if (user) {
+        user.pity_counter = newPityCounter;
+    }
 
     // Find the best (highest rarity, i.e., lowest tierIndex) result
     let best = multiDrawResults[0];
@@ -3571,6 +3589,18 @@ window.addEventListener('keydown', (e) => {
 
 function handleSwipeUp() {
     if (state === 'arrival' && fontsReady) {
+        const user = getUser();
+        const drawsNeeded = selectedMode === 'multi' ? 10 : 1;
+
+        if (user && user.draws_remaining < drawsNeeded) {
+            showRewardsPanel();
+            return;
+        }
+
+        if (user) {
+            updateDraws(-drawsNeeded);
+        }
+
         if (selectedMode === 'multi') {
             startMultiPull();
         } else {
@@ -3588,6 +3618,18 @@ function handleSwipeUp() {
             resetMultiFortune();
         }
 
+        const user = getUser();
+        const drawsNeeded = selectedMode === 'multi' ? 10 : 1;
+
+        if (user && user.draws_remaining < drawsNeeded) {
+            showRewardsPanel();
+            return;
+        }
+
+        if (user) {
+            updateDraws(-drawsNeeded);
+        }
+
         // Draw again loop
         daji3DParticles = [];
         hoveredIdx = -1;
@@ -3601,6 +3643,12 @@ function handleSwipeUp() {
             changeState('draw');
         }
     }
+}
+
+// Rewards panel opener (implemented in monetization-ui.js)
+function showRewardsPanel() {
+    const panel = document.getElementById('rewards-panel');
+    if (panel) panel.style.display = 'flex';
 }
 
 // ============================================================
@@ -3661,5 +3709,48 @@ function frame(now) {
 
     requestAnimationFrame(frame);
 }
+
+// --- Monetization init ---
+(async () => {
+  initAds();
+  await restoreSession();
+
+  // Handle gift claim from URL
+  const giftToken = getGiftTokenFromUrl();
+  if (giftToken) {
+    try {
+      const gift = await claimGift(giftToken);
+      console.log('Gift claimed:', gift.character);
+    } catch (e) {
+      console.warn('Gift claim failed:', e.message);
+    }
+  }
+
+  // Handle payment return
+  const paymentResult = getPaymentResult();
+  if (paymentResult?.status === 'success') {
+    console.log('Payment successful');
+  }
+
+  // Return expired gifts (dev mode)
+  await returnExpiredGifts();
+
+  // Daily login check
+  const loginReward = await claimDailyLogin();
+  if (loginReward) {
+    console.log('Daily login reward:', loginReward);
+  }
+
+  // Initialize monetization UI (auth bar, rewards panel, etc.)
+  initMonetizationUI();
+
+  // Listen for auth changes to update UI
+  onAuthChange((user) => {
+    const drawCounter = document.getElementById('draw-counter');
+    if (drawCounter && user) {
+      drawCounter.textContent = `🎫 ×${user.draws_remaining || 0}`;
+    }
+  });
+})();
 
 requestAnimationFrame(frame);
