@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -16,58 +16,15 @@
 <body>
     <canvas id="c"></canvas>
 
-    <!-- Draw counter (floating, bottom area) -->
-    <div id="draw-counter-float" class="draw-counter-float" style="display:none">
-        <span id="draw-counter" class="draw-counter">🎫 ×10</span>
-    </div>
-
-    <!-- Login modal -->
-    <div id="login-modal" class="modal-overlay" style="display:none">
-        <div class="modal-card">
-            <h2>Sign In</h2>
-            <p>Enter your email to receive a magic link</p>
-            <input type="email" id="login-email" placeholder="your@email.com" class="input-email" />
-            <button id="btn-send-link" class="btn-action btn-primary">Send Magic Link</button>
-            <button id="btn-close-login" class="btn-action btn-secondary">Cancel</button>
-            <p id="login-status" class="login-status"></p>
-        </div>
-    </div>
-
-    <!-- Rewards panel (slide-up drawer) -->
-    <div id="rewards-panel" class="rewards-panel" style="display:none">
-        <div class="rewards-header">
-            <h2>Get More Draws</h2>
-            <button id="btn-close-rewards" class="btn-close">✕</button>
-        </div>
-        <div class="rewards-content">
-            <div class="reward-section">
-                <h3>Daily Login</h3>
-                <div id="login-streak" class="streak-dots"></div>
-            </div>
-            <div class="reward-section">
-                <button id="btn-share-draw" class="btn-reward">Share → 10 Draws</button>
-                <span id="share-cooldown" class="cooldown-text"></span>
-            </div>
-            <div class="reward-section">
-                <button id="btn-watch-ad" class="btn-reward">Watch Ad → 1 Draw</button>
-                <span id="ad-count" class="cooldown-text"></span>
-            </div>
-            <div class="reward-section">
-                <h3>Invite Friends</h3>
-                <p class="reward-desc">1st friend: 30 draws | Each after: 10 draws</p>
-                <button id="btn-copy-referral" class="btn-reward">Copy Invite Link</button>
-            </div>
-            <div class="reward-section">
-                <h3>Buy Draws</h3>
-                <div id="purchase-bundles" class="purchase-grid"></div>
-            </div>
-        </div>
-    </div>
+    <!-- Audio mute toggle -->
+    <button id="btn-mute" class="mute-btn" title="Toggle Sound">
+        <span class="mute-icon" id="mute-icon">&#128266;</span>
+    </button>
 
     <!-- Bottom Controls -->
     <div class="bottom-controls">
-        <button id="btn-collection" class="collection-fab">COLLECTION</button>
-        
+        <button id="btn-collection" class="collection-fab">COLLECTION <span class="btn-zh">图鉴</span></button>
+
         <div id="mode-switch" class="mode-switch">
             <div class="switch-track"></div>
             <div class="switch-option active" data-mode="single">×1</div>
@@ -88,26 +45,35 @@
 
     <!-- Multi-fortune floating action buttons -->
     <div class="multi-fortune-actions" id="multi-fortune-actions">
-        <button class="btn-action btn-primary" id="btn-reveal-all" style="display:none">REVEAL ALL</button>
-        <button class="btn-action btn-share-result" id="btn-share-multi" style="display:none">SHARE</button>
-        <button class="btn-action btn-primary" id="btn-multi-again" style="display:none">DRAW x10</button>
-        <button class="btn-action btn-secondary" id="btn-multi-single" style="display:none">SINGLE (x1)</button>
-        <button class="btn-action btn-secondary" id="btn-multi-collection" style="display:none">COLLECTION</button>
+        <button class="btn-action btn-primary" id="btn-reveal-all" style="display:none">REVEAL ALL <span class="btn-zh">全部翻开</span></button>
+        <button class="btn-action btn-primary" id="btn-multi-again" style="display:none">DRAW ×10 <span class="btn-zh">十连抽</span></button>
+        <button class="btn-action btn-secondary" id="btn-multi-single" style="display:none">SINGLE ×1 <span class="btn-zh">单抽</span></button>
+        <button class="btn-action btn-secondary" id="btn-multi-collection" style="display:none">COLLECTION <span class="btn-zh">图鉴</span></button>
     </div>
 
-    <!-- Multi-pull detail popup -->
+    <!-- Detail popup (shared by multi-pull, single-pull, collection) -->
     <div id="multi-detail">
         <div class="detail-card" id="detail-card">
             <div class="detail-tier" id="detail-tier"></div>
             <div class="detail-stars" id="detail-stars"></div>
             <div class="detail-category" id="detail-category"></div>
             <div class="detail-character" id="detail-character"></div>
+            <div class="detail-char-en" id="detail-char-en"></div>
+            <div class="detail-char-speak" id="detail-char-speak" title="Listen to pronunciation">
+                <span class="speak-icon">&#128264;</span>
+            </div>
             <div class="detail-divider"></div>
-            <div class="detail-phrase" id="detail-phrase"></div>
-            <div class="detail-english" id="detail-english"></div>
-            <div class="detail-actions">
-                <button class="btn-detail-action" id="btn-detail-share">Share</button>
-                <button class="btn-detail-action btn-detail-gift" id="btn-detail-gift" style="display:none">Gift</button>
+            <div class="detail-idiom-section">
+                <div class="detail-idiom-label">Idiom <span class="btn-zh">成语</span></div>
+                <div class="detail-phrase-row">
+                    <div class="detail-phrase" id="detail-phrase"></div>
+                    <button class="speak-btn" id="detail-phrase-speak" title="Listen to idiom">&#128264;</button>
+                </div>
+                <div class="detail-english" id="detail-english"></div>
+            </div>
+            <div class="detail-meaning-section" id="detail-meaning-section">
+                <div class="detail-meaning-label">Meaning <span class="btn-zh">寓意</span></div>
+                <div class="detail-meaning" id="detail-meaning"></div>
             </div>
         </div>
     </div>
@@ -115,8 +81,7 @@
     <!-- Collection panel -->
     <div id="collection-panel">
         <div class="collection-header">
-            <h1>COLLECTION</h1>
-            <h2>图鉴</h2>
+            <h1>COLLECTION <span class="header-zh">图鉴</span></h1>
             <div id="collection-progress" class="collection-progress"></div>
             <!-- Account section (inside collection) -->
             <div id="collection-account" class="collection-account">
@@ -131,8 +96,8 @@
         </div>
         <div id="collection-grid" class="collection-grid"></div>
         <div class="collection-actions">
-            <button class="btn-action" id="btn-draw-from-collection">DRAW AGAIN</button>
-            <button class="btn-action btn-secondary" id="btn-close-collection">CLOSE</button>
+            <button class="btn-action" id="btn-draw-from-collection">DRAW AGAIN <span class="btn-zh">再抽一次</span></button>
+            <button class="btn-action btn-secondary" id="btn-close-collection">CLOSE <span class="btn-zh">关闭</span></button>
         </div>
     </div>
 

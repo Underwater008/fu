@@ -3,6 +3,10 @@
 // State machine: arrival -> draw -> fortune -> (draw again loop)
 // ============================================================
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import vertexShader from './particleVertex.glsl?raw';
 import fragmentShader from './particleFragment.glsl?raw';
 import {
@@ -12,13 +16,10 @@ import {
     BLESSING_CATEGORIES as GACHA_CATEGORIES,
     getCollectionProgress, getCollectionByCategory,
 } from './gacha.js';
-import { getUser, onAuthChange, restoreSession, updateDraws } from './auth.js';
-import { claimDailyLogin, getPityCounter, incrementPity, resetPity } from './rewards.js';
-import { initAds } from './ads.js';
-import { getPaymentResult } from './payments.js';
-import { claimGift, getGiftTokenFromUrl, returnExpiredGifts } from './gifting.js';
-import { initMonetizationUI, setCurrentDrawResult, showSingleFortuneActions, hideSingleFortuneActions, showMultiShareButton, hideMultiShareButton, setDetailDraw } from './monetization-ui.js';
-import { loadCollection } from './gacha.js';
+import {
+    initAudio, resumeAudio, startBGM, toggleMute, isBGMMuted,
+    playSfxDraw, playSfxReveal,
+} from './audio.js';
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -122,7 +123,89 @@ let dpr = Math.min(window.devicePixelRatio || 1, 2);
 
 // Forward-declare Three.js variables so resize() can reference them safely
 let glRenderer, glScene, glCamera, particlesMesh;
+let composer, bloomPass, chromaticPass, shockwavePass;
 let charToUV = {};
+
+// --- Post-processing state ---
+let ppChromatic = 0;       // chromatic aberration strength (0 = off)
+let ppBloomStrength = 0.12; // current bloom strength
+let ppBloomTarget = 0.12;  // target bloom strength (lerps)
+let ppShockwaves = [];     // { cx, cy, startTime, duration, maxRadius, strength }
+let lightPillars = [];     // { x, y, startTime, duration, color }
+let speedLinesActive = false;
+
+// --- Chromatic Aberration Shader ---
+const ChromaticAberrationShader = {
+    uniforms: {
+        tDiffuse: { value: null },
+        strength: { value: 0.0 },
+    },
+    vertexShader: `
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `,
+    fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float strength;
+        varying vec2 vUv;
+        void main() {
+            vec2 center = vec2(0.5);
+            vec2 dir = vUv - center;
+            float dist = length(dir);
+            vec2 offset = dir * strength * dist;
+            float r = texture2D(tDiffuse, vUv + offset).r;
+            vec4 base = texture2D(tDiffuse, vUv);
+            float b = texture2D(tDiffuse, vUv - offset).b;
+            gl_FragColor = vec4(r, base.g, b, base.a);
+        }
+    `
+};
+
+// --- Shockwave Distortion Shader ---
+const ShockwaveShader = {
+    uniforms: {
+        tDiffuse: { value: null },
+        shockCenter: { value: new THREE.Vector2(0.5, 0.5) },
+        shockRadius: { value: 0.0 },
+        shockWidth: { value: 0.06 },
+        shockStrength: { value: 0.0 },
+        aspectRatio: { value: 1.0 },
+    },
+    vertexShader: `
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `,
+    fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform vec2 shockCenter;
+        uniform float shockRadius;
+        uniform float shockWidth;
+        uniform float shockStrength;
+        uniform float aspectRatio;
+        varying vec2 vUv;
+        void main() {
+            vec2 uv = vUv;
+            vec2 delta = uv - shockCenter;
+            delta.x *= aspectRatio;
+            float dist = length(delta);
+            float ringDist = abs(dist - shockRadius);
+            if (ringDist < shockWidth && shockStrength > 0.001) {
+                float factor = (1.0 - ringDist / shockWidth);
+                factor = factor * factor * shockStrength;
+                vec2 dir = normalize(delta);
+                dir.x /= aspectRatio;
+                uv += dir * factor * 0.04;
+            }
+            gl_FragColor = texture2D(tDiffuse, uv);
+        }
+    `
+};
 
 function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -146,6 +229,8 @@ function resize() {
         glCamera.fov = fov;
         glCamera.aspect = window.innerWidth / window.innerHeight;
         glCamera.updateProjectionMatrix();
+        if (composer) composer.setSize(window.innerWidth, window.innerHeight);
+        if (shockwavePass) shockwavePass.uniforms.aspectRatio.value = window.innerWidth / window.innerHeight;
     }
 }
 window.addEventListener('resize', resize);
@@ -353,6 +438,29 @@ function initThreeJS() {
 
     particlesMesh.frustumCulled = false;
     glScene.add(particlesMesh);
+
+    // 6. Post-processing pipeline
+    composer = new EffectComposer(glRenderer);
+    const renderPass = new RenderPass(glScene, glCamera);
+    renderPass.clearAlpha = 0;
+    composer.addPass(renderPass);
+
+    bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.12,  // strength — very subtle glow, keep characters readable
+        0.35,  // radius
+        0.45   // threshold — high so only the brightest spots bloom
+    );
+    composer.addPass(bloomPass);
+
+    shockwavePass = new ShaderPass(ShockwaveShader);
+    shockwavePass.uniforms.aspectRatio.value = window.innerWidth / window.innerHeight;
+    shockwavePass.enabled = false;
+    composer.addPass(shockwavePass);
+
+    chromaticPass = new ShaderPass(ChromaticAberrationShader);
+    chromaticPass.enabled = false;
+    composer.addPass(chromaticPass);
 }
 
 // --- Grid Buffer (for ASCII elements) ---
@@ -534,8 +642,8 @@ function updateDajiToGPU(skipRender) {
         _dummy.updateMatrix();
         particlesMesh.setMatrixAt(i, _dummy.matrix);
 
-        let alpha = p.alpha * 1.25;
-        alpha = Math.min(0.8, alpha);
+        let alpha = p.alpha * 0.85;
+        alpha = Math.min(0.6, alpha);
         if (isHovered) alpha = 1.0;
 
         const yNorm = clusterH > 0 ? p.baseY / clusterH : 0;
@@ -952,7 +1060,46 @@ function drawOverlayText(text, yFraction, color, alpha, size, fontOverride) {
 // Render Three.js particles and composite onto the Canvas 2D
 function renderAndCompositeGL() {
     if (!glRenderer || !glScene || !glCamera) return;
-    glRenderer.render(glScene, glCamera);
+
+    // Update post-processing parameters
+    ppBloomStrength += (ppBloomTarget - ppBloomStrength) * 0.12;
+    if (bloomPass) bloomPass.strength = ppBloomStrength;
+
+    // Chromatic aberration decay
+    ppChromatic *= 0.92;
+    if (chromaticPass) {
+        chromaticPass.enabled = ppChromatic > 0.0005;
+        chromaticPass.uniforms.strength.value = ppChromatic;
+    }
+
+    // Shockwave update
+    if (shockwavePass) {
+        let best = null;
+        for (let i = ppShockwaves.length - 1; i >= 0; i--) {
+            const sw = ppShockwaves[i];
+            const age = globalTime - sw.startTime;
+            if (age > sw.duration) { ppShockwaves.splice(i, 1); continue; }
+            if (!best || age < (globalTime - best.startTime)) best = sw;
+        }
+        if (best) {
+            const age = globalTime - best.startTime;
+            const t = age / best.duration;
+            const eased = 1 - Math.pow(1 - t, 2);
+            shockwavePass.uniforms.shockCenter.value.set(best.cx, best.cy);
+            shockwavePass.uniforms.shockRadius.value = eased * best.maxRadius;
+            shockwavePass.uniforms.shockStrength.value = best.strength * (1 - t);
+            shockwavePass.enabled = true;
+        } else {
+            shockwavePass.enabled = false;
+        }
+    }
+
+    if (composer) {
+        composer.render();
+    } else {
+        glRenderer.render(glScene, glCamera);
+    }
+
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'lighter';
@@ -1017,6 +1164,7 @@ function changeState(newState) {
     stateTime = 0;
 
     if (newState === 'draw') {
+        playSfxDraw();
         initDrawAnimation();
     }
     if (newState === 'fortune') {
@@ -1026,6 +1174,12 @@ function changeState(newState) {
             drawToFortuneSeed = null;
             multiFlipState = null;
             initMultiFortuneState();
+            // Reset camera to center for fortune phase
+            camTarget.scale = 1.0;
+            cam.focusX = window.innerWidth / 2;
+            cam.focusY = window.innerHeight / 2;
+            godRayAlpha = 0;
+            meteorParticles = [];
             // Clear fireworks
             fwShells.length = 0;
             fwTrail.length = 0;
@@ -1033,6 +1187,7 @@ function changeState(newState) {
             fwLaunchTimer = 99999;
             fwLaunchCount = 0;
         } else {
+            if (currentDrawResult) playSfxReveal(currentDrawResult.rarity.stars);
             if (drawToFortuneSeed && drawToFortuneSeed.length > 0) {
                 initDaji3D(drawToFortuneSeed);
                 drawToFortuneSeed = null;
@@ -1125,6 +1280,272 @@ let launchTrail = [];
 let burstFlash = 0;
 let fuEndScreenPositions = []; // screen-coord positions where each 福 ends up before exploding
 
+// --- Cinematic Camera System ---
+const cam = { x: 0, y: 0, scale: 1, shake: 0, focusX: 0, focusY: 0 };
+let camTarget = { x: 0, y: 0, scale: 1 };
+
+function updateCam() {
+    cam.x += (camTarget.x - cam.x) * 0.08;
+    cam.y += (camTarget.y - cam.y) * 0.08;
+    cam.scale += (camTarget.scale - cam.scale) * 0.06;
+    // Decay shake
+    cam.shake *= 0.88;
+}
+
+function applyCamToCanvas() {
+    const sx = cam.shake > 0.3 ? (Math.random() - 0.5) * cam.shake : 0;
+    const sy = cam.shake > 0.3 ? (Math.random() - 0.5) * cam.shake : 0;
+    // Use CSS transform for uniform camera on both 2D + GL
+    const tx = cam.x + sx;
+    const ty = cam.y + sy;
+    if (cam.scale !== 1 || tx !== 0 || ty !== 0) {
+        canvas.style.transformOrigin = `${cam.focusX}px ${cam.focusY}px`;
+        canvas.style.transform = `scale(${cam.scale}) translate(${tx}px, ${ty}px)`;
+    } else {
+        canvas.style.transform = '';
+    }
+}
+
+function resetCam() {
+    camTarget.x = 0; camTarget.y = 0; camTarget.scale = 1;
+    cam.x = 0; cam.y = 0; cam.scale = 1; cam.shake = 0;
+    cam.focusX = 0; cam.focusY = 0;
+}
+
+function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
+
+// --- Speed Lines (radial during draw LAUNCH) ---
+function renderSpeedLines() {
+    if (!isMultiMode || bestStarsInBatch < 4) return;
+    const t = stateTime;
+    if (t > DRAW_SCATTER + 0.5) return;
+
+    const w = window.innerWidth, h = window.innerHeight;
+    const cx = w / 2, cy = h * 0.4;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    const count = bestStarsInBatch >= 6 ? 28 : bestStarsInBatch >= 5 ? 20 : 12;
+    const baseAlpha = bestStarsInBatch >= 6 ? 0.07 : bestStarsInBatch >= 5 ? 0.05 : 0.035;
+    const colors = getMeteorColor(bestStarsInBatch);
+
+    const fadeIn = Math.min(1, t / 0.3);
+    const fadeOut = t > DRAW_LAUNCH ? Math.max(0, 1 - (t - DRAW_LAUNCH) / 0.5) : 1;
+
+    for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2 + globalTime * 0.05;
+        const innerR = 40 + Math.sin(i * 1.7 + globalTime * 2) * 15;
+        const outerR = Math.max(w, h) * 0.9;
+        const halfAng = (0.003 + Math.random() * 0.004);
+
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(angle) * innerR, cy + Math.sin(angle) * innerR);
+        ctx.lineTo(cx + Math.cos(angle - halfAng) * outerR, cy + Math.sin(angle - halfAng) * outerR);
+        ctx.lineTo(cx + Math.cos(angle + halfAng) * outerR, cy + Math.sin(angle + halfAng) * outerR);
+        ctx.closePath();
+
+        const flicker = 0.5 + Math.sin(i * 2.3 + globalTime * 3) * 0.5;
+        ctx.globalAlpha = baseAlpha * flicker * fadeIn * fadeOut;
+        ctx.fillStyle = colors.head;
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+// --- Light Pillar (6-star reveal) ---
+function renderLightPillars() {
+    if (!lightPillars.length) return;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.globalCompositeOperation = 'lighter';
+
+    let alive = 0;
+    for (let i = 0; i < lightPillars.length; i++) {
+        const p = lightPillars[i];
+        const age = globalTime - p.startTime;
+        if (age > p.duration) continue;
+        lightPillars[alive++] = p;
+
+        const flashIn = Math.min(1, age / 0.12);
+        const sustain = age > p.duration * 0.3
+            ? Math.max(0, 1 - (age - p.duration * 0.3) / (p.duration * 0.7))
+            : 1;
+        const alpha = flashIn * sustain;
+
+        const baseW = 24 + Math.sin(age * 9) * 4;
+        const pillarH = window.innerHeight;
+
+        // Upward beam
+        const gradUp = ctx.createLinearGradient(p.x, p.y, p.x, 0);
+        gradUp.addColorStop(0, p.color);
+        gradUp.addColorStop(0.4, p.color);
+        gradUp.addColorStop(1, 'transparent');
+        ctx.globalAlpha = alpha * 0.45;
+        ctx.fillStyle = gradUp;
+        ctx.fillRect(p.x - baseW / 2, 0, baseW, p.y);
+
+        // Downward beam
+        const gradDown = ctx.createLinearGradient(p.x, p.y, p.x, pillarH);
+        gradDown.addColorStop(0, p.color);
+        gradDown.addColorStop(0.5, 'transparent');
+        ctx.fillStyle = gradDown;
+        ctx.fillRect(p.x - baseW / 2, p.y, baseW, pillarH - p.y);
+
+        // Bright center line
+        const cw = 3 + Math.sin(age * 14) * 1.5;
+        ctx.globalAlpha = alpha * 0.7;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(p.x - cw / 2, 0, cw, pillarH);
+
+        // Horizontal flare at card center
+        const flareW = baseW * 4 * (1 - Math.min(1, age / 0.3));
+        if (flareW > 2) {
+            ctx.globalAlpha = alpha * 0.3 * (1 - Math.min(1, age / 0.3));
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x - flareW / 2, p.y - 3, flareW, 6);
+        }
+    }
+    lightPillars.length = alive;
+
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+}
+
+// --- Meteor Shower (rarity color tell) ---
+let meteorParticles = [];
+let bestStarsInBatch = 0; // Highest rarity in multi draw
+
+// --- God Rays ---
+let godRayAlpha = 0;
+let godRayColor = '#FFD700';
+
+// Rarity → meteor color mapping (same language as Genshin/HSR)
+function getMeteorColor(stars) {
+    if (stars >= 6) return { head: '#FFD700', trail: '#FF4500', glow: 'rgba(255,69,0,0.6)' };
+    if (stars >= 5) return { head: '#D8A0FF', trail: '#A855F7', glow: 'rgba(168,85,247,0.5)' };
+    if (stars >= 4) return { head: '#7BB8FF', trail: '#3B82F6', glow: 'rgba(59,130,246,0.4)' };
+    return { head: '#FFFFFF', trail: '#94A3B8', glow: 'rgba(200,200,200,0.3)' };
+}
+
+function spawnMeteors() {
+    const w = window.innerWidth, h = window.innerHeight;
+    const colors = getMeteorColor(bestStarsInBatch);
+    const count = bestStarsInBatch >= 6 ? 6 : bestStarsInBatch >= 5 ? 4 : 2;
+    for (let i = 0; i < count; i++) {
+        const delay = i * 0.15 + Math.random() * 0.1;
+        const startX = w * (0.3 + Math.random() * 0.5);
+        const startY = -20 - Math.random() * 60;
+        // Shoot diagonally across screen
+        const angle = Math.PI * 0.55 + (Math.random() - 0.5) * 0.35;
+        const speed = 8 + Math.random() * 6;
+        meteorParticles.push({
+            x: startX, y: startY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1, decay: 0.008 + Math.random() * 0.004,
+            size: 3 + Math.random() * 3,
+            trail: [], maxTrail: 25 + Math.floor(Math.random() * 15),
+            delay, age: 0,
+            colors,
+        });
+    }
+}
+
+function updateAndRenderMeteors() {
+    if (!meteorParticles.length) return;
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    let alive = 0;
+    for (let i = 0; i < meteorParticles.length; i++) {
+        const m = meteorParticles[i];
+        m.age += 0.016;
+        if (m.age < m.delay) { meteorParticles[alive++] = m; continue; }
+
+        m.trail.push({ x: m.x, y: m.y });
+        if (m.trail.length > m.maxTrail) m.trail.shift();
+        m.x += m.vx;
+        m.y += m.vy;
+        m.vy += 0.06; // slight gravity arc
+        m.life -= m.decay;
+        if (m.life <= 0) continue;
+
+        // Trail
+        for (let j = 0; j < m.trail.length; j++) {
+            const t = j / m.trail.length;
+            const pt = m.trail[j];
+            ctx.globalAlpha = t * m.life * 0.6;
+            ctx.fillStyle = m.colors.trail;
+            ctx.shadowColor = m.colors.glow;
+            ctx.shadowBlur = 6 * t;
+            const s = m.size * t * 0.7;
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, s, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Head (bright)
+        ctx.globalAlpha = m.life;
+        ctx.fillStyle = m.colors.head;
+        ctx.shadowColor = m.colors.head;
+        ctx.shadowBlur = m.size * 5;
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, m.size, 0, Math.PI * 2);
+        ctx.fill();
+        // Extra glow pass
+        ctx.globalAlpha = m.life * 0.5;
+        ctx.shadowBlur = m.size * 12;
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, m.size * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        meteorParticles[alive++] = m;
+    }
+    meteorParticles.length = alive;
+
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    ctx.restore();
+}
+
+function renderGodRays(cx, cy) {
+    if (godRayAlpha <= 0.01) return;
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    const rayCount = 12;
+    const maxLen = Math.max(window.innerWidth, window.innerHeight) * 0.8;
+    const rotSpeed = globalTime * 0.15;
+
+    for (let i = 0; i < rayCount; i++) {
+        const angle = (Math.PI * 2 * i) / rayCount + rotSpeed;
+        const wobble = Math.sin(globalTime * 2.5 + i * 1.7) * 0.04;
+        const halfWidth = 0.06 + Math.sin(globalTime * 1.8 + i * 2.3) * 0.025;
+        const a1 = angle + wobble - halfWidth;
+        const a2 = angle + wobble + halfWidth;
+        const rayAlpha = godRayAlpha * (0.4 + Math.sin(globalTime * 3 + i) * 0.15);
+
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxLen);
+        grad.addColorStop(0, godRayColor);
+        grad.addColorStop(0.3, godRayColor);
+        grad.addColorStop(1, 'transparent');
+
+        ctx.globalAlpha = rayAlpha;
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(a1) * maxLen, cy + Math.sin(a1) * maxLen);
+        ctx.lineTo(cx + Math.cos(a2) * maxLen, cy + Math.sin(a2) * maxLen);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
 const DRAW_LAUNCH = CONFIG.fuExplodeDelay;
 const DRAW_RISE = CONFIG.fuRiseDuration;
 const DRAW_SHRINK = CONFIG.fuShrinkDuration;
@@ -1141,7 +1562,17 @@ function initDrawAnimation() {
     burstFlash = 0;
     fuEndScreenPositions = [];
     drawToFortuneSeed = null;
+    meteorParticles = [];
+    godRayAlpha = 0;
+    resetCam();
     if (!fontsReady) return;
+
+    // Multi-pull: spawn meteors as rarity tell + set god ray color
+    if (isMultiMode && bestStarsInBatch >= 4) {
+        spawnMeteors();
+        const mc = getMeteorColor(bestStarsInBatch);
+        godRayColor = mc.trail;
+    }
 
     let drawsToAnimate = [];
 
@@ -1259,8 +1690,43 @@ function initDrawAnimation() {
 
 function updateDraw() {
     updateBgParticles(globalTime);
+    updateCam();
 
     const t = stateTime;
+
+    // --- Camera choreography for multi-pull ---
+    if (isMultiMode) {
+        // During draw, focus on screen center
+        cam.focusX = window.innerWidth / 2;
+        cam.focusY = window.innerHeight / 2;
+        if (t < DRAW_LAUNCH * 0.5) {
+            // Slow zoom out as 福 rises
+            camTarget.scale = 0.92;
+        } else if (t < DRAW_LAUNCH) {
+            // Hold wide
+            camTarget.scale = 0.92;
+        } else if (t < DRAW_SCATTER) {
+            // BURST: camera shake + slight zoom in
+            if (t < DRAW_LAUNCH + 0.05) cam.shake = bestStarsInBatch >= 5 ? 14 : 8;
+            camTarget.scale = 1.0;
+        } else if (t < DRAW_REFORM) {
+            // Reform: ease back
+            camTarget.scale = 1.0;
+        } else {
+            // Settle: normalize
+            camTarget.scale = 1.0;
+        }
+        // God rays during scatter/reform for 4+ star batches
+        if (bestStarsInBatch >= 4) {
+            if (t >= DRAW_LAUNCH && t < DRAW_REFORM + 0.5) {
+                const rayT = Math.min(1, (t - DRAW_LAUNCH) / 0.4);
+                const rayFade = t > DRAW_REFORM ? Math.max(0, 1 - (t - DRAW_REFORM) / 0.5) : 1;
+                godRayAlpha = rayT * rayFade * (bestStarsInBatch >= 6 ? 0.18 : bestStarsInBatch >= 5 ? 0.12 : 0.07);
+            } else {
+                godRayAlpha *= 0.9;
+            }
+        }
+    }
 
     // --- LAUNCH: trail sparks behind rising Fu ---
     if (t < DRAW_LAUNCH) {
@@ -1487,6 +1953,12 @@ function initMultiFortuneState() {
             cardH: grid.cardH,
             revealed: false,
             revealTime: 0,
+            // New states for 3D effects
+            converging: false,
+            convergeStartTime: 0,
+            convergeDuration: 0,
+            flipping: false,
+            flipStartTime: 0,
         });
     }
 
@@ -1496,6 +1968,11 @@ function initMultiFortuneState() {
         allRevealedTime: 0,
         burstParticles: [],
     };
+    // Reset post-processing state
+    ppShockwaves = [];
+    lightPillars = [];
+    ppChromatic = 0;
+    ppBloomTarget = 0.12;
 }
 
 function updateMultiDajiToGPU(skipRender) {
@@ -1525,29 +2002,42 @@ function updateMultiDajiToGPU(skipRender) {
     for (let i = 0; i < count; i++) {
         const p = daji3DParticles[i];
 
-        // Check if this particle's card has been revealed
         let alpha = p.alpha * 1.25;
         alpha = Math.min(0.8, alpha);
         let extraX = 0, extraY = 0;
         let colorBoost = 1;
+        let goldShift = 0; // 0 = normal metallic, 1 = pure bright gold
 
         // Anticipation: particles brighten and pulse before high-rarity reveal
-        if (p.anticipating && !p.fadingOut) {
+        if (p.anticipating && !p.fadingOut && !p.converging) {
             const pulse = 0.7 + Math.sin(globalTime * 12 + p.phase * 2) * 0.3;
             alpha = Math.min(1.0, alpha * 1.8 * pulse);
             colorBoost = 1.5;
         }
 
+        // CONVERGENCE: particles rush toward card center, brighten to gold
+        if (p.converging && !p.fadingOut) {
+            const ct = Math.min(1, (globalTime - p.convergeStartTime) / p.convergeDuration);
+            const eased = easeInOut(ct);
+            // Move toward card center
+            extraX = (p.convergeTargetX - p.baseX) * eased;
+            extraY = (p.convergeTargetY - p.baseY) * eased;
+            // Brighten dramatically
+            alpha = Math.min(1.0, alpha * (1 + ct * 3));
+            colorBoost = 1 + ct * 2;
+            goldShift = ct; // shift to pure gold
+            // Scale down as they converge (compress into point)
+            // handled below in scale calculation
+        }
+
         if (p.fadingOut) {
             const fadeT = Math.min(1, (globalTime - p.fadeStartTime) / 0.7);
-            // Bright flash at start, then fast fade
-            const flashBoost = fadeT < 0.15 ? 1.5 : 1;
+            const flashBoost = fadeT < 0.15 ? 2.0 : 1;
             alpha *= (1 - fadeT) * flashBoost;
-            // Stronger burst outward with easing
             const burstEase = 1 - Math.pow(1 - fadeT, 2);
-            extraX = p.burstVx * burstEase * spread * 4;
-            extraY = p.burstVy * burstEase * spread * 4;
-            if (fadeT >= 1) continue; // fully faded, skip
+            extraX = p.burstVx * burstEase * spread * 5;
+            extraY = p.burstVy * burstEase * spread * 5;
+            if (fadeT >= 1) continue;
         }
 
         const z = p.origZ + Math.sin(globalTime * 1.5 + p.phase) * breatheAmp;
@@ -1556,15 +2046,22 @@ function updateMultiDajiToGPU(skipRender) {
         _dummy.updateMatrix();
         particlesMesh.setMatrixAt(visibleCount, _dummy.matrix);
 
-        // Metallic gold gradient
+        // Metallic gold gradient (base)
         const yNorm = clusterH > 0 ? p.baseY / clusterH : 0;
         const gradT = Math.max(0, Math.min(1, (yNorm + 1) * 0.5));
         const hDist = Math.abs(yNorm - highlightPos);
         const highlight = Math.max(0, 1 - hDist * 3);
 
-        const metalR = Math.min(255, Math.floor(lerp(255, 180, gradT) + highlight * 55));
-        const metalG = Math.min(255, Math.floor(lerp(225, 130, gradT) + highlight * 40));
-        const metalB = Math.min(255, Math.floor(lerp(50, 10, gradT) + highlight * 50));
+        let metalR = Math.min(255, Math.floor(lerp(255, 180, gradT) + highlight * 55));
+        let metalG = Math.min(255, Math.floor(lerp(225, 130, gradT) + highlight * 40));
+        let metalB = Math.min(255, Math.floor(lerp(50, 10, gradT) + highlight * 50));
+
+        // Gold shift during convergence
+        if (goldShift > 0) {
+            metalR = Math.floor(lerp(metalR, 255, goldShift));
+            metalG = Math.floor(lerp(metalG, 240, goldShift));
+            metalB = Math.floor(lerp(metalB, 120, goldShift));
+        }
 
         const blendT = Math.min(1, entryT);
         const gr = lerp(p.r, metalR, blendT) / 255;
@@ -1578,6 +2075,11 @@ function updateMultiDajiToGPU(skipRender) {
         if (uv) instUV.setXY(visibleCount, uv.u, uv.v);
 
         let scale = cellSize * 0.85 * scaleFactor;
+        // Convergence: shrink as they rush to center
+        if (p.converging && !p.fadingOut) {
+            const ct = Math.min(1, (globalTime - p.convergeStartTime) / p.convergeDuration);
+            scale *= lerp(1, 0.3, ct * ct);
+        }
         instScale.setX(visibleCount, scale);
         visibleCount++;
     }
@@ -1593,82 +2095,163 @@ function updateMultiDajiToGPU(skipRender) {
     return visibleCount;
 }
 
+// Helper: draw a rounded rect path at given position
+function roundRectPath(ctxRef, x, y, w, h, r) {
+    ctxRef.beginPath();
+    ctxRef.moveTo(x + r, y);
+    ctxRef.lineTo(x + w - r, y);
+    ctxRef.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctxRef.lineTo(x + w, y + h - r);
+    ctxRef.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctxRef.lineTo(x + r, y + h);
+    ctxRef.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctxRef.lineTo(x, y + r);
+    ctxRef.quadraticCurveTo(x, y, x + r, y);
+    ctxRef.closePath();
+}
+
 function renderMultiCards() {
     if (!multiFortuneState) return;
     const fadeIn = Math.min(1, stateTime / 0.5);
+    const FLIP_DURATION = 0.55; // seconds for 3D flip
 
     for (const card of multiFortuneState.cards) {
         const revealAge = card.revealed ? (globalTime - card.revealTime) : -1;
-        const alpha = fadeIn * (card.revealed ? 0.7 : 0.6);
-        const borderColor = card.revealed
-            ? card.draw.rarity.glow
-            : 'rgba(255, 215, 0, 0.15)';
-        const fillColor = card.revealed
-            ? 'rgba(40, 5, 5, 0.45)'
-            : 'rgba(80, 10, 10, 0.5)';
 
-        // Use lightweight card (no blur pass) for performance with 10 cards
+        // === 3D CARD FLIP ANIMATION ===
+        if (card.flipping) {
+            const flipAge = globalTime - card.flipStartTime;
+            const flipT = Math.min(1, flipAge / FLIP_DURATION);
+            if (flipT >= 1) card.flipping = false;
+
+            const angle = flipT * Math.PI; // 0 → PI
+            const cosA = Math.cos(angle);
+            const scaleX = Math.abs(cosA);
+            const isBack = cosA > 0; // first half = back, second half = front
+
+            ctx.save();
+            ctx.scale(dpr, dpr);
+            ctx.translate(card.centerX, card.centerY);
+
+            // Perspective distortion: slight vertical stretch at midpoint
+            const perspSkew = Math.sin(angle) * 0.06;
+            ctx.transform(Math.max(0.02, scaleX), 0, 0, 1 + perspSkew, 0, 0);
+
+            // Drop shadow during flip
+            if (scaleX < 0.7) {
+                ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                ctx.shadowBlur = 12 * (1 - scaleX);
+                ctx.shadowOffsetX = (1 - scaleX) * 8 * Math.sign(cosA);
+            }
+
+            const hw = card.cardW / 2, hh = card.cardH / 2;
+            const rd = 8;
+
+            if (isBack) {
+                // BACK FACE: dark frosted glass with 福
+                roundRectPath(ctx, -hw, -hh, card.cardW, card.cardH, rd);
+                ctx.fillStyle = 'rgba(80, 10, 10, 0.6)';
+                ctx.globalAlpha = fadeIn * 0.7;
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 215, 0, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                // 福 character
+                const hintSize = Math.min(card.cardW, card.cardH) * 0.35;
+                ctx.font = `bold ${hintSize}px "Ma Shan Zheng", serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.globalAlpha = fadeIn * 0.25;
+                ctx.fillStyle = CONFIG.glowGold;
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.fillText('\u798F', 0, 0);
+            } else {
+                // FRONT FACE: revealed card with rarity styling
+                roundRectPath(ctx, -hw, -hh, card.cardW, card.cardH, rd);
+                ctx.fillStyle = 'rgba(40, 5, 5, 0.55)';
+                ctx.globalAlpha = fadeIn * 0.8;
+                ctx.fill();
+                ctx.strokeStyle = card.draw.rarity.color;
+                ctx.lineWidth = 2;
+                ctx.shadowColor = card.draw.rarity.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetX = 0;
+                ctx.stroke();
+            }
+
+            // Card edge at midpoint (golden edge)
+            if (scaleX < 0.12) {
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 0.8;
+                ctx.fillStyle = 'rgba(220, 190, 80, 0.9)';
+                ctx.fillRect(-1.5, -hh, 3, card.cardH);
+            }
+
+            ctx.restore();
+            continue; // Skip normal card rendering during flip
+        }
+
+        // === NORMAL CARD RENDERING ===
+        // Convergence glow: card center brightens as particles converge
+        if (card.converging) {
+            const ct = Math.min(1, (globalTime - card.convergeStartTime) / card.convergeDuration);
+            ctx.save();
+            ctx.scale(dpr, dpr);
+            // Bright convergence glow at card center
+            const glowR = Math.min(card.cardW, card.cardH) * 0.4 * (1 + ct);
+            const grad = ctx.createRadialGradient(
+                card.centerX, card.centerY, 0,
+                card.centerX, card.centerY, glowR
+            );
+            grad.addColorStop(0, `rgba(255, 240, 120, ${ct * 0.6})`);
+            grad.addColorStop(0.5, `rgba(255, 200, 50, ${ct * 0.3})`);
+            grad.addColorStop(1, 'rgba(255, 200, 50, 0)');
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = grad;
+            ctx.fillRect(card.centerX - glowR, card.centerY - glowR, glowR * 2, glowR * 2);
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.restore();
+        }
+
+        const alpha = fadeIn * (card.revealed ? 0.7 : 0.6);
+        const borderColor = card.revealed ? card.draw.rarity.glow : 'rgba(255, 215, 0, 0.15)';
+        const fillColor = card.revealed ? 'rgba(40, 5, 5, 0.45)' : 'rgba(80, 10, 10, 0.5)';
+
         drawMultiCardRect(card.centerX, card.centerY, card.cardW, card.cardH, alpha, borderColor, fillColor);
 
-        // REVEAL FLASH: bright white→rarity-color flash that fades quickly
+        // REVEAL FLASH: bright white→rarity-color flash
         if (card.revealed && revealAge < 0.5) {
             ctx.save();
             ctx.scale(dpr, dpr);
             const flashT = revealAge / 0.5;
-            const flashAlpha = (1 - flashT) * 0.7;
-            const x = card.centerX - card.cardW / 2;
-            const y = card.centerY - card.cardH / 2;
-            const rd = 10;
-            ctx.beginPath();
-            ctx.moveTo(x + rd, y);
-            ctx.lineTo(x + card.cardW - rd, y);
-            ctx.quadraticCurveTo(x + card.cardW, y, x + card.cardW, y + rd);
-            ctx.lineTo(x + card.cardW, y + card.cardH - rd);
-            ctx.quadraticCurveTo(x + card.cardW, y + card.cardH, x + card.cardW - rd, y + card.cardH);
-            ctx.lineTo(x + rd, y + card.cardH);
-            ctx.quadraticCurveTo(x, y + card.cardH, x, y + card.cardH - rd);
-            ctx.lineTo(x, y + rd);
-            ctx.quadraticCurveTo(x, y, x + rd, y);
-            ctx.closePath();
-            // White flash → rarity color
+            const flashAlpha = (1 - flashT) * 0.8;
+            roundRectPath(ctx, card.centerX - card.cardW / 2, card.centerY - card.cardH / 2, card.cardW, card.cardH, 10);
             const flashColor = flashT < 0.3 ? 'white' : card.draw.rarity.color;
             ctx.globalAlpha = flashAlpha;
             ctx.fillStyle = flashColor;
             ctx.shadowColor = card.draw.rarity.color;
-            ctx.shadowBlur = 20 * (1 - flashT);
+            ctx.shadowBlur = 25 * (1 - flashT);
             ctx.fill();
             ctx.restore();
         }
 
-        // Draw rarity-colored border glow for revealed cards
-        if (card.revealed) {
+        // Rarity-colored border glow for revealed cards
+        if (card.revealed && revealAge >= 0.5) {
             ctx.save();
             ctx.scale(dpr, dpr);
-            const x = card.centerX - card.cardW / 2;
-            const y = card.centerY - card.cardH / 2;
-            const glowPulse = revealAge < 1 ? 0.5 + Math.sin(revealAge * Math.PI * 3) * 0.2 : 0.3;
+            const glowPulse = revealAge < 1.5 ? 0.5 + Math.sin(revealAge * Math.PI * 2) * 0.2 : 0.3;
             ctx.globalAlpha = fadeIn * glowPulse;
             ctx.shadowColor = card.draw.rarity.color;
-            ctx.shadowBlur = 12 + (revealAge < 0.5 ? (1 - revealAge * 2) * 15 : 0);
+            ctx.shadowBlur = 10;
             ctx.strokeStyle = card.draw.rarity.color;
-            ctx.lineWidth = revealAge < 0.3 ? 3 : 1.5;
-            ctx.beginPath();
-            const r = 10;
-            ctx.moveTo(x + r, y);
-            ctx.lineTo(x + card.cardW - r, y);
-            ctx.quadraticCurveTo(x + card.cardW, y, x + card.cardW, y + r);
-            ctx.lineTo(x + card.cardW, y + card.cardH - r);
-            ctx.quadraticCurveTo(x + card.cardW, y + card.cardH, x + card.cardW - r, y + card.cardH);
-            ctx.lineTo(x + r, y + card.cardH);
-            ctx.quadraticCurveTo(x, y + card.cardH, x, y + card.cardH - r);
-            ctx.lineTo(x, y + r);
-            ctx.quadraticCurveTo(x, y, x + r, y);
-            ctx.closePath();
+            ctx.lineWidth = 1.5;
+            roundRectPath(ctx, card.centerX - card.cardW / 2, card.centerY - card.cardH / 2, card.cardW, card.cardH, 10);
             ctx.stroke();
             ctx.restore();
         }
 
-        // ANTICIPATION for 5+ star: shake + glow buildup before reveal
+        // ANTICIPATION for 5+ star: shake + glow buildup
         if (card.anticipating && card.anticipateStart) {
             const anticAge = globalTime - card.anticipateStart;
             const anticT = Math.min(1, anticAge / card.anticipateDuration);
@@ -1679,13 +2262,11 @@ function renderMultiCards() {
             const x = card.centerX - card.cardW / 2;
             const y = card.centerY - card.cardH / 2;
 
-            // Shake: increasing intensity
             const shakeIntensity = anticT * (stars >= 6 ? 6 : 3.5);
             const shakeX = Math.sin(anticAge * 35) * shakeIntensity;
             const shakeY = Math.cos(anticAge * 28) * shakeIntensity * 0.6;
             ctx.translate(shakeX, shakeY);
 
-            // Glow buildup: rarity color glow intensifying around card
             const glowIntensity = anticT * anticT;
             const glowSize = 15 + glowIntensity * (stars >= 6 ? 40 : 25);
             ctx.globalAlpha = glowIntensity * 0.8;
@@ -1693,33 +2274,20 @@ function renderMultiCards() {
             ctx.shadowBlur = glowSize;
             ctx.strokeStyle = card.draw.rarity.color;
             ctx.lineWidth = 2 + glowIntensity * 3;
-            ctx.beginPath();
-            const rd = 10;
-            ctx.moveTo(x + rd, y);
-            ctx.lineTo(x + card.cardW - rd, y);
-            ctx.quadraticCurveTo(x + card.cardW, y, x + card.cardW, y + rd);
-            ctx.lineTo(x + card.cardW, y + card.cardH - rd);
-            ctx.quadraticCurveTo(x + card.cardW, y + card.cardH, x + card.cardW - rd, y + card.cardH);
-            ctx.lineTo(x + rd, y + card.cardH);
-            ctx.quadraticCurveTo(x, y + card.cardH, x, y + card.cardH - rd);
-            ctx.lineTo(x, y + rd);
-            ctx.quadraticCurveTo(x, y, x + rd, y);
-            ctx.closePath();
+            roundRectPath(ctx, x, y, card.cardW, card.cardH, 10);
             ctx.stroke();
 
-            // 6-star: inner radiant glow fill
             if (stars >= 6 && anticT > 0.4) {
                 const innerT = (anticT - 0.4) / 0.6;
                 ctx.globalAlpha = innerT * 0.3;
                 ctx.fillStyle = card.draw.rarity.color;
                 ctx.fill();
             }
-
             ctx.restore();
         }
 
-        // Draw "福" on unrevealed cards as hint
-        if (!card.revealed && !card.anticipating) {
+        // 福 hint on unrevealed cards
+        if (!card.revealed && !card.anticipating && !card.converging) {
             ctx.save();
             ctx.scale(dpr, dpr);
             const hintSize = Math.min(card.cardW, card.cardH) * 0.35;
@@ -1742,7 +2310,13 @@ function renderMultiCardText() {
 
     for (const card of multiFortuneState.cards) {
         if (!card.revealed) continue;
-        const revealT = Math.min(1, (globalTime - card.revealTime) / 0.5);
+        // Don't show text until card flip completes
+        if (card.flipping) continue;
+        const FLIP_DUR = 0.55;
+        const textDelay = FLIP_DUR + 0.05; // wait for flip + tiny gap
+        const timeSinceReveal = globalTime - card.revealTime;
+        if (timeSinceReveal < textDelay) continue;
+        const revealT = Math.min(1, (timeSinceReveal - textDelay) / 0.4);
         if (revealT <= 0) continue;
 
         const dr = card.draw;
@@ -1811,30 +2385,68 @@ function renderMultiCardText() {
 function revealCard(index) {
     if (!multiFortuneState || index < 0 || index >= multiFortuneState.cards.length) return;
     const card = multiFortuneState.cards[index];
-    if (card.revealed || card.anticipating) return;
+    if (card.revealed || card.anticipating || card.converging) return;
 
     const stars = card.draw.rarity.stars;
 
-    // 5+ star: anticipation phase before reveal
+    // 5+ star: anticipation phase (shake + glow) before convergence
     if (stars >= 5) {
         card.anticipating = true;
         card.anticipateStart = globalTime;
         card.anticipateDuration = stars >= 6 ? 0.9 : 0.55;
-        // Slow-pulse the particles during anticipation (brighten them)
         for (const p of daji3DParticles) {
             if (p.drawIndex === index) p.anticipating = true;
         }
-        // Delayed actual reveal
         const delay = card.anticipateDuration * 1000;
-        setTimeout(() => executeReveal(index), delay);
+        setTimeout(() => startConvergence(index), delay);
         return;
     }
 
-    // Normal reveal (2-4 stars)
-    executeReveal(index);
+    // Normal reveal (2-4 stars): skip anticipation, go straight to convergence
+    startConvergence(index);
 }
 
-function executeReveal(index) {
+// Phase 2: Golden convergence — particles rush to card center
+function startConvergence(index) {
+    if (!multiFortuneState || index < 0 || index >= multiFortuneState.cards.length) return;
+    const card = multiFortuneState.cards[index];
+    if (card.revealed) return;
+
+    const stars = card.draw.rarity.stars;
+    card.anticipating = false;
+    card.converging = true;
+    card.convergeStartTime = globalTime;
+    card.convergeDuration = stars >= 6 ? 0.6 : stars >= 5 ? 0.5 : 0.3;
+
+    // Mark particles as converging toward card center
+    const cardWorldCX = card.centerX - window.innerWidth / 2;
+    const cardWorldCY = card.centerY - window.innerHeight / 2;
+    for (const p of daji3DParticles) {
+        if (p.drawIndex === index) {
+            p.converging = true;
+            p.anticipating = false;
+            p.convergeStartTime = globalTime;
+            p.convergeDuration = card.convergeDuration;
+            p.convergeTargetX = cardWorldCX;
+            p.convergeTargetY = cardWorldCY;
+        }
+    }
+
+    // Camera begins to zoom in for 5+
+    if (stars >= 5) {
+        cam.focusX = card.centerX;
+        cam.focusY = card.centerY;
+        camTarget.scale = stars >= 6 ? 1.2 : 1.12;
+    }
+
+    // Bloom ramp-up during convergence (subtle)
+    ppBloomTarget = stars >= 6 ? 1.0 : stars >= 5 ? 0.8 : 0.5;
+
+    setTimeout(() => finishReveal(index), card.convergeDuration * 1000);
+}
+
+// Phase 3: Burst + Reveal — the climax
+function finishReveal(index) {
     if (!multiFortuneState || index < 0 || index >= multiFortuneState.cards.length) return;
     const card = multiFortuneState.cards[index];
     if (card.revealed) return;
@@ -1842,29 +2454,75 @@ function executeReveal(index) {
     const stars = card.draw.rarity.stars;
     card.revealed = true;
     card.revealTime = globalTime;
-    card.anticipating = false;
+    card.converging = false;
+    card.flipping = true;
+    card.flipStartTime = globalTime;
     multiFortuneState.revealedCount++;
+    playSfxReveal(stars);
 
-    // Mark matching daji particles as fading out with burst direction
+    // BLOOM SPIKE then decay (keep subtle so text stays readable)
+    ppBloomTarget = stars >= 6 ? 1.5 : stars >= 5 ? 1.0 : 0.6;
+    setTimeout(() => { ppBloomTarget = 0.12; }, 350);
+
+    // CAMERA SHAKE + zoom back
+    if (stars >= 5) {
+        cam.shake = stars >= 6 ? 14 : 8;
+        camTarget.scale = stars >= 6 ? 1.3 : 1.18;
+        const easeBackDelay = stars >= 6 ? 900 : 600;
+        setTimeout(() => { camTarget.scale = 1.0; }, easeBackDelay);
+    } else if (stars >= 4) {
+        cam.shake = 4;
+    }
+
+    // CHROMATIC ABERRATION spike
+    ppChromatic = stars >= 6 ? 0.018 : stars >= 5 ? 0.01 : 0.004;
+
+    // SHOCKWAVE distortion
+    if (stars >= 4) {
+        ppShockwaves.push({
+            cx: card.centerX / window.innerWidth,
+            cy: 1 - card.centerY / window.innerHeight,
+            startTime: globalTime,
+            duration: stars >= 6 ? 0.7 : 0.5,
+            maxRadius: stars >= 6 ? 0.55 : stars >= 5 ? 0.4 : 0.25,
+            strength: stars >= 6 ? 0.8 : stars >= 5 ? 0.5 : 0.25,
+        });
+        // Double shockwave for 6-star
+        if (stars >= 6) {
+            setTimeout(() => {
+                ppShockwaves.push({
+                    cx: card.centerX / window.innerWidth,
+                    cy: 1 - card.centerY / window.innerHeight,
+                    startTime: globalTime,
+                    duration: 0.6,
+                    maxRadius: 0.7,
+                    strength: 0.4,
+                });
+            }, 150);
+        }
+    }
+
+    // Light pillar removed per user request
+
+    // BURST particles outward from center
+    const cardWorldCX = card.centerX - window.innerWidth / 2;
+    const cardWorldCY = card.centerY - window.innerHeight / 2;
     for (const p of daji3DParticles) {
         if (p.drawIndex === index && !p.fadingOut) {
             p.fadingOut = true;
-            p.anticipating = false;
+            p.converging = false;
             p.fadeStartTime = globalTime;
-            const dx = p.baseX - (card.centerX - window.innerWidth / 2);
-            const dy = p.baseY - (card.centerY - window.innerHeight / 2);
-            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            // 5+ stars: much stronger outward burst
-            const burstPower = stars >= 6 ? 3.0 : stars >= 5 ? 2.0 : 1.0;
-            p.burstVx = (dx / dist) * (burstPower + Math.random() * burstPower);
-            p.burstVy = (dy / dist) * (burstPower + Math.random() * burstPower);
+            // Burst from card center outward (radial explosion)
+            const angle = Math.random() * Math.PI * 2;
+            const burstPower = stars >= 6 ? 4.5 : stars >= 5 ? 3.0 : 1.5;
+            const speed = burstPower * (0.5 + Math.random());
+            p.burstVx = Math.cos(angle) * speed;
+            p.burstVy = Math.sin(angle) * speed;
         }
     }
 
     // Screen flash
-    if (stars >= 4) {
-        triggerScreenFlash(stars);
-    }
+    if (stars >= 4) triggerScreenFlash(stars);
 
     if (multiFortuneState.revealedCount >= multiFortuneState.cards.length) {
         multiFortuneState.allRevealedTime = globalTime;
@@ -1938,11 +2596,24 @@ function hitTestMultiHint(screenX, screenY) {
 function revealNextUnrevealedCard() {
     if (!multiFortuneState) return;
     for (let i = 0; i < multiFortuneState.cards.length; i++) {
-        if (!multiFortuneState.cards[i].revealed && !multiFortuneState.cards[i].anticipating) {
+        const c = multiFortuneState.cards[i];
+        if (!c.revealed && !c.anticipating && !c.converging) {
             revealCard(i);
             return;
         }
     }
+}
+
+function hitTestSingleFortuneCard(screenX, screenY) {
+    if (state !== 'fortune' || isMultiMode || !currentDrawResult) return false;
+    const L = getLayout();
+    const w = window.innerWidth, h = window.innerHeight;
+    const cardW = w * L.cardWidth;
+    const cardTop = h * L.cardTop;
+    const cardBottom = h * L.cardBottom;
+    const cardLeft = (w - cardW) / 2;
+    return screenX >= cardLeft && screenX <= cardLeft + cardW &&
+           screenY >= cardTop && screenY <= cardBottom;
 }
 
 function resetMultiFortune() {
@@ -1951,6 +2622,16 @@ function resetMultiFortune() {
     isMultiMode = false;
     multiDrawResults = null;
     daji3DParticles = [];
+    meteorParticles = [];
+    godRayAlpha = 0;
+    // Reset post-processing effects
+    ppShockwaves = [];
+    lightPillars = [];
+    ppChromatic = 0;
+    ppBloomTarget = 0.12;
+    ppBloomStrength = 0.12;
+    resetCam();
+    canvas.style.transform = '';
     if (particlesMesh) particlesMesh.count = 0;
     // Hide DOM buttons
     const btnRevealAll = document.getElementById('btn-reveal-all');
@@ -2055,7 +2736,19 @@ function renderDrawParticles3D(t) {
 
 function renderDrawOverlay() {
     const t = stateTime;
+
+    // Speed lines — render BEFORE everything as background energy
+    if (isMultiMode) renderSpeedLines();
+
+    // Meteor shower — render BEFORE particles so they're behind
+    if (isMultiMode) updateAndRenderMeteors();
+
     renderDrawParticles3D(t);
+
+    // God rays — render after particles for additive glow
+    if (isMultiMode && godRayAlpha > 0.01) {
+        renderGodRays(window.innerWidth / 2, window.innerHeight * 0.4);
+    }
 
     // Launch: draw Fu rising upward and shrinking
     if (t < DRAW_LAUNCH) {
@@ -2229,6 +2922,7 @@ function renderDaji(alpha) {
 
 function updateFortune() {
     updateBgParticles(globalTime);
+    updateCam();
     // Update firework physics if we have fireworks active (4+ stars or tap fireworks)
     if ((currentDrawResult && currentDrawResult.rarity.stars >= 4) || hasTapFireworks()) {
         updateFireworkPhysics();
@@ -2463,14 +3157,16 @@ function renderCharMorph(t, fadeIn, oldFont, newFont) {
 function renderFortuneOverlay() {
     // Multi-mode: canvas-integrated particle + card display
     if (isMultiMode && multiFortuneState) {
-        // 1. Frosted glass cards (behind particles)
+        // 1. Frosted glass cards (behind particles) — includes 3D flip
         renderMultiCards();
-        // 2. GPU particles on top (additive blend)
+        // 2. GPU particles on top (additive blend + bloom + post-fx)
         updateMultiDajiToGPU(true);
         renderAndCompositeGL();
-        // 3. Revealed card text (on top of everything)
+        // 3. Light pillars (additive, on top of particles)
+        renderLightPillars();
+        // 4. Revealed card text (on top of everything)
         renderMultiCardText();
-        // 4. Hints
+        // 5. Hints
         renderMultiHints();
         return;
     }
@@ -2924,6 +3620,7 @@ const multiOverlay = document.getElementById('multi-overlay');
 const multiGrid = document.getElementById('multi-grid');
 const multiDetail = document.getElementById('multi-detail');
 const detailCard = document.getElementById('detail-card');
+let multiDetailShowTime = 0; // Guard against synthetic click dismissing detail on mobile
 const btnMultiSingle = document.getElementById('btn-multi-single');
 const btnMultiCollection = document.getElementById('btn-multi-collection');
 const btnMultiAgain = document.getElementById('btn-multi-again');
@@ -2963,11 +3660,14 @@ function startMultiPull() {
         if (d.tierIndex < best.tierIndex) best = d;
     }
     currentDrawResult = best;
+    bestStarsInBatch = best.rarity.stars;
     isMultiMode = true;
     multiFlipState = null;
     multiFortuneState = null;
 
     // Reset state for draw animation
+    meteorParticles = [];
+    resetCam();
     daji3DParticles = [];
     hoveredIdx = -1;
     if (particlesMesh) particlesMesh.count = 0;
@@ -3154,28 +3854,69 @@ function showMultiDetail(draw) {
     const detailStars = document.getElementById('detail-stars');
     const detailCategory = document.getElementById('detail-category');
     const detailCharacter = document.getElementById('detail-character');
+    const detailCharEn = document.getElementById('detail-char-en');
+    const detailCharSpeak = document.getElementById('detail-char-speak');
     const detailPhrase = document.getElementById('detail-phrase');
+    const detailPhraseSpeak = document.getElementById('detail-phrase-speak');
     const detailEnglish = document.getElementById('detail-english');
     const detailTier = document.getElementById('detail-tier');
+    const detailMeaning = document.getElementById('detail-meaning');
 
     detailCard.style.setProperty('--card-color', draw.rarity.color);
     detailCard.style.setProperty('--card-glow', draw.rarity.glow);
 
     detailStars.textContent = '\u2605'.repeat(draw.rarity.stars) + '\u2606'.repeat(6 - draw.rarity.stars);
     detailStars.style.color = draw.rarity.color;
-    detailCategory.textContent = '[ ' + draw.category.name + ' ]';
+    detailCategory.textContent = '[ ' + draw.category.name + ' \u00B7 ' + draw.category.nameEn + ' ]';
     detailCategory.style.color = draw.category.color;
     detailCharacter.textContent = draw.char;
-    detailPhrase.textContent = draw.blessing.phrase;
-    detailEnglish.textContent = draw.blessing.english;
+
+    // English name of the character
+    const charEn = draw.blessing ? draw.blessing.charEn : '';
+    detailCharEn.textContent = charEn || '';
+
+    // Idiom
+    detailPhrase.textContent = draw.blessing ? draw.blessing.phrase : '';
+    detailEnglish.textContent = draw.blessing ? draw.blessing.english : '';
+
+    // Tier label
     detailTier.textContent = draw.rarity.label + ' \u00B7 ' + draw.rarity.labelEn;
     detailTier.style.color = draw.rarity.color;
 
-    multiDetail.classList.add('visible');
+    // Meaning section — bilingual explanation
+    if (detailMeaning && draw.blessing) {
+        const meaningCn = '\u300C' + draw.char + '\u300D\u2014\u2014' + draw.blessing.phrase;
+        const meaningEn = '"' + (charEn || draw.char) + '" \u2014 ' + draw.blessing.english;
+        detailMeaning.innerHTML = '<span style="color:rgba(255,215,0,0.5)">' + meaningCn + '</span><br>' + meaningEn;
+    }
 
-    // Pass to monetization UI for share/gift buttons
-    const coll = loadCollection();
-    setDetailDraw(draw, coll[draw.char] || null);
+    // TTS: Character pronunciation
+    if (detailCharSpeak) {
+        detailCharSpeak.onclick = () => speakText(draw.char, 'zh-CN', detailCharSpeak);
+    }
+    // TTS: Idiom pronunciation
+    if (detailPhraseSpeak) {
+        detailPhraseSpeak.onclick = () => speakText(draw.blessing ? draw.blessing.phrase : '', 'zh-CN', detailPhraseSpeak);
+    }
+
+    multiDetail.classList.add('visible');
+    multiDetailShowTime = performance.now();
+}
+
+// --- Text-to-Speech helper ---
+function speakText(text, lang, btnEl) {
+    if (!text || !window.speechSynthesis) return;
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = lang || 'zh-CN';
+    utter.rate = 0.85;
+    utter.pitch = 1;
+    // Visual feedback
+    if (btnEl) btnEl.classList.add('playing');
+    utter.onend = () => { if (btnEl) btnEl.classList.remove('playing'); };
+    utter.onerror = () => { if (btnEl) btnEl.classList.remove('playing'); };
+    window.speechSynthesis.speak(utter);
 }
 
 function hideMultiDetail() {
@@ -3230,12 +3971,12 @@ if (btnRevealAll) {
         let delay = 0;
         for (let i = 0; i < multiFortuneState.cards.length; i++) {
             const card = multiFortuneState.cards[i];
-            if (!card.revealed && !card.anticipating) {
+            if (!card.revealed && !card.anticipating && !card.converging) {
                 const idx = i;
                 const stars = card.draw.rarity.stars;
                 setTimeout(() => revealCard(idx), delay);
-                // Add extra time for high-rarity anticipation animations
-                delay += stars >= 6 ? 1100 : stars >= 5 ? 750 : 100;
+                // Add extra time for anticipation + convergence animations
+                delay += stars >= 6 ? 1800 : stars >= 5 ? 1200 : 400;
             }
         }
     });
@@ -3244,7 +3985,8 @@ if (btnRevealAll) {
 // Detail popup — click to dismiss
 if (multiDetail) {
     multiDetail.addEventListener('click', (e) => {
-        if (e.target === multiDetail) {
+        // Guard: ignore synthetic click from the touch that opened the detail (mobile)
+        if (e.target === multiDetail && performance.now() - multiDetailShowTime > 400) {
             hideMultiDetail();
         }
     });
@@ -3271,15 +4013,15 @@ function showCollectionPanel() {
         collectionProgress.innerHTML =
             `<div class="stat-item">
                 <div class="stat-value">${progress.collected}</div>
-                <div class="stat-label">Collected</div>
+                <div class="stat-label">Collected <span class="btn-zh">\u5DF2\u6536\u96C6</span></div>
             </div>
             <div class="stat-item">
                 <div class="stat-value">${progress.total}</div>
-                <div class="stat-label">Total</div>
+                <div class="stat-label">Total <span class="btn-zh">\u603B\u8BA1</span></div>
             </div>
             <div class="stat-item">
                 <div class="stat-value">${progress.percentage}%</div>
-                <div class="stat-label">Completion</div>
+                <div class="stat-label">Complete <span class="btn-zh">\u5B8C\u6210</span></div>
             </div>`;
     }
 
@@ -3504,7 +4246,7 @@ canvas.addEventListener('touchend', (e) => {
             const card = multiFortuneState.cards[cardIdx];
             if (!card.revealed) {
                 revealCard(cardIdx);
-            } else {
+            } else if (!card.flipping || (globalTime - card.flipStartTime > 0.55)) {
                 showMultiDetail(card.draw);
             }
             return;
@@ -3521,7 +4263,12 @@ canvas.addEventListener('touchend', (e) => {
     } else if (dy > 50 && dt < 500) {
         handleSwipeUp();
     } else if (!touchMoved && dt < 300 && (state === 'arrival' || (state === 'fortune' && !multiFortuneState))) {
-        // Tap → firework burst (not during multi-fortune card display)
+        // Single-pull fortune: tap on character card → show detail popup
+        if (state === 'fortune' && !isMultiMode && hitTestSingleFortuneCard(endX, endY)) {
+            showMultiDetail(currentDrawResult);
+            return;
+        }
+        // Tap → firework burst
         tapBurstAtScreen(endX, endY);
     }
 }, { passive: true });
@@ -3568,7 +4315,7 @@ canvas.addEventListener('mouseup', (e) => {
                 const card = multiFortuneState.cards[cardIdx];
                 if (!card.revealed) {
                     revealCard(cardIdx);
-                } else {
+                } else if (!card.flipping || (globalTime - card.flipStartTime > 0.55)) {
                     showMultiDetail(card.draw);
                 }
                 mouseDown = false;
@@ -3585,6 +4332,12 @@ canvas.addEventListener('mouseup', (e) => {
         if (dy > 50) {
             handleSwipeUp();
         } else if (dy < 20 && dx < 20 && (state === 'arrival' || state === 'fortune')) {
+            // Single-pull fortune: click on character card → show detail popup
+            if (state === 'fortune' && !isMultiMode && hitTestSingleFortuneCard(e.clientX, e.clientY)) {
+                showMultiDetail(currentDrawResult);
+                mouseDown = false;
+                return;
+            }
             // Click → firework burst
             tapBurstAtScreen(e.clientX, e.clientY);
         }
@@ -3673,6 +4426,45 @@ function showRewardsPanel() {
 }
 
 // ============================================================
+// AUDIO — BGM + Mute Toggle
+// ============================================================
+let audioInited = false;
+function ensureAudio() {
+    if (!audioInited) {
+        audioInited = true;
+        initAudio();
+        startBGM();
+    } else {
+        resumeAudio();
+    }
+}
+
+// Init audio on first user interaction (browser autoplay policy)
+const audioTriggerEvents = ['touchstart', 'mousedown', 'keydown'];
+function onFirstInteraction() {
+    ensureAudio();
+    for (const ev of audioTriggerEvents) {
+        document.removeEventListener(ev, onFirstInteraction);
+    }
+}
+for (const ev of audioTriggerEvents) {
+    document.addEventListener(ev, onFirstInteraction, { once: false, passive: true });
+}
+
+// Mute button
+const btnMute = document.getElementById('btn-mute');
+const muteIcon = document.getElementById('mute-icon');
+if (btnMute) {
+    btnMute.addEventListener('click', (e) => {
+        e.stopPropagation();
+        ensureAudio();
+        const muted = toggleMute();
+        btnMute.classList.toggle('muted', muted);
+        muteIcon.textContent = muted ? '\u{1F507}' : '\u{1F50A}';
+    });
+}
+
+// ============================================================
 // MAIN LOOP
 // ============================================================
 const startTime = performance.now();
@@ -3713,6 +4505,13 @@ function frame(now) {
 
         // Reset particle count
         if (particlesMesh) particlesMesh.count = 0;
+
+        // Apply cinematic camera (CSS transform — uniform for 2D + GL)
+        if ((state === 'draw' || state === 'fortune') && isMultiMode) {
+            applyCamToCanvas();
+        } else if (canvas.style.transform) {
+            canvas.style.transform = '';
+        }
 
         switch (state) {
             case 'arrival':  renderArrivalOverlay(); break;
