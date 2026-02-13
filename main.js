@@ -1457,8 +1457,16 @@ let globalTime = 0;
 let stateStartGlobal = 0;
 let drawToFortuneSeed = null;
 let fortuneUseDrawMorph = false;
+let pendingInstSwitchTimer = null;
+const VOCAL_HOLD_AFTER_FORTUNE_MS = 2200;
+const VOCAL_HOLD_AFTER_MULTI_FORTUNE_MS = 3200;
 
 function changeState(newState) {
+    if (pendingInstSwitchTimer) {
+        clearTimeout(pendingInstSwitchTimer);
+        pendingInstSwitchTimer = null;
+    }
+
     state = newState;
     stateStartGlobal = globalTime;
     stateTime = 0;
@@ -1469,7 +1477,11 @@ function changeState(newState) {
         switchToVocal();
     }
     if (newState === 'fortune') {
-        switchToInst(); // Switch back to instrumental when results appear
+        const holdMs = isMultiMode ? VOCAL_HOLD_AFTER_MULTI_FORTUNE_MS : VOCAL_HOLD_AFTER_FORTUNE_MS;
+        pendingInstSwitchTimer = setTimeout(() => {
+            pendingInstSwitchTimer = null;
+            if (state === 'fortune') switchToInst();
+        }, holdMs);
         if (isMultiMode) {
             // Multi-mode: seed particles from morph (seamless transition)
             buildMultiDajiFromMorph();

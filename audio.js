@@ -25,6 +25,8 @@ const BGM_VOLUME = 0.2;
 // Settings
 let activeTrack = 'inst'; // 'inst' or 'vocal'
 let fadeInterval = null;
+const CROSSFADE_TO_VOCAL_SEC = 0.6;
+const CROSSFADE_TO_INST_SEC = 2.0;
 
 // --- Initialization ---
 
@@ -168,6 +170,7 @@ export function switchToInst() {
 
 function setTrack(trackName) {
     if (activeTrack === trackName) return;
+    const prevTrack = activeTrack;
     activeTrack = trackName;
     
     // UI Update
@@ -178,7 +181,10 @@ function setTrack(trackName) {
         btnVocal.style.background = trackName === 'vocal' ? '#800' : '';
     }
 
-    updateGains(0.3); // 300ms crossfade
+    const fadeDuration = (prevTrack === 'vocal' && trackName === 'inst')
+        ? CROSSFADE_TO_INST_SEC
+        : CROSSFADE_TO_VOCAL_SEC;
+    updateGains(fadeDuration);
     updateDebugStatus(`Switched to ${trackName}`);
 }
 
@@ -198,8 +204,21 @@ function updateGains(duration = 0.3) {
         instGain.gain.setValueAtTime(targetInst, now);
         vocalGain.gain.setValueAtTime(targetVocal, now);
     } else {
-        instGain.gain.setTargetAtTime(targetInst, now, duration / 3); // timeConstant approx duration/3
-        vocalGain.gain.setTargetAtTime(targetVocal, now, duration / 3);
+        const startInst = instGain.gain.value;
+        const startVocal = vocalGain.gain.value;
+        const curveSteps = 64;
+        const instCurve = new Float32Array(curveSteps);
+        const vocalCurve = new Float32Array(curveSteps);
+
+        for (let i = 0; i < curveSteps; i++) {
+            const t = i / (curveSteps - 1);
+            const eased = 0.5 - 0.5 * Math.cos(Math.PI * t); // ease-in-out sine
+            instCurve[i] = startInst + (targetInst - startInst) * eased;
+            vocalCurve[i] = startVocal + (targetVocal - startVocal) * eased;
+        }
+
+        instGain.gain.setValueCurveAtTime(instCurve, now, duration);
+        vocalGain.gain.setValueCurveAtTime(vocalCurve, now, duration);
     }
 }
 
