@@ -18,7 +18,7 @@ import {
 } from './gacha.js';
 import {
     initAudio, resumeAudio, startBGM, toggleMute, isBGMMuted,
-    playSfxDraw, playSfxReveal, switchToVocal, switchToInst
+    playSfxDraw, playSfxReveal, switchToVocal, switchToInst, initMusicSystem
 } from './audio.js';
 import { getUser, onAuthChange, restoreSession, updateDraws } from './auth.js';
 import { claimDailyLogin, getPityCounter, incrementPity, resetPity } from './rewards.js';
@@ -27,6 +27,9 @@ import { getPaymentResult } from './payments.js';
 import { claimGift, getGiftTokenFromUrl, returnExpiredGifts } from './gifting.js';
 import { initMonetizationUI, setCurrentDrawResult, showSingleFortuneActions, hideSingleFortuneActions, showMultiShareButton, hideMultiShareButton, setDetailDraw } from './monetization-ui.js';
 import { loadCollection } from './gacha.js';
+
+// Preload Local Audio
+initMusicSystem();
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -4859,6 +4862,79 @@ function handleSwipeUp() {
     }
 }
 
+// ============================================================
+// START OVERLAY & CNY COUNTDOWN
+// ============================================================
+const CNY_DATES = [
+    { year: 2025, date: new Date('2025-01-29T00:00:00') },
+    { year: 2026, date: new Date('2026-02-17T00:00:00') },
+    { year: 2027, date: new Date('2027-02-06T00:00:00') },
+];
+
+function initStartOverlay() {
+    const overlay = document.getElementById('start-overlay');
+    const btnEnter = document.getElementById('btn-enter');
+    const countdownEl = document.getElementById('cny-countdown');
+    const labelEl = document.getElementById('cny-label');
+
+    if (!overlay || !btnEnter) return;
+
+    const updateTime = () => {
+        if (overlay.style.opacity === '0' || overlay.style.display === 'none') return;
+
+        const now = new Date();
+        const nextTarget = CNY_DATES.find(d => d.date > now);
+        
+        if (nextTarget) {
+            const diff = nextTarget.date - now;
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+            const mins = Math.floor((diff / 1000 / 60) % 60);
+            const secs = Math.floor((diff / 1000) % 60);
+            
+            countdownEl.innerHTML = `${days}<span style="font-size:1.2rem; margin-right:6px">d</span> ${hours}<span style="font-size:1.2rem; margin-right:6px">h</span> ${mins}<span style="font-size:1.2rem; margin-right:6px">m</span> ${secs}<span style="font-size:1.2rem">s</span>`;
+            labelEl.textContent = `UNTIL YEAR OF THE ${getZodiac(nextTarget.year)}`;
+        } else {
+            // If no future date in our list, find the most recent past date
+            let lastTarget = CNY_DATES[CNY_DATES.length - 1];
+            for (let i = CNY_DATES.length - 1; i >= 0; i--) {
+                if (CNY_DATES[i].date <= now) {
+                    lastTarget = CNY_DATES[i];
+                    break;
+                }
+            }
+            
+            const diff = now - lastTarget.date;
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            
+            countdownEl.innerHTML = `${days}<span style="font-size:1.5rem"> DAYS AGO</span>`;
+            labelEl.textContent = `SINCE YEAR OF THE ${getZodiac(lastTarget.year)}`;
+        }
+
+        requestAnimationFrame(updateTime);
+    };
+    
+    requestAnimationFrame(updateTime);
+
+    // 2. Interaction
+    btnEnter.onclick = () => {
+        // Init Audio Context (User Gesture)
+        ensureAudio();
+        
+        // Fade out overlay
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            overlay.style.visibility = 'hidden';
+            overlay.style.display = 'none'; // remove from flow
+        }, 800);
+    };
+}
+
+function getZodiac(year) {
+    const animals = ['RAT', 'OX', 'TIGER', 'RABBIT', 'DRAGON', 'SNAKE', 'HORSE', 'GOAT', 'MONKEY', 'ROOSTER', 'DOG', 'PIG'];
+    return animals[(year - 4) % 12];
+}
+
 // Rewards panel opener (implemented in monetization-ui.js)
 function showRewardsPanel() {
     const panel = document.getElementById('rewards-panel');
@@ -4879,18 +4955,6 @@ function ensureAudio() {
     }
 }
 
-// Init audio on first user interaction (browser autoplay policy)
-const audioTriggerEvents = ['touchstart', 'mousedown', 'keydown'];
-function onFirstInteraction() {
-    ensureAudio();
-    for (const ev of audioTriggerEvents) {
-        document.removeEventListener(ev, onFirstInteraction);
-    }
-}
-for (const ev of audioTriggerEvents) {
-    document.addEventListener(ev, onFirstInteraction, { once: false, passive: true });
-}
-
 // Mute button
 const btnMute = document.getElementById('btn-mute');
 if (btnMute) {
@@ -4901,6 +4965,9 @@ if (btnMute) {
         btnMute.classList.toggle('muted', muted);
     });
 }
+
+// Init Start Screen
+initStartOverlay();
 
 // ============================================================
 // MAIN LOOP
