@@ -231,11 +231,15 @@ export function hideSingleFortuneActions() {
 
 // Show share button in multi-fortune actions
 export function showMultiShareButton() {
+  const wrap = document.getElementById('multi-fortune-share-actions');
   const btn = document.getElementById('btn-share-multi');
+  if (wrap) wrap.classList.add('visible');
   if (btn) btn.style.display = '';
 }
 export function hideMultiShareButton() {
+  const wrap = document.getElementById('multi-fortune-share-actions');
   const btn = document.getElementById('btn-share-multi');
+  if (wrap) wrap.classList.remove('visible');
   if (btn) btn.style.display = 'none';
 }
 

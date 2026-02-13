@@ -304,24 +304,26 @@ function getClusterSpread() {
     return baseSpread;
 }
 
-// Responsive grid layout for multi-pull (portrait 2×5, landscape 5×2)
+// Responsive grid layout for multi-pull (portrait 5×2, landscape 10×1)
 function getMultiGridLayout() {
     const w = window.innerWidth;
     const h = window.innerHeight;
     const portrait = !isLandscape();
-    const multiCols = portrait ? 2 : 5;
-    const multiRows = portrait ? 5 : 2;
-    const gridW = w * (portrait ? 0.92 : 0.85);
-    const gridH = h * (portrait ? 0.72 : 0.55);
-    const scaleFactor = portrait ? 0.38 : 0.35;
-    // Shift grid upward slightly in portrait to leave room for buttons at bottom
-    const gridTopY = portrait ? h * 0.06 : (h - gridH) / 2;
+    const multiCols = portrait ? 5 : 10;
+    const multiRows = portrait ? 2 : 1;
+    const gridW = w * (portrait ? 0.92 : 0.95);
+    const gridH = h * (portrait ? 0.72 : 0.32);
+    const scaleFactor = portrait ? 0.30 : 0.26;
+    // Shift grid upward to leave room for bottom controls/hints.
+    const gridTopY = portrait ? h * 0.06 : h * 0.12;
     const startX = (w - gridW) / 2 + (gridW / multiCols) / 2;
     const startY = gridTopY + (gridH / multiRows) / 2;
     const stepX = gridW / multiCols;
     const stepY = gridH / multiRows;
     const cardW = stepX - 8;
-    const cardH = stepY - 8;
+    // Keep cards tall with a small row gap in portrait.
+    const cardHeightScale = portrait ? 0.94 : 0.95;
+    const cardH = stepY * cardHeightScale;
     const gridBottom = gridTopY + gridH;
     return { multiCols, multiRows, gridW, gridH, startX, startY, stepX, stepY, cardW, cardH, scaleFactor, gridBottom };
 }
@@ -1025,7 +1027,7 @@ function drawCardAt(cx, cy, cw, ch, alpha, borderColor, fillColor) {
 }
 
 // Lightweight card rect (no blur pass) — for 10-card multi-fortune grid
-function drawMultiCardRect(cx, cy, cw, ch, alpha, borderColor, fillColor) {
+function drawMultiCardRect(cx, cy, cw, ch, alpha, borderColor, fillColor, midFillColor, bottomFillColor) {
     const cardX = cx - cw / 2;
     const cardY = cy - ch / 2;
     const r = 8;
@@ -1044,10 +1046,45 @@ function drawMultiCardRect(cx, cy, cw, ch, alpha, borderColor, fillColor) {
     ctx.lineTo(cardX, cardY + r);
     ctx.quadraticCurveTo(cardX, cardY, cardX + r, cardY);
     ctx.closePath();
-    ctx.fillStyle = fillColor || 'rgba(80, 10, 10, 0.5)';
+    // Frosted-glass body: soft white tint gradient instead of dark fill.
+    const glassFill = ctx.createLinearGradient(cardX, cardY, cardX, cardY + ch);
+    glassFill.addColorStop(0, fillColor || 'rgba(242, 248, 255, 0.22)');
+    glassFill.addColorStop(0.5, midFillColor || 'rgba(236, 245, 255, 0.12)');
+    glassFill.addColorStop(1, bottomFillColor || 'rgba(228, 238, 252, 0.08)');
+    ctx.fillStyle = glassFill;
     ctx.fill();
-    ctx.strokeStyle = borderColor || 'rgba(255, 215, 0, 0.15)';
+
+    // Frost highlight band on upper half.
+    ctx.save();
+    ctx.clip();
+    const sheen = ctx.createLinearGradient(cardX, cardY, cardX, cardY + ch * 0.62);
+    sheen.addColorStop(0, 'rgba(255, 255, 255, 0.24)');
+    sheen.addColorStop(0.45, 'rgba(255, 255, 255, 0.08)');
+    sheen.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(cardX, cardY, cw, ch * 0.62);
+    ctx.restore();
+
+    // Outer + inner edge for glass-panel definition.
+    ctx.strokeStyle = borderColor || 'rgba(235, 245, 255, 0.45)';
     ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    const ir = Math.max(4, r - 1.5);
+    const inset = 1.2;
+    ctx.moveTo(cardX + inset + ir, cardY + inset);
+    ctx.lineTo(cardX + cw - inset - ir, cardY + inset);
+    ctx.quadraticCurveTo(cardX + cw - inset, cardY + inset, cardX + cw - inset, cardY + inset + ir);
+    ctx.lineTo(cardX + cw - inset, cardY + ch - inset - ir);
+    ctx.quadraticCurveTo(cardX + cw - inset, cardY + ch - inset, cardX + cw - inset - ir, cardY + ch - inset);
+    ctx.lineTo(cardX + inset + ir, cardY + ch - inset);
+    ctx.quadraticCurveTo(cardX + inset, cardY + ch - inset, cardX + inset, cardY + ch - inset - ir);
+    ctx.lineTo(cardX + inset, cardY + inset + ir);
+    ctx.quadraticCurveTo(cardX + inset, cardY + inset, cardX + inset + ir, cardY + inset);
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 0.9;
     ctx.stroke();
     ctx.restore();
 }
@@ -1595,7 +1632,7 @@ function changeState(newState) {
         setCurrentDrawResult(currentDrawResult);
         if (isMultiMode) {
             hideSingleFortuneActions();
-            showMultiShareButton();
+            hideMultiShareButton();
         } else {
             showSingleFortuneActions();
             hideMultiShareButton();
@@ -1957,7 +1994,7 @@ function initDrawAnimation() {
         drawsToAnimate = multiDrawResults;
     }
 
-    // Grid layout configuration for 10x (responsive: portrait 2×5, landscape 5×2)
+    // Grid layout configuration for 10x (responsive: 5×2)
     const grid = getMultiGridLayout();
     const multiCols = grid.multiCols;
     const multiRows = grid.multiRows;
@@ -2515,12 +2552,12 @@ function renderMultiCards() {
             const rd = 8;
 
             if (isBack) {
-                // BACK FACE: dark frosted glass with 福
+                // BACK FACE: frosted glass with 福
                 roundRectPath(ctx, -hw, -hh, card.cardW, card.cardH, rd);
-                ctx.fillStyle = 'rgba(80, 10, 10, 0.6)';
-                ctx.globalAlpha = fadeIn * 0.7;
+                ctx.fillStyle = 'rgba(240, 248, 255, 0.2)';
+                ctx.globalAlpha = fadeIn * 0.9;
                 ctx.fill();
-                ctx.strokeStyle = 'rgba(255, 215, 0, 0.2)';
+                ctx.strokeStyle = 'rgba(235, 245, 255, 0.38)';
                 ctx.lineWidth = 1;
                 ctx.stroke();
                 // 福 character
@@ -2535,9 +2572,14 @@ function renderMultiCards() {
                 ctx.fillText('\u798F', 0, 0);
             } else {
                 // FRONT FACE: revealed card with rarity styling
+                const [rr, rg, rb] = card.draw.rarity.burstRGB || [236, 245, 255];
                 roundRectPath(ctx, -hw, -hh, card.cardW, card.cardH, rd);
-                ctx.fillStyle = 'rgba(40, 5, 5, 0.55)';
-                ctx.globalAlpha = fadeIn * 0.8;
+                const frontGlass = ctx.createLinearGradient(-hw, -hh, -hw, hh);
+                frontGlass.addColorStop(0, `rgba(${rr}, ${rg}, ${rb}, 0.30)`);
+                frontGlass.addColorStop(0.55, `rgba(${rr}, ${rg}, ${rb}, 0.18)`);
+                frontGlass.addColorStop(1, 'rgba(236, 246, 255, 0.12)');
+                ctx.fillStyle = frontGlass;
+                ctx.globalAlpha = fadeIn * 0.9;
                 ctx.fill();
                 ctx.strokeStyle = card.draw.rarity.color;
                 ctx.lineWidth = 2;
@@ -2581,11 +2623,14 @@ function renderMultiCards() {
             ctx.restore();
         }
 
-        const alpha = fadeIn * (card.revealed ? 0.7 : 0.6);
-        const borderColor = card.revealed ? card.draw.rarity.glow : 'rgba(255, 215, 0, 0.15)';
-        const fillColor = card.revealed ? 'rgba(40, 5, 5, 0.45)' : 'rgba(80, 10, 10, 0.5)';
+        const [rr, rg, rb] = card.draw.rarity.burstRGB || [236, 245, 255];
+        const alpha = fadeIn * (card.revealed ? 0.9 : 0.8);
+        const borderColor = card.revealed ? card.draw.rarity.glow : 'rgba(235, 245, 255, 0.4)';
+        const fillColor = card.revealed ? `rgba(${rr}, ${rg}, ${rb}, 0.30)` : 'rgba(244, 250, 255, 0.24)';
+        const midFillColor = card.revealed ? `rgba(${rr}, ${rg}, ${rb}, 0.18)` : undefined;
+        const bottomFillColor = card.revealed ? `rgba(${rr}, ${rg}, ${rb}, 0.12)` : undefined;
 
-        drawMultiCardRect(card.centerX, card.centerY, card.cardW, card.cardH, alpha, borderColor, fillColor);
+        drawMultiCardRect(card.centerX, card.centerY, card.cardW, card.cardH, alpha, borderColor, fillColor, midFillColor, bottomFillColor);
 
         // REVEAL FLASH: bright white→rarity-color flash
         if (card.revealed && revealAge < 0.5) {
@@ -2917,9 +2962,10 @@ function renderMultiHints() {
             const hintFade = Math.min(1, (revealAge - 1.0) / 0.5);
             const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;
             const hopOffset = getSwipeHintHopOffset();
-            const { mainText, subText } = getSwipeHintText(true);
-            drawOverlayText(mainText, L.arrivalHintY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSize);
-            drawOverlayText(subText, L.arrivalHintSubY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSubSize);
+            const { mainText, subText } = getSwipeHintText(selectedMode === 'multi');
+            const swipeHintOffsetY = 0.05;
+            drawOverlayText(mainText, L.arrivalHintY + swipeHintOffsetY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSize);
+            drawOverlayText(subText, L.arrivalHintSubY + swipeHintOffsetY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSubSize);
         }
     }
 }
@@ -3773,7 +3819,7 @@ function renderFortuneOverlay() {
         const hintFade = Math.min(1, (stateTime - 2.5) / 0.5);
         const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;
         const hopOffset = getSwipeHintHopOffset();
-        const { mainText, subText } = getSwipeHintText(false);
+        const { mainText, subText } = getSwipeHintText(selectedMode === 'multi');
         const { hintSize, hintSubSize } = getSwipeHintSizes();
         drawOverlayText(mainText, L.arrivalHintY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSize);
         drawOverlayText(subText, L.arrivalHintSubY + hopOffset, CONFIG.glowGold, hintFade * pulse, hintSubSize);
@@ -4680,6 +4726,7 @@ if (btnCloseCollection) {
 
 function updateUIVisibility() {
     const allMultiRevealed = multiFortuneState && multiFortuneState.revealedCount >= multiFortuneState.cards.length;
+    const hasPendingMultiReveals = multiFortuneState && multiFortuneState.revealedCount < multiFortuneState.cards.length;
     const collVisible = collectionPanel && collectionPanel.classList.contains('visible');
     // Mode Switch: visible in arrival, single fortune, and multi fortune after all revealed
     if (modeSwitch) {
@@ -4702,11 +4749,18 @@ function updateUIVisibility() {
     // Reveal All button: visible when multi-fortune cards are showing and not all revealed
     const btnRevealAll = document.getElementById('btn-reveal-all');
     if (btnRevealAll) {
-        if (multiFortuneState && multiFortuneState.revealedCount < multiFortuneState.cards.length) {
+        if (state === 'fortune' && isMultiMode && hasPendingMultiReveals) {
             btnRevealAll.style.display = 'block';
         } else {
             btnRevealAll.style.display = 'none';
         }
+    }
+
+    // Multi share button: only after all multi cards are revealed
+    if (state === 'fortune' && isMultiMode && allMultiRevealed && !collVisible) {
+        showMultiShareButton();
+    } else {
+        hideMultiShareButton();
     }
 }
 
