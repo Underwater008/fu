@@ -2862,7 +2862,7 @@ function renderMultiHints() {
             const isMulti = selectedMode === 'multi';
             const mainText = isMulti ? '\u2191 \u518D\u6765\u5341\u8FDE \u2191' : '\u2191 \u518D\u62BD\u4E00\u6B21 \u2191';
             const subText = isMulti ? 'Swipe Up to Draw \u00D710' : 'Swipe Up to Draw Again';
-            const singleHintLift = isMulti ? 0 : 0.03;
+            const singleHintLift = 0.03;
             const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
             const hintSubSize = isLandscape() ? Math.min(cellSize * 0.9, window.innerHeight * 0.02) : cellSize * 0.9;
             drawOverlayText(mainText, L.hintY - singleHintLift, CONFIG.glowGold, hintFade * pulse, hintSize);
@@ -3686,7 +3686,7 @@ function renderFortuneOverlay() {
         const isMulti = selectedMode === 'multi';
         const mainText = isMulti ? '\u2191 \u518D\u6765\u5341\u8FDE \u2191' : '\u2191 \u518D\u62BD\u4E00\u6B21 \u2191';
         const subText = isMulti ? 'Swipe Up to Draw \u00D710' : 'Swipe Up to Draw Again';
-        const singleHintLift = isMulti ? 0 : 0.03;
+        const singleHintLift = 0.03;
 
         const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
         const hintSubSize = isLandscape() ? Math.min(cellSize * 0.9, window.innerHeight * 0.02) : cellSize * 0.9;
@@ -4801,6 +4801,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 function handleSwipeUp() {
+    ensureAudio();
     if (state === 'arrival' && fontsReady) {
         const user = getUser();
         const drawsNeeded = selectedMode === 'multi' ? 10 : 1;
