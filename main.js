@@ -20,6 +20,13 @@ import {
     initAudio, resumeAudio, startBGM, toggleMute, isBGMMuted,
     playSfxDraw, playSfxReveal,
 } from './audio.js';
+import { getUser, onAuthChange, restoreSession, updateDraws } from './auth.js';
+import { claimDailyLogin, getPityCounter, incrementPity, resetPity } from './rewards.js';
+import { initAds } from './ads.js';
+import { getPaymentResult } from './payments.js';
+import { claimGift, getGiftTokenFromUrl, returnExpiredGifts } from './gifting.js';
+import { initMonetizationUI, setCurrentDrawResult, showSingleFortuneActions, hideSingleFortuneActions, showMultiShareButton, hideMultiShareButton, setDetailDraw } from './monetization-ui.js';
+import { loadCollection } from './gacha.js';
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -3901,18 +3908,20 @@ function showMultiDetail(draw) {
 
     multiDetail.classList.add('visible');
     multiDetailShowTime = performance.now();
+
+    // Pass to monetization UI for share/gift buttons
+    const coll = loadCollection();
+    setDetailDraw(draw, coll[draw.char] || null);
 }
 
 // --- Text-to-Speech helper ---
 function speakText(text, lang, btnEl) {
     if (!text || !window.speechSynthesis) return;
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = lang || 'zh-CN';
     utter.rate = 0.85;
     utter.pitch = 1;
-    // Visual feedback
     if (btnEl) btnEl.classList.add('playing');
     utter.onend = () => { if (btnEl) btnEl.classList.remove('playing'); };
     utter.onerror = () => { if (btnEl) btnEl.classList.remove('playing'); };
@@ -4000,7 +4009,6 @@ const btnCollection = document.getElementById('btn-collection');
 const collectionPanel = document.getElementById('collection-panel');
 const collectionGrid = document.getElementById('collection-grid');
 const collectionProgress = document.getElementById('collection-progress');
-const btnDrawFromCollection = document.getElementById('btn-draw-from-collection');
 const btnCloseCollection = document.getElementById('btn-close-collection');
 
 function showCollectionPanel() {
@@ -4023,6 +4031,15 @@ function showCollectionPanel() {
                 <div class="stat-value">${progress.percentage}%</div>
                 <div class="stat-label">Complete <span class="btn-zh">\u5B8C\u6210</span></div>
             </div>`;
+        // Add progress bar after stats
+        let bar = collectionProgress.parentElement.querySelector('.collection-progress-bar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.className = 'collection-progress-bar';
+            bar.innerHTML = '<div class="collection-progress-fill"></div>';
+            collectionProgress.parentElement.appendChild(bar);
+        }
+        bar.querySelector('.collection-progress-fill').style.width = `${progress.percentage}%`;
     }
 
     // Build grid
@@ -4128,24 +4145,6 @@ if (btnCollection) {
     btnCollection.addEventListener('click', (e) => {
         e.stopPropagation();
         showCollectionPanel();
-    });
-}
-
-if (btnDrawFromCollection) {
-    btnDrawFromCollection.addEventListener('click', (e) => {
-        e.stopPropagation();
-        hideCollectionPanel();
-        if (isMultiMode) {
-            resetMultiFortune();
-        }
-        if (state === 'fortune' || state === 'arrival') {
-            isMultiMode = false;
-            daji3DParticles = [];
-            hoveredIdx = -1;
-            if (particlesMesh) particlesMesh.count = 0;
-            hideTooltip();
-            changeState('draw');
-        }
     });
 }
 
