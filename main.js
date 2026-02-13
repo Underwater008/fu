@@ -1799,6 +1799,20 @@ const DRAW_CAMERA_RETURN = CONFIG.fuCameraReturnDuration;
 const DRAW_SCATTER = DRAW_LAUNCH + 1.2;
 const DRAW_REFORM = DRAW_SCATTER + 1.1;
 const DRAW_SETTLE = DRAW_REFORM + 0.4;
+const DRAW_TO_FORTUNE_DELAY = 0.3;
+const SINGLE_DRAW_POST_REFORM_ALPHA_DIM = 0.68;
+const SINGLE_DRAW_POST_REFORM_COLOR_DIM = 0.78;
+const SINGLE_DRAW_POST_REFORM_DIM_DURATION = 1.2;
+
+function getSingleDrawPostReformDim(elapsed) {
+    const safeElapsed = Math.max(0, elapsed);
+    const progress = Math.min(1, safeElapsed / SINGLE_DRAW_POST_REFORM_DIM_DURATION);
+    const eased = easeInOut(progress);
+    return {
+        alpha: lerp(1, SINGLE_DRAW_POST_REFORM_ALPHA_DIM, eased),
+        color: lerp(1, SINGLE_DRAW_POST_REFORM_COLOR_DIM, eased),
+    };
+}
 
 function initDrawAnimation() {
     morphParticles = [];
@@ -2123,7 +2137,7 @@ function updateDraw() {
     }
     launchTrail.length = tw;
 
-    if (t >= DRAW_SETTLE + 0.3) {
+    if (t >= DRAW_SETTLE + DRAW_TO_FORTUNE_DELAY) {
         if (isMultiMode) {
             // Multi-mode: particles will be seeded in changeState via buildMultiDajiFromMorph
             drawToFortuneSeed = null;
@@ -2970,6 +2984,14 @@ function renderDrawParticles3D(t) {
             size = lerp(size, 1.1, easedSettle);
         }
 
+        if (!isMultiMode && t >= DRAW_SETTLE) {
+            const dim = getSingleDrawPostReformDim(t - DRAW_SETTLE);
+            alpha *= dim.alpha;
+            r *= dim.color;
+            g *= dim.color;
+            b *= dim.color;
+        }
+
         let breatheMix = 0;
         if (t >= DRAW_REFORM) {
             breatheMix = 1;
@@ -3505,7 +3527,7 @@ function appendStarsToGPU(startIdx, starsCount, centerY, colorHex, elapsedTime) 
 }
 
 // Reuse draw-phase reformed particles directly in fortune (single mode).
-function appendStaticMorphToGPU(startIdx = 0) {
+function appendStaticMorphToGPU(startIdx = 0, postReformElapsed = Number.POSITIVE_INFINITY) {
     if (!particlesMesh) return startIdx;
 
     const instColor = particlesMesh.geometry.attributes.instanceColor;
@@ -3513,6 +3535,7 @@ function appendStaticMorphToGPU(startIdx = 0) {
     const instUV = particlesMesh.geometry.attributes.instanceUV;
     const instScale = particlesMesh.geometry.attributes.instanceScale;
     const maxCount = instColor.count;
+    const dim = getSingleDrawPostReformDim(postReformElapsed);
 
     let idx = startIdx;
     for (const p of morphParticles) {
@@ -3528,8 +3551,11 @@ function appendStaticMorphToGPU(startIdx = 0) {
         _dummy.updateMatrix();
         particlesMesh.setMatrixAt(idx, _dummy.matrix);
 
-        instColor.setXYZ(idx, color.r / 255, color.g / 255, color.b / 255);
-        instAlpha.setX(idx, 0.3 + lum * 0.7);
+        const dimR = (color.r / 255) * dim.color;
+        const dimG = (color.g / 255) * dim.color;
+        const dimB = (color.b / 255) * dim.color;
+        instColor.setXYZ(idx, dimR, dimG, dimB);
+        instAlpha.setX(idx, (0.3 + lum * 0.7) * dim.alpha);
 
         const uv = (p.fontIdx != null && charToUV[char + '|' + p.fontIdx]) || charToUV[char];
         if (uv) instUV.setXY(idx, uv.u, uv.v);
@@ -3593,7 +3619,10 @@ function renderFortuneOverlay() {
     }
 
     // 2. Update GPU particles (skip render)
-    let gpuIdx = fortuneUseDrawMorph ? appendStaticMorphToGPU(0) : updateDajiToGPU(true);
+    const postReformElapsed = DRAW_TO_FORTUNE_DELAY + stateTime;
+    let gpuIdx = fortuneUseDrawMorph
+        ? appendStaticMorphToGPU(0, postReformElapsed)
+        : updateDajiToGPU(true);
 
     // 3. Add Stars as GPU particles (stamped in one by one)
     if (cardFade > 0.01 && stateTime > 0.4) {
