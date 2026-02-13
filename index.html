@@ -16,16 +16,9 @@
 <body>
     <canvas id="c"></canvas>
 
-    <!-- Auth bar -->
-    <div id="auth-bar" class="auth-bar">
-        <div id="auth-logged-out" class="auth-section">
-            <button id="btn-login" class="btn-auth">Sign In</button>
-        </div>
-        <div id="auth-logged-in" class="auth-section" style="display:none">
-            <span id="auth-email" class="auth-email"></span>
-            <span id="draw-counter" class="draw-counter">🎫 ×10</span>
-            <button id="btn-logout" class="btn-auth btn-small">Logout</button>
-        </div>
+    <!-- Draw counter (floating, bottom area) -->
+    <div id="draw-counter-float" class="draw-counter-float" style="display:none">
+        <span id="draw-counter" class="draw-counter">🎫 ×10</span>
     </div>
 
     <!-- Login modal -->
@@ -125,6 +118,16 @@
             <h1>COLLECTION</h1>
             <h2>图鉴</h2>
             <div id="collection-progress" class="collection-progress"></div>
+            <!-- Account section (inside collection) -->
+            <div id="collection-account" class="collection-account">
+                <div id="auth-logged-out" class="auth-logged-out-row">
+                    <button id="btn-login" class="btn-auth">Sign In to Save Progress</button>
+                </div>
+                <div id="auth-logged-in" class="auth-logged-in-row" style="display:none">
+                    <span id="auth-email" class="auth-email"></span>
+                    <button id="btn-logout" class="btn-auth btn-small">Logout</button>
+                </div>
+            </div>
         </div>
         <div id="collection-grid" class="collection-grid"></div>
         <div class="collection-actions">

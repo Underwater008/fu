@@ -39,6 +39,7 @@ function updateAuthUI(user) {
   const loggedOut = document.getElementById('auth-logged-out');
   const loggedIn = document.getElementById('auth-logged-in');
   const drawCounter = document.getElementById('draw-counter');
+  const drawCounterFloat = document.getElementById('draw-counter-float');
 
   if (!loggedOut || !loggedIn) return;
 
@@ -47,9 +48,11 @@ function updateAuthUI(user) {
     loggedIn.style.display = 'flex';
     document.getElementById('auth-email').textContent = user.display_name || user.email;
     if (drawCounter) drawCounter.textContent = `🎫 ×${user.draws_remaining || 0}`;
+    if (drawCounterFloat) drawCounterFloat.style.display = '';
   } else {
-    loggedOut.style.display = 'flex';
+    loggedOut.style.display = '';
     loggedIn.style.display = 'none';
+    if (drawCounterFloat) drawCounterFloat.style.display = 'none';
   }
 }
 

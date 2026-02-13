@@ -1226,36 +1226,30 @@ canvas {
    MONETIZATION UI — Auth bar, Login modal, Rewards panel
    ============================================================ */
 
-/* --- Auth Bar (top-right, frosted glass) --- */
-.auth-bar {
+/* --- Account Section (inside collection panel) --- */
+.collection-account {
+    margin-top: 12px;
+    text-align: center;
+}
+.auth-logged-out-row {
+    display: flex;
+    justify-content: center;
+}
+.auth-logged-in-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+/* --- Floating Draw Counter (bottom, near controls) --- */
+.draw-counter-float {
     position: fixed;
-    top: env(safe-area-inset-top, 12px);
-    right: 12px;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-top: 12px;
-}
-.auth-section {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-#auth-logged-in {
-    background: linear-gradient(135deg,
-        rgba(255, 255, 255, 0.08) 0%,
-        rgba(255, 255, 255, 0.03) 50%,
-        rgba(255, 215, 0, 0.04) 100%);
-    backdrop-filter: blur(20px) saturate(1.4);
-    -webkit-backdrop-filter: blur(20px) saturate(1.4);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 24px;
-    padding: 6px 16px;
-    box-shadow:
-        0 4px 24px rgba(0, 0, 0, 0.25),
-        0 0 1px rgba(255, 255, 255, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 500;
+    pointer-events: none;
 }
 .btn-auth {
     background: linear-gradient(135deg,
