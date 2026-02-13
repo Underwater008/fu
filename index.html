@@ -16,6 +16,61 @@
 <body>
     <canvas id="c"></canvas>
 
+    <!-- Auth bar -->
+    <div id="auth-bar" class="auth-bar">
+        <div id="auth-logged-out" class="auth-section">
+            <button id="btn-login" class="btn-auth">Sign In</button>
+        </div>
+        <div id="auth-logged-in" class="auth-section" style="display:none">
+            <span id="auth-email" class="auth-email"></span>
+            <span id="draw-counter" class="draw-counter">🎫 ×10</span>
+            <button id="btn-logout" class="btn-auth btn-small">Logout</button>
+        </div>
+    </div>
+
+    <!-- Login modal -->
+    <div id="login-modal" class="modal-overlay" style="display:none">
+        <div class="modal-card">
+            <h2>Sign In</h2>
+            <p>Enter your email to receive a magic link</p>
+            <input type="email" id="login-email" placeholder="your@email.com" class="input-email" />
+            <button id="btn-send-link" class="btn-action btn-primary">Send Magic Link</button>
+            <button id="btn-close-login" class="btn-action btn-secondary">Cancel</button>
+            <p id="login-status" class="login-status"></p>
+        </div>
+    </div>
+
+    <!-- Rewards panel (slide-up drawer) -->
+    <div id="rewards-panel" class="rewards-panel" style="display:none">
+        <div class="rewards-header">
+            <h2>Get More Draws</h2>
+            <button id="btn-close-rewards" class="btn-close">✕</button>
+        </div>
+        <div class="rewards-content">
+            <div class="reward-section">
+                <h3>Daily Login</h3>
+                <div id="login-streak" class="streak-dots"></div>
+            </div>
+            <div class="reward-section">
+                <button id="btn-share-draw" class="btn-reward">Share → 10 Draws</button>
+                <span id="share-cooldown" class="cooldown-text"></span>
+            </div>
+            <div class="reward-section">
+                <button id="btn-watch-ad" class="btn-reward">Watch Ad → 1 Draw</button>
+                <span id="ad-count" class="cooldown-text"></span>
+            </div>
+            <div class="reward-section">
+                <h3>Invite Friends</h3>
+                <p class="reward-desc">1st friend: 30 draws | Each after: 10 draws</p>
+                <button id="btn-copy-referral" class="btn-reward">Copy Invite Link</button>
+            </div>
+            <div class="reward-section">
+                <h3>Buy Draws</h3>
+                <div id="purchase-bundles" class="purchase-grid"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bottom Controls -->
     <div class="bottom-controls">
         <button id="btn-collection" class="collection-fab">COLLECTION</button>
