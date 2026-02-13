@@ -4436,7 +4436,7 @@ function showMultiDetail(draw) {
     // TTS: Character pronunciation (button under the detail card)
     if (detailSoundBtn) {
         detailSoundBtn.classList.remove('playing');
-        detailSoundBtn.title = `Listen: ${draw.char}`;
+        detailSoundBtn.title = `Play pronunciation: ${draw.char}`;
         detailSoundBtn.onclick = () => speakText(draw.char, 'zh-CN', detailSoundBtn);
     }
 

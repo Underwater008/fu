@@ -1020,7 +1020,7 @@ canvas {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 14px;
+    gap: 24px;
     cursor: default;
 }
 
@@ -1428,7 +1428,7 @@ canvas {
 @media (max-width: 520px) {
     .detail-dialog {
         width: min(94vw, 420px);
-        gap: 12px;
+        gap: 20px;
     }
     .detail-card {
         padding: 30px 20px 22px;
@@ -2191,7 +2191,7 @@ canvas {
 /* --- Detail popup action buttons --- */
 .detail-actions {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     justify-content: center;
     flex-wrap: wrap;
     width: 100%;
@@ -2199,64 +2199,53 @@ canvas {
 .detail-actions-outside {
     max-width: min(420px, 88vw);
     padding: 0 6px;
+    margin-top: 20px;
 }
 .btn-detail-action {
     background: linear-gradient(135deg,
-        rgba(255, 255, 255, 0.3) 0%,
-        rgba(255, 250, 240, 0.2) 58%,
-        rgba(255, 220, 150, 0.16) 100%);
-    backdrop-filter: blur(16px) saturate(1.25);
-    -webkit-backdrop-filter: blur(16px) saturate(1.25);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    border-top-color: rgba(255, 255, 255, 0.62);
-    color: rgba(255, 251, 240, 0.98);
-    min-width: 96px;
-    padding: 10px 22px;
-    border-radius: 22px;
+        rgba(176, 22, 22, 0.9) 0%,
+        rgba(142, 14, 14, 0.92) 56%,
+        rgba(110, 10, 10, 0.9) 100%);
+    backdrop-filter: blur(14px) saturate(1.1);
+    -webkit-backdrop-filter: blur(14px) saturate(1.1);
+    border: 1px solid rgba(255, 218, 128, 0.58);
+    box-shadow:
+        0 6px 16px rgba(100, 0, 0, 0.42),
+        0 0 12px rgba(255, 184, 64, 0.2),
+        inset 0 1px 0 rgba(255, 238, 190, 0.25);
+    color: #FFD700;
+    min-width: 104px;
+    padding: 11px 24px;
+    border-radius: 24px;
     font-size: 12px;
     font-weight: 600;
-    letter-spacing: 1.1px;
+    letter-spacing: 1.4px;
     text-transform: uppercase;
     cursor: pointer;
     transition: all 0.25s ease;
-    box-shadow:
-        0 4px 18px rgba(255, 215, 0, 0.16),
-        inset 0 1px 0 rgba(255, 255, 255, 0.36);
 }
 .btn-detail-action:hover {
     background: linear-gradient(135deg,
-        rgba(255, 255, 255, 0.38) 0%,
-        rgba(255, 230, 170, 0.25) 100%);
-    border-color: rgba(255, 225, 150, 0.62);
-    color: #FFD700;
+        rgba(198, 28, 28, 0.94) 0%,
+        rgba(158, 18, 18, 0.96) 56%,
+        rgba(124, 12, 12, 0.94) 100%);
+    border-color: rgba(255, 225, 146, 0.78);
+    color: #FFF1BE;
     transform: translateY(-1px);
     box-shadow:
-        0 8px 24px rgba(255, 215, 0, 0.22),
-        0 0 16px rgba(255, 235, 170, 0.2);
-}
-.btn-detail-sound {
-    border-color: rgba(170, 255, 220, 0.52);
-    color: rgba(205, 255, 235, 0.98);
-}
-.btn-detail-sound:hover {
-    border-color: rgba(170, 255, 220, 0.78);
-    color: #AAFFDC;
+        0 8px 22px rgba(120, 0, 0, 0.48),
+        0 0 18px rgba(255, 198, 86, 0.3);
 }
 .btn-detail-sound.playing {
-    border-color: rgba(170, 255, 220, 0.82);
-    color: #AAFFDC;
+    border-color: rgba(255, 220, 120, 0.72);
+    color: #FFE6A8;
     box-shadow:
-        0 8px 24px rgba(170, 255, 220, 0.2),
-        0 0 18px rgba(170, 255, 220, 0.32);
-    animation: speakPulse 0.6s ease-in-out infinite;
+        0 8px 24px rgba(0, 0, 0, 0.32),
+        0 0 20px rgba(255, 195, 80, 0.35);
 }
-.btn-detail-gift {
-    border-color: rgba(255, 170, 205, 0.52);
-    color: rgba(255, 210, 232, 0.98);
-}
-.btn-detail-gift:hover {
-    border-color: rgba(255, 170, 205, 0.82);
-    color: #FF82B4;
-    box-shadow: 0 0 16px rgba(255, 130, 180, 0.26);
+.btn-detail-pronunciation {
+    flex-basis: 100%;
+    margin-top: 2px;
+    max-width: 220px;
 }
 
