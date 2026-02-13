@@ -238,9 +238,23 @@ export function stopBGM() {
 export function toggleMute() {
     isMuted = !isMuted;
     
-    // Toggle YouTube Mute
-    if (playerInst) isMuted ? playerInst.mute() : playerInst.unMute();
-    if (playerVocal) isMuted ? playerVocal.mute() : playerVocal.unMute();
+    // Toggle YouTube Mute & Restore Volume
+    if (playerInst) {
+        if (isMuted) {
+            playerInst.mute();
+        } else {
+            playerInst.unMute();
+            playerInst.setVolume(activeTrack === 'inst' ? masterVolume : 0);
+        }
+    }
+    if (playerVocal) {
+        if (isMuted) {
+            playerVocal.mute();
+        } else {
+            playerVocal.unMute();
+            playerVocal.setVolume(activeTrack === 'vocal' ? masterVolume : 0);
+        }
+    }
     
     // Toggle SFX Gain
     if (sfxGain && audioCtx) {
@@ -252,6 +266,13 @@ export function toggleMute() {
 
 export function isBGMMuted() {
     return isMuted;
+}
+
+export function isAudioPlaying() {
+    if (isMuted) return false;
+    const s1 = playerInst && typeof playerInst.getPlayerState === 'function' ? playerInst.getPlayerState() : -1;
+    const s2 = playerVocal && typeof playerVocal.getPlayerState === 'function' ? playerVocal.getPlayerState() : -1;
+    return s1 === 1 || s2 === 1;
 }
 
 
