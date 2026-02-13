@@ -4892,8 +4892,16 @@ function initStartOverlay() {
             const mins = Math.floor((diff / 1000 / 60) % 60);
             const secs = Math.floor((diff / 1000) % 60);
             
+            const zodiac = getZodiac(nextTarget.year);
+            const dateStr = `${nextTarget.date.getFullYear()}.${String(nextTarget.date.getMonth() + 1).padStart(2, '0')}.${String(nextTarget.date.getDate()).padStart(2, '0')}`;
+            
             countdownEl.innerHTML = `${days}<span style="font-size:1.2rem; margin-right:6px">d</span> ${hours}<span style="font-size:1.2rem; margin-right:6px">h</span> ${mins}<span style="font-size:1.2rem; margin-right:6px">m</span> ${secs}<span style="font-size:1.2rem">s</span>`;
-            labelEl.textContent = `UNTIL YEAR OF THE ${getZodiac(nextTarget.year)}`;
+            labelEl.innerHTML = `
+                <div style="margin-bottom: 12px">UNTIL YEAR OF THE ${zodiac.en}</div>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 16px;">
+                    <span style="font-family:'Ma Shan Zheng', 'Noto Serif TC', serif; font-size:1.6em; font-weight:normal">${zodiac.cn} ${zodiac.ganZhi}</span>
+                    <span style="opacity:0.8; font-family:'Courier New', monospace; font-size: 0.9em">${dateStr}</span>
+                </div>`;
         } else {
             // If no future date in our list, find the most recent past date
             let lastTarget = CNY_DATES[CNY_DATES.length - 1];
@@ -4907,8 +4915,11 @@ function initStartOverlay() {
             const diff = now - lastTarget.date;
             const days = Math.floor(diff / (1000 * 60 * 60 * 24));
             
+            const zodiac = getZodiac(lastTarget.year);
+            const dateStr = `${lastTarget.date.getFullYear()}.${String(lastTarget.date.getMonth() + 1).padStart(2, '0')}.${String(lastTarget.date.getDate()).padStart(2, '0')}`;
+            
             countdownEl.innerHTML = `${days}<span style="font-size:1.5rem"> DAYS AGO</span>`;
-            labelEl.textContent = `SINCE YEAR OF THE ${getZodiac(lastTarget.year)}`;
+            labelEl.innerHTML = `SINCE YEAR OF THE ${zodiac.en} <span style="font-family:'Ma Shan Zheng', 'Noto Serif TC', serif; margin-left:24px; font-size:1.5em; font-weight:normal">${zodiac.cn} ${zodiac.ganZhi}</span> <span style="margin-left:8px; opacity:0.8; font-family:'Courier New', monospace">${dateStr}</span>`;
         }
 
         requestAnimationFrame(updateTime);
@@ -4931,8 +4942,30 @@ function initStartOverlay() {
 }
 
 function getZodiac(year) {
-    const animals = ['RAT', 'OX', 'TIGER', 'RABBIT', 'DRAGON', 'SNAKE', 'HORSE', 'GOAT', 'MONKEY', 'ROOSTER', 'DOG', 'PIG'];
-    return animals[(year - 4) % 12];
+    const stems = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+    const branches = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+    
+    const stem = stems[(year - 4) % 10];
+    const branch = branches[(year - 4) % 12];
+    const ganZhi = `${stem}${branch}年`;
+
+    const animals = [
+        { en: 'RAT', cn: '鼠' },
+        { en: 'OX', cn: '牛' },
+        { en: 'TIGER', cn: '虎' },
+        { en: 'RABBIT', cn: '兔' },
+        { en: 'DRAGON', cn: '龍' },
+        { en: 'SNAKE', cn: '蛇' },
+        { en: 'HORSE', cn: '馬' },
+        { en: 'GOAT', cn: '羊' },
+        { en: 'MONKEY', cn: '猴' },
+        { en: 'ROOSTER', cn: '雞' },
+        { en: 'DOG', cn: '狗' },
+        { en: 'PIG', cn: '豬' }
+    ];
+    
+    const animal = animals[(year - 4) % 12];
+    return { ...animal, ganZhi };
 }
 
 // Rewards panel opener (implemented in monetization-ui.js)
