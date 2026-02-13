@@ -989,6 +989,36 @@ canvas {
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
+/* Reveal All: explicit frosted-glass variant */
+.multi-fortune-actions #btn-reveal-all {
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.14) 0%,
+        rgba(255, 255, 255, 0.06) 48%,
+        rgba(255, 215, 0, 0.1) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.24) !important;
+    border-top-color: rgba(255, 255, 255, 0.4) !important;
+    color: rgba(255, 245, 220, 0.95) !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+    box-shadow:
+        0 6px 22px rgba(0, 0, 0, 0.32),
+        0 0 14px rgba(255, 215, 0, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    backdrop-filter: blur(16px) saturate(1.35) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(1.35) !important;
+}
+
+.multi-fortune-actions #btn-reveal-all:hover {
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.2) 0%,
+        rgba(255, 255, 255, 0.1) 48%,
+        rgba(255, 215, 0, 0.14) 100%) !important;
+    border-color: rgba(255, 255, 255, 0.36) !important;
+    box-shadow:
+        0 8px 28px rgba(0, 0, 0, 0.4),
+        0 0 18px rgba(255, 215, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.24) !important;
+}
+
 .multi-fortune-actions .btn-action.btn-secondary:hover {
     background: rgba(40, 0, 0, 0.6);
     border-color: rgba(255, 215, 0, 0.4);

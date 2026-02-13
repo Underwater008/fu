@@ -2554,10 +2554,14 @@ function renderMultiCards() {
             if (isBack) {
                 // BACK FACE: frosted glass with 福
                 roundRectPath(ctx, -hw, -hh, card.cardW, card.cardH, rd);
-                ctx.fillStyle = 'rgba(240, 248, 255, 0.2)';
-                ctx.globalAlpha = fadeIn * 0.9;
+                const backGlass = ctx.createLinearGradient(-hw, -hh, -hw, hh);
+                backGlass.addColorStop(0, 'rgba(255, 228, 150, 0.34)');
+                backGlass.addColorStop(0.55, 'rgba(255, 202, 100, 0.2)');
+                backGlass.addColorStop(1, 'rgba(222, 142, 36, 0.14)');
+                ctx.fillStyle = backGlass;
+                ctx.globalAlpha = fadeIn * 0.95;
                 ctx.fill();
-                ctx.strokeStyle = 'rgba(235, 245, 255, 0.38)';
+                ctx.strokeStyle = 'rgba(255, 220, 125, 0.58)';
                 ctx.lineWidth = 1;
                 ctx.stroke();
                 // 福 character
@@ -2625,10 +2629,10 @@ function renderMultiCards() {
 
         const [rr, rg, rb] = card.draw.rarity.burstRGB || [236, 245, 255];
         const alpha = fadeIn * (card.revealed ? 0.9 : 0.8);
-        const borderColor = card.revealed ? card.draw.rarity.glow : 'rgba(235, 245, 255, 0.4)';
-        const fillColor = card.revealed ? `rgba(${rr}, ${rg}, ${rb}, 0.30)` : 'rgba(244, 250, 255, 0.24)';
-        const midFillColor = card.revealed ? `rgba(${rr}, ${rg}, ${rb}, 0.18)` : undefined;
-        const bottomFillColor = card.revealed ? `rgba(${rr}, ${rg}, ${rb}, 0.12)` : undefined;
+        const borderColor = card.revealed ? card.draw.rarity.glow : 'rgba(255, 220, 125, 0.5)';
+        const fillColor = card.revealed ? `rgba(${rr}, ${rg}, ${rb}, 0.30)` : 'rgba(255, 225, 140, 0.3)';
+        const midFillColor = card.revealed ? `rgba(${rr}, ${rg}, ${rb}, 0.18)` : 'rgba(255, 200, 95, 0.2)';
+        const bottomFillColor = card.revealed ? `rgba(${rr}, ${rg}, ${rb}, 0.12)` : 'rgba(222, 140, 30, 0.14)';
 
         drawMultiCardRect(card.centerX, card.centerY, card.cardW, card.cardH, alpha, borderColor, fillColor, midFillColor, bottomFillColor);
 
@@ -2748,9 +2752,9 @@ function renderMultiCardText() {
         const alpha = revealT;
         const unit = Math.min(cw, ch); // Base dimension for text sizing
 
-        // Stars
-        const starsStr = '\u2605'.repeat(dr.rarity.stars) + '\u2606'.repeat(6 - dr.rarity.stars);
-        const starsSize = Math.max(7, unit * 0.1);
+        // Stars (vertical stack)
+        const starsChars = Array.from('\u2605'.repeat(dr.rarity.stars) + '\u2606'.repeat(6 - dr.rarity.stars));
+        const starsSize = Math.max(13, unit * 0.17);
         ctx.font = `${starsSize}px "Courier New", monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -2758,7 +2762,16 @@ function renderMultiCardText() {
         ctx.fillStyle = dr.rarity.color;
         ctx.shadowColor = dr.rarity.color;
         ctx.shadowBlur = 4;
-        ctx.fillText(starsStr, cx, cy - ch * 0.39);
+        const starsTopY = cy - ch * 0.42;
+        const starsBottomY = cy - ch * 0.10;
+        let starsStep = Math.max(starsSize * 0.98, 10);
+        if (starsChars.length > 1) {
+            starsStep = Math.min(starsStep, (starsBottomY - starsTopY) / (starsChars.length - 1));
+            starsStep = Math.max(8.5, starsStep);
+        }
+        for (let i = 0; i < starsChars.length; i++) {
+            ctx.fillText(starsChars[i], cx, starsTopY + i * starsStep);
+        }
 
         // Main character
         const charSize = Math.max(14, unit * 0.45);
@@ -2767,16 +2780,26 @@ function renderMultiCardText() {
         ctx.fillStyle = CONFIG.glowGold;
         ctx.shadowColor = CONFIG.glowGold;
         ctx.shadowBlur = charSize * 0.15;
-        ctx.fillText(dr.char, cx, cy - ch * 0.07);
+        ctx.fillText(dr.char, cx, cy - ch * 0.02);
 
-        // Blessing phrase
-        const phraseSize = Math.max(6, unit * 0.07);
-        ctx.font = `${phraseSize}px "Courier New", monospace`;
+        // Blessing phrase (vertical stack)
+        const phraseChars = Array.from(dr.blessing.phrase || '');
+        const phraseSize = Math.max(13, unit * 0.15);
+        ctx.font = `${phraseSize}px ${getDajiFont()}, serif`;
         ctx.globalAlpha = alpha * 0.6;
         ctx.fillStyle = CONFIG.glowRed;
         ctx.shadowColor = CONFIG.glowRed;
         ctx.shadowBlur = 2;
-        ctx.fillText(dr.blessing.phrase, cx, cy + ch * 0.39);
+        const phraseTopY = cy + ch * 0.18;
+        const phraseBottomY = cy + ch * 0.48;
+        let phraseStep = Math.max(phraseSize * 1.02, 11);
+        if (phraseChars.length > 1) {
+            phraseStep = Math.min(phraseStep, (phraseBottomY - phraseTopY) / (phraseChars.length - 1));
+            phraseStep = Math.max(9, phraseStep);
+        }
+        for (let i = 0; i < phraseChars.length; i++) {
+            ctx.fillText(phraseChars[i], cx, phraseTopY + i * phraseStep);
+        }
 
         ctx.restore();
     }
