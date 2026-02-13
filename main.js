@@ -243,15 +243,18 @@ window.addEventListener('resize', resize);
 resize();
 
 // --- Responsive Layout Helpers ---
+const CLUSTER_SIZE_MULTIPLIER = 1.28;
+const LANDSCAPE_CLUSTER_CAP_RATIO = 0.33;
+
 function isLandscape() {
     return window.innerWidth > window.innerHeight * 1.2;
 }
 
 function getClusterSpread() {
-    const baseSpread = Math.min(cols, rows) * 0.40 * cellSize;
+    const baseSpread = Math.min(cols, rows) * 0.40 * cellSize * CLUSTER_SIZE_MULTIPLIER;
     if (isLandscape()) {
         // On landscape/desktop, cap spread to keep cluster proportional
-        return Math.min(baseSpread, window.innerHeight * 0.28);
+        return Math.min(baseSpread, window.innerHeight * LANDSCAPE_CLUSTER_CAP_RATIO);
     }
     return baseSpread;
 }
@@ -1582,7 +1585,6 @@ let launchTrail = [];
 let burstFlash = 0;
 let fuEndScreenPositions = []; // screen-coord positions where each 福 ends up before exploding
 let drawBurstTriggered = false;
-let drawReformFinalized = false;
 
 // --- Cinematic Camera System ---
 const cam = { x: 0, y: 0, scale: 1, shake: 0, focusX: 0, focusY: 0 };
@@ -1800,18 +1802,57 @@ const DRAW_SCATTER = DRAW_LAUNCH + 1.2;
 const DRAW_REFORM = DRAW_SCATTER + 1.1;
 const DRAW_SETTLE = DRAW_REFORM + 0.4;
 const DRAW_TO_FORTUNE_DELAY = 0.3;
-const SINGLE_DRAW_POST_REFORM_ALPHA_DIM = 0.68;
-const SINGLE_DRAW_POST_REFORM_COLOR_DIM = 0.78;
-const SINGLE_DRAW_POST_REFORM_DIM_DURATION = 1.2;
+const SINGLE_DRAW_PARTICLE_MAX_COUNT = 390;
+const SINGLE_DRAW_PARTICLE_KEEP_BASE = 0.36;
+const SINGLE_DRAW_PARTICLE_KEEP_BRIGHTNESS_BIAS = 0.26;
+const SINGLE_DRAW_PARTICLE_CORE_BRIGHTNESS = 0.84;
 
-function getSingleDrawPostReformDim(elapsed) {
-    const safeElapsed = Math.max(0, elapsed);
-    const progress = Math.min(1, safeElapsed / SINGLE_DRAW_POST_REFORM_DIM_DURATION);
-    const eased = easeInOut(progress);
-    return {
-        alpha: lerp(1, SINGLE_DRAW_POST_REFORM_ALPHA_DIM, eased),
-        color: lerp(1, SINGLE_DRAW_POST_REFORM_COLOR_DIM, eased),
-    };
+function pseudoRandom01(seed) {
+    let x = seed | 0;
+    x ^= x >>> 13;
+    x = Math.imul(x, 1274126177);
+    x ^= x >>> 16;
+    return (x >>> 0) / 4294967295;
+}
+
+function filterSingleDrawShapePoints(shape, drawIdx) {
+    if (!Array.isArray(shape) || shape.length === 0) return shape;
+    const filtered = [];
+    for (let i = 0; i < shape.length; i++) {
+        const pt = shape[i];
+        if (pt.brightness >= SINGLE_DRAW_PARTICLE_CORE_BRIGHTNESS) {
+            filtered.push(pt);
+            continue;
+        }
+        const keepThreshold = Math.min(1, SINGLE_DRAW_PARTICLE_KEEP_BASE + pt.brightness * SINGLE_DRAW_PARTICLE_KEEP_BRIGHTNESS_BIAS);
+        const seed = Math.imul(drawIdx + 1, 73856093) ^ Math.imul(i + 1, 19349663);
+        if (pseudoRandom01(seed) <= keepThreshold) filtered.push(pt);
+    }
+    const source = filtered.length > 0 ? filtered : shape;
+    if (source.length <= SINGLE_DRAW_PARTICLE_MAX_COUNT) return source;
+
+    // Keep global shape coverage by selecting one candidate per contiguous segment.
+    const capped = [];
+    const stride = source.length / SINGLE_DRAW_PARTICLE_MAX_COUNT;
+    for (let seg = 0; seg < SINGLE_DRAW_PARTICLE_MAX_COUNT; seg++) {
+        const segStart = Math.floor(seg * stride);
+        const nextStart = Math.floor((seg + 1) * stride);
+        const segEnd = Math.min(source.length - 1, Math.max(segStart, nextStart - 1));
+
+        let bestIdx = segStart;
+        let bestScore = -1;
+        for (let i = segStart; i <= segEnd; i++) {
+            const jitterSeed = Math.imul(drawIdx + 1, 1597334677) ^ Math.imul(i + 1, 3812015801);
+            const jitter = pseudoRandom01(jitterSeed);
+            const score = source[i].brightness * 0.8 + jitter * 0.2;
+            if (score > bestScore) {
+                bestScore = score;
+                bestIdx = i;
+            }
+        }
+        capped.push(source[bestIdx]);
+    }
+    return capped;
 }
 
 function initDrawAnimation() {
@@ -1819,7 +1860,6 @@ function initDrawAnimation() {
     launchTrail = [];
     burstFlash = 0;
     drawBurstTriggered = false;
-    drawReformFinalized = false;
     fortuneUseDrawMorph = false;
     fuEndScreenPositions = [];
     drawToFortuneSeed = null;
@@ -1886,7 +1926,8 @@ function initDrawAnimation() {
 
         // 2. Sample shape — proportionally scaled with cluster size
         const res = isMultiMode ? Math.round(50 * scaleFactor) : 50;
-        const shape = sampleCharacterShape(drawRes.char, res);
+        const sampledShape = sampleCharacterShape(drawRes.char, res);
+        const shape = isMultiMode ? sampledShape : filterSingleDrawShapePoints(sampledShape, idx);
 
         const spread = getClusterSpread() * scaleFactor;
         const depth = spread * 0.4;
@@ -2100,25 +2141,9 @@ function updateDraw() {
                     p.scrambleTimer = 2 + st * 12;
                 }
             } else {
-                const settleT = Math.min(1, (t - DRAW_REFORM) / Math.max(0.001, DRAW_SETTLE - DRAW_REFORM));
-                const eased = easeInOut(settleT);
-                p.x = lerp(p.x, p.targetX, eased);
-                p.y = lerp(p.y, p.targetY, eased);
-                p.z = lerp(p.z, p.targetZ, eased);
+                // After reform, keep particles where they already are (no extra settle motion).
                 p.char = p.finalChar;
             }
-        }
-    }
-
-    // Ensure reform is fully complete before transitioning to fortune.
-    if (!drawReformFinalized && t >= DRAW_SETTLE) {
-        drawReformFinalized = true;
-        for (const p of morphParticles) {
-            if (!p.active) continue;
-            p.x = p.targetX;
-            p.y = p.targetY;
-            p.z = p.targetZ;
-            p.char = p.finalChar;
         }
     }
 
@@ -2984,14 +3009,6 @@ function renderDrawParticles3D(t) {
             size = lerp(size, 1.1, easedSettle);
         }
 
-        if (!isMultiMode && t >= DRAW_SETTLE) {
-            const dim = getSingleDrawPostReformDim(t - DRAW_SETTLE);
-            alpha *= dim.alpha;
-            r *= dim.color;
-            g *= dim.color;
-            b *= dim.color;
-        }
-
         let breatheMix = 0;
         if (t >= DRAW_REFORM) {
             breatheMix = 1;
@@ -3527,7 +3544,7 @@ function appendStarsToGPU(startIdx, starsCount, centerY, colorHex, elapsedTime) 
 }
 
 // Reuse draw-phase reformed particles directly in fortune (single mode).
-function appendStaticMorphToGPU(startIdx = 0, postReformElapsed = Number.POSITIVE_INFINITY) {
+function appendStaticMorphToGPU(startIdx = 0) {
     if (!particlesMesh) return startIdx;
 
     const instColor = particlesMesh.geometry.attributes.instanceColor;
@@ -3535,7 +3552,6 @@ function appendStaticMorphToGPU(startIdx = 0, postReformElapsed = Number.POSITIV
     const instUV = particlesMesh.geometry.attributes.instanceUV;
     const instScale = particlesMesh.geometry.attributes.instanceScale;
     const maxCount = instColor.count;
-    const dim = getSingleDrawPostReformDim(postReformElapsed);
 
     let idx = startIdx;
     for (const p of morphParticles) {
@@ -3551,11 +3567,8 @@ function appendStaticMorphToGPU(startIdx = 0, postReformElapsed = Number.POSITIV
         _dummy.updateMatrix();
         particlesMesh.setMatrixAt(idx, _dummy.matrix);
 
-        const dimR = (color.r / 255) * dim.color;
-        const dimG = (color.g / 255) * dim.color;
-        const dimB = (color.b / 255) * dim.color;
-        instColor.setXYZ(idx, dimR, dimG, dimB);
-        instAlpha.setX(idx, (0.3 + lum * 0.7) * dim.alpha);
+        instColor.setXYZ(idx, color.r / 255, color.g / 255, color.b / 255);
+        instAlpha.setX(idx, 0.3 + lum * 0.7);
 
         const uv = (p.fontIdx != null && charToUV[char + '|' + p.fontIdx]) || charToUV[char];
         if (uv) instUV.setXY(idx, uv.u, uv.v);
@@ -3619,9 +3632,8 @@ function renderFortuneOverlay() {
     }
 
     // 2. Update GPU particles (skip render)
-    const postReformElapsed = DRAW_TO_FORTUNE_DELAY + stateTime;
     let gpuIdx = fortuneUseDrawMorph
-        ? appendStaticMorphToGPU(0, postReformElapsed)
+        ? appendStaticMorphToGPU(0)
         : updateDajiToGPU(true);
 
     // 3. Add Stars as GPU particles (stamped in one by one)
