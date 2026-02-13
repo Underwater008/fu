@@ -752,22 +752,28 @@ function drawCalligraphyFu(alpha) {
     const cy = window.innerHeight / 2;
 
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'alphabetic';
     ctx.font = `${fuSize}px ${chosenFont}, serif`;
+
+    // Measure actual bounding box to compute true visual center
+    const m = ctx.measureText('\u798F');
+    const ascent = m.actualBoundingBoxAscent;
+    const descent = m.actualBoundingBoxDescent;
+    const visualCy = cy + (ascent - descent) / 2;
 
     // Outer glow layer
     ctx.globalAlpha = alpha * 0.3;
     ctx.shadowColor = CONFIG.glowGold;
     ctx.shadowBlur = fuSize * 0.15;
     ctx.fillStyle = CONFIG.glowGold;
-    ctx.fillText('\u798F', cx, cy);
+    ctx.fillText('\u798F', cx, visualCy);
 
     // Main character
     ctx.globalAlpha = alpha;
     ctx.shadowColor = CONFIG.glowGold;
     ctx.shadowBlur = fuSize * 0.06;
     ctx.fillStyle = CONFIG.glowGold;
-    ctx.fillText('\u798F', cx, cy);
+    ctx.fillText('\u798F', cx, visualCy);
 
     ctx.shadowBlur = 0;
     ctx.restore();
@@ -1190,7 +1196,7 @@ function initDrawAnimation() {
                 startY: scatterOriginY,
                 startZ: 0,
                 scatterX: scatterOriginX + Math.cos(angle) * scatterRadius,
-                scatterY: scatterOriginY + Math.sin(angle) * scatterRadius * 0.6,
+                scatterY: scatterOriginY + Math.sin(angle) * scatterRadius,
                 scatterZ: (Math.random() - 0.5) * depth * 1.6,
                 targetX: tgt.x,
                 targetY: tgt.y,
@@ -1838,12 +1844,15 @@ function executeReveal(index) {
 }
 
 function onAllMultiCardsRevealed() {
-    // Show action buttons
+    // Hide reveal-all button and DOM action buttons
     const btnRevealAll = document.getElementById('btn-reveal-all');
     if (btnRevealAll) btnRevealAll.style.display = 'none';
+    if (btnMultiSingle) btnMultiSingle.style.display = 'none';
+    if (btnMultiCollection) btnMultiCollection.style.display = 'none';
+    if (btnMultiAgain) btnMultiAgain.style.display = 'none';
 
-    if (btnMultiSingle) btnMultiSingle.style.display = 'block';
-    if (btnMultiCollection) btnMultiCollection.style.display = 'block';
+    // Show mode switch + collection FAB (same as single draw)
+    updateUIVisibility();
 }
 
 
@@ -1856,8 +1865,21 @@ function renderMultiHints() {
         const hintFade = Math.min(1, Math.max(0, (stateTime - 0.8) / 0.5));
         const pulse = 0.5 + Math.sin(globalTime * 3) * 0.2;
         const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
-        const hintSubSize = isLandscape() ? Math.min(cellSize * 0.9, window.innerHeight * 0.02) : cellSize * 0.9;
         drawOverlayText('\u70B9\u51FB\u7FFB\u5F00 \u00B7 Tap to Reveal', L.multiHintY, CONFIG.glowGold, hintFade * pulse, hintSize);
+    } else {
+        // Swipe-up hint after all revealed (same as single draw)
+        const revealAge = globalTime - multiFortuneState.allRevealedTime;
+        if (revealAge > 1.0) {
+            const hintFade = Math.min(1, (revealAge - 1.0) / 0.5);
+            const pulse = 0.4 + Math.sin(globalTime * 3) * 0.2;
+            const isMulti = selectedMode === 'multi';
+            const mainText = isMulti ? '\u2191 \u518D\u6765\u5341\u8FDE \u2191' : '\u2191 \u518D\u62BD\u4E00\u6B21 \u2191';
+            const subText = isMulti ? 'Swipe Up to Draw \u00D710' : 'Swipe Up to Draw Again';
+            const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
+            const hintSubSize = isLandscape() ? Math.min(cellSize * 0.9, window.innerHeight * 0.02) : cellSize * 0.9;
+            drawOverlayText(mainText, L.hintY, CONFIG.glowGold, hintFade * pulse, hintSize);
+            drawOverlayText(subText, L.hintSubY, CONFIG.glowGold, hintFade * pulse, hintSubSize);
+        }
     }
 }
 
@@ -1871,6 +1893,27 @@ function hitTestMultiCard(screenX, screenY) {
         }
     }
     return -1;
+}
+
+function hitTestMultiHint(screenX, screenY) {
+    if (!multiFortuneState) return false;
+    const L = getLayout();
+    const hintY = L.multiHintY * window.innerHeight;
+    const hintSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.028) : cellSize * 1.2;
+    const hitH = hintSize * 2;
+    const hitW = window.innerWidth * 0.6;
+    return Math.abs(screenX - window.innerWidth / 2) < hitW / 2 &&
+           Math.abs(screenY - hintY) < hitH;
+}
+
+function revealNextUnrevealedCard() {
+    if (!multiFortuneState) return;
+    for (let i = 0; i < multiFortuneState.cards.length; i++) {
+        if (!multiFortuneState.cards[i].revealed && !multiFortuneState.cards[i].anticipating) {
+            revealCard(i);
+            return;
+        }
+    }
 }
 
 function resetMultiFortune() {
@@ -2454,12 +2497,6 @@ function renderFortuneOverlay() {
         drawOverlayText(tierLabel, L.tierY, dr.rarity.color, tierFade * 0.7, tierSize);
     }
 
-    // --- Category ---
-    const catFade = Math.min(1, Math.max(0, (stateTime - 0.7) / 0.7));
-    const catLabel = '[ ' + dr.category.name + ' ]';
-    const catSize = isLandscape() ? Math.min(cellSize * 1.2, window.innerHeight * 0.026) : cellSize * 1.2;
-    drawOverlayText(catLabel, L.categoryY, dr.category.color, catFade * 0.6, catSize);
-
     // --- Blessing phrase + english ---
     const blessFade = Math.min(1, Math.max(0, (stateTime - 0.5) / 0.9));
     const phraseSize = isLandscape() ? Math.min(cellSize * 1.5, window.innerHeight * 0.032) : cellSize * 1.5;
@@ -2531,22 +2568,22 @@ function launchShell() {
 }
 
 function burstShell(shell) {
-    const count = 25 + Math.floor(Math.random() * 35);
+    const count = 35 + Math.floor(Math.random() * 25);
     const { chars, r, g, b } = shell.cat;
     for (let i = 0; i < count; i++) {
-        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
-        const speed = cellSize * (0.06 + Math.random() * 0.10);
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
+        const speed = cellSize * (0.08 + Math.random() * 0.08);
         fwParticles.push({
             x: shell.x, y: shell.y, z: shell.z,
             vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed - cellSize * 0.06,
-            vz: (Math.random() - 0.5) * speed * 0.5,
+            vy: Math.sin(angle) * speed,
+            vz: (Math.random() - 0.5) * speed * 0.4,
             char: chars[Math.floor(Math.random() * chars.length)],
             r, g, b,
-            life: 0.6 + Math.random() * 0.3,
-            decay: 0.008 + Math.random() * 0.008,
-            gravity: cellSize * (0.001 + Math.random() * 0.001),
-            drag: 0.985,
+            life: 0.4 + Math.random() * 0.25,
+            decay: 0.012 + Math.random() * 0.010,
+            gravity: cellSize * (0.0005 + Math.random() * 0.0008),
+            drag: 0.975,
             trailSegs: [],
             lastTrailTime: globalTime,
         });
@@ -2559,22 +2596,22 @@ function tapBurstAtScreen(screenX, screenY) {
     const worldX = screenX - window.innerWidth / 2;
     const worldY = screenY - window.innerHeight / 2;
     const cat = FW_CATEGORIES[Math.floor(Math.random() * FW_CATEGORIES.length)];
-    const count = 20 + Math.floor(Math.random() * 25);
+    const count = 30 + Math.floor(Math.random() * 20);
     const { chars, r, g, b } = cat;
     for (let i = 0; i < count; i++) {
-        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
-        const speed = cellSize * (0.05 + Math.random() * 0.09);
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
+        const speed = cellSize * (0.06 + Math.random() * 0.07);
         fwParticles.push({
             x: worldX, y: worldY, z: (Math.random() - 0.5) * cellSize * 4,
             vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed - cellSize * 0.04,
+            vy: Math.sin(angle) * speed,
             vz: (Math.random() - 0.5) * speed * 0.4,
             char: chars[Math.floor(Math.random() * chars.length)],
             r, g, b,
-            life: 0.5 + Math.random() * 0.3,
-            decay: 0.01 + Math.random() * 0.008,
-            gravity: cellSize * (0.001 + Math.random() * 0.001),
-            drag: 0.985,
+            life: 0.4 + Math.random() * 0.25,
+            decay: 0.012 + Math.random() * 0.010,
+            gravity: cellSize * (0.0005 + Math.random() * 0.0008),
+            drag: 0.975,
             trailSegs: [],
             lastTrailTime: globalTime,
         });
@@ -3335,12 +3372,6 @@ if (btnCloseCollection) {
     btnCloseCollection.addEventListener('click', (e) => {
         e.stopPropagation();
         hideCollectionPanel();
-        // Restore multi action buttons if returning to multi-draw results
-        if (isMultiMode && multiFortuneState && multiFortuneState.allRevealedTime) {
-        
-            if (btnMultiSingle) btnMultiSingle.style.display = 'block';
-            if (btnMultiCollection) btnMultiCollection.style.display = 'block';
-        }
     });
 }
 
@@ -3349,22 +3380,20 @@ if (btnCloseCollection) {
 // ============================================================
 
 function updateUIVisibility() {
-    const multiVisible = (multiOverlay && multiOverlay.classList.contains('visible')) || !!multiFortuneState;
+    const allMultiRevealed = multiFortuneState && multiFortuneState.revealedCount >= multiFortuneState.cards.length;
     const collVisible = collectionPanel && collectionPanel.classList.contains('visible');
-    const panelOpen = multiVisible || collVisible;
-
-    // Mode Switch: visible in arrival and fortune (not multi), hidden during draw and overlays
+    // Mode Switch: visible in arrival, single fortune, and multi fortune after all revealed
     if (modeSwitch) {
-        if (!panelOpen && (state === 'arrival' || (state === 'fortune' && !isMultiMode)) && fontsReady) {
+        if (!collVisible && (state === 'arrival' || (state === 'fortune' && (!isMultiMode || allMultiRevealed))) && fontsReady) {
             modeSwitch.classList.add('visible');
         } else {
             modeSwitch.classList.remove('visible');
         }
     }
 
-    // Collection FAB: visible in arrival and fortune (not multi), hidden during draw and overlays
+    // Collection FAB: visible in arrival, single fortune, and multi fortune after all revealed
     if (btnCollection) {
-        if (!panelOpen && (state === 'arrival' || (state === 'fortune' && !isMultiMode))) {
+        if (!collVisible && (state === 'arrival' || (state === 'fortune' && (!isMultiMode || allMultiRevealed)))) {
             btnCollection.classList.add('visible');
         } else {
             btnCollection.classList.remove('visible');
@@ -3441,6 +3470,11 @@ canvas.addEventListener('touchend', (e) => {
             }
             return;
         }
+        // Tap on "点击翻开" hint text → reveal next unrevealed card
+        if (hitTestMultiHint(endX, endY) && multiFortuneState.revealedCount < multiFortuneState.cards.length) {
+            revealNextUnrevealedCard();
+            return;
+        }
     }
 
     if (state === 'fortune' && !isMultiMode && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) && dt < 500) {
@@ -3498,6 +3532,12 @@ canvas.addEventListener('mouseup', (e) => {
                 } else {
                     showMultiDetail(card.draw);
                 }
+                mouseDown = false;
+                return;
+            }
+            // Click on "点击翻开" hint text → reveal next unrevealed card
+            if (hitTestMultiHint(e.clientX, e.clientY) && multiFortuneState.revealedCount < multiFortuneState.cards.length) {
+                revealNextUnrevealedCard();
                 mouseDown = false;
                 return;
             }
