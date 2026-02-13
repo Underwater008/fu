@@ -309,20 +309,22 @@ function getMultiGridLayout() {
     const w = window.innerWidth;
     const h = window.innerHeight;
     const portrait = !isLandscape();
+    // Portrait: 5×2 grid; Landscape/Desktop: 10×1 row of tall fortune-stick cards.
     const multiCols = portrait ? 5 : 10;
     const multiRows = portrait ? 2 : 1;
-    const gridW = w * (portrait ? 0.92 : 0.95);
-    const gridH = h * (portrait ? 0.72 : 0.32);
-    const scaleFactor = portrait ? 0.30 : 0.26;
+    const gridW = portrait ? w * 0.92 : w * 0.88;
+    // Desktop: tall cards filling most of the screen height (fortune-stick look).
+    const gridH = portrait ? h * 0.72 : h * 0.74;
+    const scaleFactor = portrait ? 0.30 : 0.28;
     // Shift grid upward to leave room for bottom controls/hints.
-    const gridTopY = portrait ? h * 0.06 : h * 0.12;
+    const gridTopY = portrait ? h * 0.06 : h * 0.04;
     const startX = (w - gridW) / 2 + (gridW / multiCols) / 2;
     const startY = gridTopY + (gridH / multiRows) / 2;
     const stepX = gridW / multiCols;
     const stepY = gridH / multiRows;
-    const cardW = stepX - 8;
-    // Keep cards tall with a small row gap in portrait.
-    const cardHeightScale = portrait ? 0.94 : 0.95;
+    // Desktop: add more horizontal gap between stick-cards.
+    const cardW = portrait ? stepX - 8 : stepX - 14;
+    const cardHeightScale = portrait ? 0.94 : 0.96;
     const cardH = stepY * cardHeightScale;
     const gridBottom = gridTopY + gridH;
     return { multiCols, multiRows, gridW, gridH, startX, startY, stepX, stepY, cardW, cardH, scaleFactor, gridBottom };
@@ -721,8 +723,10 @@ function updateDajiToGPU(skipRender) {
         _dummy.updateMatrix();
         particlesMesh.setMatrixAt(i, _dummy.matrix);
 
-        let alpha = p.alpha * 0.85;
-        alpha = Math.min(0.6, alpha);
+        // Desktop: much softer particles (triple additive blending compounds brightness)
+        const _desktop = isLandscape();
+        let alpha = p.alpha * (_desktop ? 0.10 : 0.85);
+        alpha = Math.min(_desktop ? 0.032 : 0.6, alpha);
         if (isHovered) alpha = 1.0;
 
         const yNorm = clusterH > 0 ? p.baseY / clusterH : 0;
@@ -744,7 +748,7 @@ function updateDajiToGPU(skipRender) {
         const uv = (p.fontIdx != null && charToUV[p.char + '|' + p.fontIdx]) || charToUV[p.char];
         if (uv) instUV.setXY(i, uv.u, uv.v);
 
-        let scale = cellSize * 0.85;
+        let scale = cellSize * (_desktop ? 0.30 : 0.85);
         if (isHovered) scale *= 2.2;
         instScale.setX(i, scale);
     }
@@ -1456,9 +1460,10 @@ function drawOverlayText3D(text, yFraction, color, alpha, size, fontOverride) {
 function renderAndCompositeGL() {
     if (!glRenderer || !glScene || !glCamera) return;
 
-    // Update post-processing parameters
+    // Update post-processing parameters — desktop gets weaker bloom to keep text readable
     ppBloomStrength += (ppBloomTarget - ppBloomStrength) * 0.12;
-    if (bloomPass) bloomPass.strength = ppBloomStrength;
+    const bloomMult = isLandscape() ? 0.4 : 1.0;
+    if (bloomPass) bloomPass.strength = ppBloomStrength * bloomMult;
 
     // Chromatic aberration decay
     ppChromatic *= 0.92;
@@ -1903,7 +1908,9 @@ const DRAW_SCATTER = DRAW_LAUNCH + 1.2;
 const DRAW_REFORM = DRAW_SCATTER + 1.1;
 const DRAW_SETTLE = DRAW_REFORM + 0.4;
 const DRAW_TO_FORTUNE_DELAY = 0.3;
-const SINGLE_DRAW_PARTICLE_MAX_COUNT = 600;
+// Desktop uses fewer, subtler particles; mobile keeps current density.
+const SINGLE_DRAW_PARTICLE_MAX_COUNT_MOBILE = 600;
+const SINGLE_DRAW_PARTICLE_MAX_COUNT_DESKTOP = 140;
 const SINGLE_DRAW_PARTICLE_KEEP_BASE = 0.36;
 const SINGLE_DRAW_PARTICLE_KEEP_BRIGHTNESS_BIAS = 0.26;
 const SINGLE_DRAW_PARTICLE_CORE_BRIGHTNESS = 0.84;
@@ -1918,6 +1925,7 @@ function pseudoRandom01(seed) {
 
 function filterSingleDrawShapePoints(shape, drawIdx) {
     if (!Array.isArray(shape) || shape.length === 0) return shape;
+    const maxCount = isLandscape() ? SINGLE_DRAW_PARTICLE_MAX_COUNT_DESKTOP : SINGLE_DRAW_PARTICLE_MAX_COUNT_MOBILE;
     const filtered = [];
     for (let i = 0; i < shape.length; i++) {
         const pt = shape[i];
@@ -1930,12 +1938,12 @@ function filterSingleDrawShapePoints(shape, drawIdx) {
         if (pseudoRandom01(seed) <= keepThreshold) filtered.push(pt);
     }
     const source = filtered.length > 0 ? filtered : shape;
-    if (source.length <= SINGLE_DRAW_PARTICLE_MAX_COUNT) return source;
+    if (source.length <= maxCount) return source;
 
     // Keep global shape coverage by selecting one candidate per contiguous segment.
     const capped = [];
-    const stride = source.length / SINGLE_DRAW_PARTICLE_MAX_COUNT;
-    for (let seg = 0; seg < SINGLE_DRAW_PARTICLE_MAX_COUNT; seg++) {
+    const stride = source.length / maxCount;
+    for (let seg = 0; seg < maxCount; seg++) {
         const segStart = Math.floor(seg * stride);
         const nextStart = Math.floor((seg + 1) * stride);
         const segEnd = Math.min(source.length - 1, Math.max(segStart, nextStart - 1));
@@ -2564,7 +2572,8 @@ function renderMultiCards() {
                 ctx.lineWidth = 1;
                 ctx.stroke();
                 // 福 character
-                const hintSize = Math.min(card.cardW, card.cardH) * 0.35;
+                const _stickFlip = card.cardH > card.cardW * 2.5;
+                const hintSize = _stickFlip ? card.cardW * 0.55 : Math.min(card.cardW, card.cardH) * 0.35;
                 ctx.font = `bold ${hintSize}px "Ma Shan Zheng", serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -2572,7 +2581,7 @@ function renderMultiCards() {
                 ctx.fillStyle = CONFIG.glowGold;
                 ctx.shadowBlur = 0;
                 ctx.shadowOffsetX = 0;
-                ctx.fillText('\u798F', 0, 0);
+                ctx.fillText('\u798F', 0, _stickFlip ? -card.cardH * 0.12 : 0);
             } else {
                 // FRONT FACE: revealed card with rarity styling
                 const [rr, rg, rb] = card.draw.rarity.burstRGB || [236, 245, 255];
@@ -2705,13 +2714,14 @@ function renderMultiCards() {
         if (!card.revealed && !card.anticipating && !card.converging) {
             ctx.save();
             ctx.scale(dpr, dpr);
-            const hintSize = Math.min(card.cardW, card.cardH) * 0.35;
+            const _isStick = card.cardH > card.cardW * 2.5;
+            const hintSize = _isStick ? card.cardW * 0.55 : Math.min(card.cardW, card.cardH) * 0.35;
             ctx.font = `bold ${hintSize}px "Ma Shan Zheng", serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.globalAlpha = fadeIn * 0.2;
+            ctx.globalAlpha = fadeIn * (_isStick ? 0.15 : 0.2);
             ctx.fillStyle = CONFIG.glowGold;
-            ctx.fillText('\u798F', card.centerX, card.centerY);
+            ctx.fillText('\u798F', card.centerX, card.centerY - (_isStick ? card.cardH * 0.12 : 0));
             ctx.restore();
         }
     }
@@ -2739,6 +2749,7 @@ function renderMultiCardText() {
         const cy = card.centerY;
         const cw = card.cardW;
         const ch = card.cardH;
+        const isStick = ch > cw * 2.5; // Fortune-stick proportions (tall & narrow)
 
         // Clip to card bounds
         ctx.save();
@@ -2751,53 +2762,113 @@ function renderMultiCardText() {
         const alpha = revealT;
         const unit = Math.min(cw, ch); // Base dimension for text sizing
 
-        // Stars (vertical stack)
-        const starsChars = Array.from('\u2605'.repeat(dr.rarity.stars) + '\u2606'.repeat(6 - dr.rarity.stars));
-        const starsSize = Math.max(13, unit * 0.17);
-        ctx.font = `${starsSize}px "Courier New", monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.globalAlpha = alpha * 0.85;
-        ctx.fillStyle = dr.rarity.color;
-        ctx.shadowColor = dr.rarity.color;
-        ctx.shadowBlur = 4;
-        const starsTopY = cy - ch * 0.42;
-        const starsBottomY = cy - ch * 0.10;
-        let starsStep = Math.max(starsSize * 0.98, 10);
-        if (starsChars.length > 1) {
-            starsStep = Math.min(starsStep, (starsBottomY - starsTopY) / (starsChars.length - 1));
-            starsStep = Math.max(8.5, starsStep);
-        }
-        for (let i = 0; i < starsChars.length; i++) {
-            ctx.fillText(starsChars[i], cx, starsTopY + i * starsStep);
-        }
+        if (isStick) {
+            // === FORTUNE-STICK LAYOUT (desktop) ===
+            // Tall narrow card: stars → character → phrase laid out with generous vertical spacing.
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
 
-        // Main character
-        const charSize = Math.max(14, unit * 0.45);
-        ctx.font = `bold ${charSize}px ${getDajiFont()}, serif`;
-        ctx.globalAlpha = alpha * 0.9;
-        ctx.fillStyle = CONFIG.glowGold;
-        ctx.shadowColor = CONFIG.glowGold;
-        ctx.shadowBlur = charSize * 0.15;
-        ctx.fillText(dr.char, cx, cy - ch * 0.02);
+            // Stars — compact row at top
+            const starsStr = '\u2605'.repeat(dr.rarity.stars);
+            const starsSize = Math.max(10, cw * 0.12);
+            ctx.font = `${starsSize}px "Courier New", monospace`;
+            ctx.globalAlpha = alpha * 0.7;
+            ctx.fillStyle = dr.rarity.color;
+            ctx.shadowColor = dr.rarity.color;
+            ctx.shadowBlur = 4;
+            ctx.letterSpacing = '1px';
+            ctx.fillText(starsStr, cx, cy - ch * 0.40);
 
-        // Blessing phrase (vertical stack)
-        const phraseChars = Array.from(dr.blessing.phrase || '');
-        const phraseSize = Math.max(13, unit * 0.15);
-        ctx.font = `${phraseSize}px ${getDajiFont()}, serif`;
-        ctx.globalAlpha = alpha * 0.6;
-        ctx.fillStyle = CONFIG.glowRed;
-        ctx.shadowColor = CONFIG.glowRed;
-        ctx.shadowBlur = 2;
-        const phraseTopY = cy + ch * 0.18;
-        const phraseBottomY = cy + ch * 0.48;
-        let phraseStep = Math.max(phraseSize * 1.02, 11);
-        if (phraseChars.length > 1) {
-            phraseStep = Math.min(phraseStep, (phraseBottomY - phraseTopY) / (phraseChars.length - 1));
-            phraseStep = Math.max(9, phraseStep);
-        }
-        for (let i = 0; i < phraseChars.length; i++) {
-            ctx.fillText(phraseChars[i], cx, phraseTopY + i * phraseStep);
+            // Main character — large, centered
+            const charSize = Math.max(18, cw * 0.62);
+            ctx.font = `bold ${charSize}px ${getDajiFont()}, serif`;
+            ctx.globalAlpha = alpha * 0.92;
+            ctx.fillStyle = CONFIG.glowGold;
+            ctx.shadowColor = CONFIG.glowGold;
+            ctx.shadowBlur = charSize * 0.12;
+            ctx.fillText(dr.char, cx, cy - ch * 0.18);
+
+            // English name — small, below character
+            const charEn = dr.blessing ? (dr.blessing.charEn || '') : '';
+            if (charEn) {
+                const enSize = Math.max(8, cw * 0.1);
+                ctx.font = `${enSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+                ctx.globalAlpha = alpha * 0.35;
+                ctx.fillStyle = '#FFD700';
+                ctx.shadowBlur = 0;
+                ctx.fillText(charEn, cx, cy - ch * 0.04);
+            }
+
+            // Blessing phrase — vertical column with generous spacing
+            const phraseChars = Array.from(dr.blessing.phrase || '');
+            const phraseSize = Math.max(11, cw * 0.18);
+            ctx.font = `${phraseSize}px ${getDajiFont()}, serif`;
+            ctx.globalAlpha = alpha * 0.55;
+            ctx.fillStyle = CONFIG.glowRed;
+            ctx.shadowColor = CONFIG.glowRed;
+            ctx.shadowBlur = 2;
+            const phraseTopY = cy + ch * 0.08;
+            const phraseBottomY = cy + ch * 0.44;
+            let phraseStep = phraseSize * 1.35; // generous spacing
+            if (phraseChars.length > 1) {
+                phraseStep = Math.min(phraseStep, (phraseBottomY - phraseTopY) / (phraseChars.length - 1));
+                phraseStep = Math.max(phraseSize * 0.9, phraseStep);
+            }
+            const phraseBlockH = (phraseChars.length - 1) * phraseStep;
+            const phraseStartY = phraseTopY + ((phraseBottomY - phraseTopY) - phraseBlockH) / 2;
+            for (let i = 0; i < phraseChars.length; i++) {
+                ctx.fillText(phraseChars[i], cx, phraseStartY + i * phraseStep);
+            }
+        } else {
+            // === STANDARD LAYOUT (mobile 5×2) ===
+            // Stars (vertical stack)
+            const starsChars = Array.from('\u2605'.repeat(dr.rarity.stars) + '\u2606'.repeat(6 - dr.rarity.stars));
+            const starsSize = Math.max(13, unit * 0.17);
+            ctx.font = `${starsSize}px "Courier New", monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.globalAlpha = alpha * 0.85;
+            ctx.fillStyle = dr.rarity.color;
+            ctx.shadowColor = dr.rarity.color;
+            ctx.shadowBlur = 4;
+            const starsTopY = cy - ch * 0.42;
+            const starsBottomY = cy - ch * 0.10;
+            let starsStep = Math.max(starsSize * 0.98, 10);
+            if (starsChars.length > 1) {
+                starsStep = Math.min(starsStep, (starsBottomY - starsTopY) / (starsChars.length - 1));
+                starsStep = Math.max(8.5, starsStep);
+            }
+            for (let i = 0; i < starsChars.length; i++) {
+                ctx.fillText(starsChars[i], cx, starsTopY + i * starsStep);
+            }
+
+            // Main character
+            const charSize = Math.max(14, unit * 0.45);
+            ctx.font = `bold ${charSize}px ${getDajiFont()}, serif`;
+            ctx.globalAlpha = alpha * 0.9;
+            ctx.fillStyle = CONFIG.glowGold;
+            ctx.shadowColor = CONFIG.glowGold;
+            ctx.shadowBlur = charSize * 0.15;
+            ctx.fillText(dr.char, cx, cy - ch * 0.02);
+
+            // Blessing phrase (vertical stack)
+            const phraseChars = Array.from(dr.blessing.phrase || '');
+            const phraseSize = Math.max(13, unit * 0.15);
+            ctx.font = `${phraseSize}px ${getDajiFont()}, serif`;
+            ctx.globalAlpha = alpha * 0.6;
+            ctx.fillStyle = CONFIG.glowRed;
+            ctx.shadowColor = CONFIG.glowRed;
+            ctx.shadowBlur = 2;
+            const phraseTopY = cy + ch * 0.18;
+            const phraseBottomY = cy + ch * 0.48;
+            let phraseStep = Math.max(phraseSize * 1.02, 11);
+            if (phraseChars.length > 1) {
+                phraseStep = Math.min(phraseStep, (phraseBottomY - phraseTopY) / (phraseChars.length - 1));
+                phraseStep = Math.max(9, phraseStep);
+            }
+            for (let i = 0; i < phraseChars.length; i++) {
+                ctx.fillText(phraseChars[i], cx, phraseTopY + i * phraseStep);
+            }
         }
 
         ctx.restore();
@@ -3812,7 +3883,7 @@ function renderFortuneOverlay() {
     } else {
         renderAndCompositeGL();
     }
-    
+
     // 5. Draw Text (Character + Blessing) on top
     if (dajiFontTransition) {
         const transDur = 1.2;
