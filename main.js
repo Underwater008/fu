@@ -102,6 +102,23 @@ const FONT_DISPLAY_NAMES = [
     '\u5CC4\u5C71\u7891\u7BC6\u4F53',
 ];
 const chosenFont = CALLI_FONTS[Math.floor(Math.random() * CALLI_FONTS.length)];
+// Fixed font for multi-pull cards — uses @chinese-fonts package with full CJK coverage
+// so all characters (main + blessing phrase) render consistently in calligraphy.
+const MULTI_CARD_FONT = '"TsangerZhoukeZhengdabangshu"';
+
+// Preload MULTI_CARD_FONT for all characters used on cards (main + blessing phrases).
+// cn-font-split uses unicode-range, and canvas fillText won't trigger on-demand loading.
+(function preloadMultiCardFont() {
+    const allPhraseChars = Object.values(FULL_CHAR_BLESSINGS).map(b => b.phrase).join('');
+    const unique = [...new Set([...ALL_LUCKY, ...allPhraseChars])].join('');
+    document.fonts.load(`20px ${MULTI_CARD_FONT}`, unique).catch(() => {});
+    // Also inject a hidden DOM element to trigger unicode-range matching
+    const el = document.createElement('span');
+    el.style.cssText = 'position:fixed;left:-9999px;top:-9999px;font-size:1px;visibility:hidden;pointer-events:none;';
+    el.style.fontFamily = 'TsangerZhoukeZhengdabangshu, serif';
+    el.textContent = unique;
+    document.documentElement.appendChild(el);
+})();
 
 // --- Daji title font cycling ---
 let dajiFontIdx = 2; // Start with Ma Shan Zheng
@@ -1460,10 +1477,9 @@ function drawOverlayText3D(text, yFraction, color, alpha, size, fontOverride) {
 function renderAndCompositeGL() {
     if (!glRenderer || !glScene || !glCamera) return;
 
-    // Update post-processing parameters — desktop gets weaker bloom to keep text readable
+    // Update post-processing parameters
     ppBloomStrength += (ppBloomTarget - ppBloomStrength) * 0.12;
-    const bloomMult = isLandscape() ? 0.4 : 1.0;
-    if (bloomPass) bloomPass.strength = ppBloomStrength * bloomMult;
+    if (bloomPass) bloomPass.strength = ppBloomStrength;
 
     // Chromatic aberration decay
     ppChromatic *= 0.92;
@@ -2013,11 +2029,14 @@ function initDrawAnimation() {
     const stepY = grid.stepY;
 
     // Pre-compute where each 福 ends up (screen coords) before exploding
+    // For stick cards, offset upward so particles form at the character text position.
+    const _stickLayout = grid.cardH > grid.cardW * 2.5;
+    const _charYOff = _stickLayout ? grid.cardH * 0.18 : grid.cardH * 0.02;
     drawsToAnimate.forEach((drawRes, idx) => {
         if (isMultiMode) {
             const c = idx % multiCols;
             const r = Math.floor(idx / multiCols);
-            fuEndScreenPositions.push({ x: startX + c * stepX, y: startY + r * stepY });
+            fuEndScreenPositions.push({ x: startX + c * stepX, y: (startY + r * stepY) - _charYOff });
         } else {
             fuEndScreenPositions.push({ x: window.innerWidth / 2, y: window.innerHeight * 0.20 });
         }
@@ -2581,7 +2600,7 @@ function renderMultiCards() {
                 ctx.fillStyle = CONFIG.glowGold;
                 ctx.shadowBlur = 0;
                 ctx.shadowOffsetX = 0;
-                ctx.fillText('\u798F', 0, _stickFlip ? -card.cardH * 0.12 : 0);
+                ctx.fillText('\u798F', 0, _stickFlip ? -card.cardH * 0.18 : -card.cardH * 0.02);
             } else {
                 // FRONT FACE: revealed card with rarity styling
                 const [rr, rg, rb] = card.draw.rarity.burstRGB || [236, 245, 255];
@@ -2614,23 +2633,24 @@ function renderMultiCards() {
         }
 
         // === NORMAL CARD RENDERING ===
-        // Convergence glow: card center brightens as particles converge
+        // Convergence glow: brightens at the character position (where particles converge)
         if (card.converging) {
             const ct = Math.min(1, (globalTime - card.convergeStartTime) / card.convergeDuration);
             ctx.save();
             ctx.scale(dpr, dpr);
-            // Bright convergence glow at card center
+            const _stkGlow = card.cardH > card.cardW * 2.5;
+            const glowCY = card.centerY - (_stkGlow ? card.cardH * 0.18 : card.cardH * 0.02);
             const glowR = Math.min(card.cardW, card.cardH) * 0.4 * (1 + ct);
             const grad = ctx.createRadialGradient(
-                card.centerX, card.centerY, 0,
-                card.centerX, card.centerY, glowR
+                card.centerX, glowCY, 0,
+                card.centerX, glowCY, glowR
             );
             grad.addColorStop(0, `rgba(255, 240, 120, ${ct * 0.6})`);
             grad.addColorStop(0.5, `rgba(255, 200, 50, ${ct * 0.3})`);
             grad.addColorStop(1, 'rgba(255, 200, 50, 0)');
             ctx.globalCompositeOperation = 'lighter';
             ctx.fillStyle = grad;
-            ctx.fillRect(card.centerX - glowR, card.centerY - glowR, glowR * 2, glowR * 2);
+            ctx.fillRect(card.centerX - glowR, glowCY - glowR, glowR * 2, glowR * 2);
             ctx.globalCompositeOperation = 'source-over';
             ctx.restore();
         }
@@ -2721,7 +2741,7 @@ function renderMultiCards() {
             ctx.textBaseline = 'middle';
             ctx.globalAlpha = fadeIn * (_isStick ? 0.15 : 0.2);
             ctx.fillStyle = CONFIG.glowGold;
-            ctx.fillText('\u798F', card.centerX, card.centerY - (_isStick ? card.cardH * 0.12 : 0));
+            ctx.fillText('\u798F', card.centerX, card.centerY - (_isStick ? card.cardH * 0.18 : card.cardH * 0.02));
             ctx.restore();
         }
     }
@@ -2781,7 +2801,7 @@ function renderMultiCardText() {
 
             // Main character — large, centered
             const charSize = Math.max(18, cw * 0.62);
-            ctx.font = `bold ${charSize}px ${getDajiFont()}, serif`;
+            ctx.font = `bold ${charSize}px ${MULTI_CARD_FONT}, serif`;
             ctx.globalAlpha = alpha * 0.92;
             ctx.fillStyle = CONFIG.glowGold;
             ctx.shadowColor = CONFIG.glowGold;
@@ -2802,7 +2822,7 @@ function renderMultiCardText() {
             // Blessing phrase — vertical column with generous spacing
             const phraseChars = Array.from(dr.blessing.phrase || '');
             const phraseSize = Math.max(11, cw * 0.18);
-            ctx.font = `${phraseSize}px ${getDajiFont()}, serif`;
+            ctx.font = `${phraseSize}px ${MULTI_CARD_FONT}, serif`;
             ctx.globalAlpha = alpha * 0.55;
             ctx.fillStyle = CONFIG.glowRed;
             ctx.shadowColor = CONFIG.glowRed;
@@ -2844,7 +2864,7 @@ function renderMultiCardText() {
 
             // Main character
             const charSize = Math.max(14, unit * 0.45);
-            ctx.font = `bold ${charSize}px ${getDajiFont()}, serif`;
+            ctx.font = `bold ${charSize}px ${MULTI_CARD_FONT}, serif`;
             ctx.globalAlpha = alpha * 0.9;
             ctx.fillStyle = CONFIG.glowGold;
             ctx.shadowColor = CONFIG.glowGold;
@@ -2854,7 +2874,7 @@ function renderMultiCardText() {
             // Blessing phrase (vertical stack)
             const phraseChars = Array.from(dr.blessing.phrase || '');
             const phraseSize = Math.max(13, unit * 0.15);
-            ctx.font = `${phraseSize}px ${getDajiFont()}, serif`;
+            ctx.font = `${phraseSize}px ${MULTI_CARD_FONT}, serif`;
             ctx.globalAlpha = alpha * 0.6;
             ctx.fillStyle = CONFIG.glowRed;
             ctx.shadowColor = CONFIG.glowRed;
@@ -2915,9 +2935,11 @@ function startConvergence(index) {
     card.convergeStartTime = globalTime;
     card.convergeDuration = stars >= 6 ? 0.6 : stars >= 5 ? 0.5 : 0.3;
 
-    // Mark particles as converging toward card center
+    // Mark particles as converging toward where the main character text will appear
+    const isStick = card.cardH > card.cardW * 2.5;
+    const charOffsetY = isStick ? card.cardH * 0.18 : card.cardH * 0.02;
     const cardWorldCX = card.centerX - window.innerWidth / 2;
-    const cardWorldCY = card.centerY - window.innerHeight / 2;
+    const cardWorldCY = (card.centerY - charOffsetY) - window.innerHeight / 2;
     for (const p of daji3DParticles) {
         if (p.drawIndex === index) {
             p.converging = true;
@@ -2974,11 +2996,16 @@ function finishReveal(index) {
     // CHROMATIC ABERRATION spike
     ppChromatic = stars >= 6 ? 0.018 : stars >= 5 ? 0.01 : 0.004;
 
-    // SHOCKWAVE distortion
+    // Character position offset (same as text rendering position)
+    const _isStick = card.cardH > card.cardW * 2.5;
+    const _charOffY = _isStick ? card.cardH * 0.18 : card.cardH * 0.02;
+    const _charCY = card.centerY - _charOffY;
+
+    // SHOCKWAVE distortion — centered on character position
     if (stars >= 4) {
         ppShockwaves.push({
             cx: card.centerX / window.innerWidth,
-            cy: 1 - card.centerY / window.innerHeight,
+            cy: 1 - _charCY / window.innerHeight,
             startTime: globalTime,
             duration: stars >= 6 ? 0.7 : 0.5,
             maxRadius: stars >= 6 ? 0.55 : stars >= 5 ? 0.4 : 0.25,
@@ -2989,7 +3016,7 @@ function finishReveal(index) {
             setTimeout(() => {
                 ppShockwaves.push({
                     cx: card.centerX / window.innerWidth,
-                    cy: 1 - card.centerY / window.innerHeight,
+                    cy: 1 - _charCY / window.innerHeight,
                     startTime: globalTime,
                     duration: 0.6,
                     maxRadius: 0.7,
@@ -2999,9 +3026,9 @@ function finishReveal(index) {
         }
     }
 
-    // BURST particles outward from center
+    // BURST particles outward from character position
     const cardWorldCX = card.centerX - window.innerWidth / 2;
-    const cardWorldCY = card.centerY - window.innerHeight / 2;
+    const cardWorldCY = _charCY - window.innerHeight / 2;
     for (const p of daji3DParticles) {
         if (p.drawIndex === index && !p.fadingOut) {
             p.fadingOut = true;
@@ -3283,11 +3310,13 @@ function renderDrawOverlay() {
             const morphPhase = t * morphSpeed;
             const fontCount = CALLI_FONTS.length;
 
+            const _stickRise = grid.cardH > grid.cardW * 2.5;
+            const _charRiseOff = _stickRise ? grid.cardH * 0.18 : grid.cardH * 0.02;
             for (let i = 0; i < count; i++) {
                 const c = i % grid.multiCols;
                 const r = Math.floor(i / grid.multiCols);
                 const targetX = grid.startX + c * grid.stepX;
-                const targetY = grid.startY + r * grid.stepY;
+                const targetY = (grid.startY + r * grid.stepY) - _charRiseOff;
 
                 // Each 福 rises from bottom center, spreading out to its grid target
                 const bottomX = window.innerWidth / 2;
