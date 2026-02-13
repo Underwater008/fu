@@ -6,10 +6,10 @@
 // --- Rarity Tiers (weighted probabilities) ---
 export const RARITY_TIERS = [
     { stars: 6, weight: 3,  label: '天赐鸿福', labelEn: 'Heavenly Fortune', color: '#FF4500', glow: 'rgba(255,69,0,0.5)',   burstRGB: [255, 69, 0] },
-    { stars: 5, weight: 7,  label: '吉星高照', labelEn: 'Auspicious Stars', color: '#A855F7', glow: 'rgba(168,85,247,0.5)', burstRGB: [168, 85, 247] },
-    { stars: 4, weight: 15, label: '福泽绵长', labelEn: 'Enduring Blessings', color: '#3B82F6', glow: 'rgba(59,130,246,0.5)', burstRGB: [59, 130, 246] },
-    { stars: 3, weight: 25, label: '万事如意', labelEn: 'All Wishes Fulfilled', color: '#22C55E', glow: 'rgba(34,197,94,0.5)', burstRGB: [34, 197, 94] },
-    { stars: 2, weight: 50, label: '迎春纳福', labelEn: 'Welcoming Fortune',   color: '#94A3B8', glow: 'rgba(148,163,184,0.5)', burstRGB: [148, 163, 184] },
+    { stars: 5, weight: 7,  label: '吉星高照', labelEn: 'Auspicious Stars', color: '#B070FF', glow: 'rgba(176,112,255,0.5)', burstRGB: [176, 112, 255] },
+    { stars: 4, weight: 15, label: '福泽绵长', labelEn: 'Enduring Blessings', color: '#4DA6FF', glow: 'rgba(77,166,255,0.5)', burstRGB: [77, 166, 255] },
+    { stars: 3, weight: 25, label: '心想事成', labelEn: 'Wishes Come True', color: '#4ADE80', glow: 'rgba(74,222,128,0.5)', burstRGB: [74, 222, 128] },
+    { stars: 2, weight: 50, label: '迎春纳福', labelEn: 'Welcoming Fortune',   color: '#B0BEC5', glow: 'rgba(176,190,197,0.5)', burstRGB: [176, 190, 197] },
 ];
 
 // --- Blessing Categories (9 categories) ---

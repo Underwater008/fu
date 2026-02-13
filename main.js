@@ -284,12 +284,13 @@ function getLayout() {
     if (isLandscape()) {
         const maxCharSize = Math.min(cellSize * 5, window.innerHeight * 0.11);
         return {
-            starsY: 0.06,
-            charY: 0.14,
-            tierY: 0.21,
-            cardTop: 0.02,
-            cardBottom: 0.24,
-            cardWidth: 0.35,
+            starsY: 0.08,
+            charY: 0.17,
+            tierY: 0.25,
+            tierEnY: 0.28,
+            cardTop: 0.03,
+            cardBottom: 0.32,
+            cardWidth: 0.42,
             categoryY: 0.70,
             phraseY: 0.77,
             englishY: 0.82,
@@ -307,11 +308,12 @@ function getLayout() {
     }
     return {
         starsY: 0.08,
-        charY: 0.15,
-        tierY: 0.22,
-        cardTop: 0.04,
-        cardBottom: 0.26,
-        cardWidth: 0.5,
+        charY: 0.18,
+        tierY: 0.27,
+        tierEnY: 0.30,
+        cardTop: 0.05,
+        cardBottom: 0.34,
+        cardWidth: 0.62,
         categoryY: 0.61,
         phraseY: 0.71,
         englishY: 0.77,
@@ -362,7 +364,7 @@ function initThreeJS() {
         ...LUCKY_CHARS_BY_DENSITY,
         ...ALL_LUCKY.split(''),
         ...Object.keys(FULL_CHAR_BLESSINGS),
-        '\u00B7',
+        '\u00B7', '\u2605',
     ]);
 
     actx.font = `bold ${Math.floor(CELL_PX * 0.7)}px "Courier New", "SF Mono", monospace`;
@@ -1060,6 +1062,49 @@ function drawOverlayText(text, yFraction, color, alpha, size, fontOverride) {
     ctx.shadowColor = color || CONFIG.glowGreen;
     ctx.shadowBlur = fontSize * 0.4;
     ctx.fillText(text, window.innerWidth / 2, window.innerHeight * yFraction);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+}
+
+// --- Draw 3D text overlay (multi-pass glow + depth + highlight) ---
+function drawOverlayText3D(text, yFraction, color, alpha, size, fontOverride) {
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    const fontSize = size || Math.max(12, cellSize * 1.2);
+    const font = fontOverride || '"Courier New", "SF Mono", monospace';
+    ctx.font = `${fontSize}px ${font}, serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight * yFraction;
+    const baseAlpha = alpha ?? 0.6;
+
+    // Pass 1: Wide outer glow (neon halo)
+    ctx.globalAlpha = baseAlpha * 0.3;
+    ctx.fillStyle = color || CONFIG.glowGreen;
+    ctx.shadowColor = color || CONFIG.glowGreen;
+    ctx.shadowBlur = fontSize * 1.2;
+    ctx.fillText(text, cx, cy);
+
+    // Pass 2: 3D depth shadow (dark offset behind text)
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = baseAlpha * 0.4;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillText(text, cx + fontSize * 0.02, cy + fontSize * 0.04);
+
+    // Pass 3: Main fill with medium glow
+    ctx.globalAlpha = baseAlpha;
+    ctx.fillStyle = color || CONFIG.glowGreen;
+    ctx.shadowColor = color || CONFIG.glowGreen;
+    ctx.shadowBlur = fontSize * 0.5;
+    ctx.fillText(text, cx, cy);
+
+    // Pass 4: Bright highlight (specular, shifted up-left)
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = baseAlpha * 0.25;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(text, cx - fontSize * 0.01, cy - fontSize * 0.02);
+
     ctx.shadowBlur = 0;
     ctx.restore();
 }
@@ -2698,15 +2743,22 @@ function renderDrawParticles3D(t) {
             size *= (1 + breathe);
         } else {
             const settleSt = Math.min(1, (t - DRAW_REFORM) / (DRAW_SETTLE - DRAW_REFORM));
+            const easedSettle = easeInOut(settleSt);
             const lum = Math.min(1, gp + 0.08);
             const seed = lerpColor(lum);
             r = lerp(drawR, seed.r, settleSt);
             g = lerp(drawG, seed.g, settleSt);
             b = lerp(drawB, seed.b, settleSt);
             const seedAlpha = 0.3 + lum * 0.7;
-            const pulseAlpha = Math.min(1, (0.5 + gp * 0.5) * (1 + Math.sin(settleSt * Math.PI) * 0.3));
-            alpha = lerp(pulseAlpha, seedAlpha, settleSt);
-            size = lerp(size, 1.1, settleSt);
+            // Continue reform oscillations, fading them out smoothly
+            const fadeOut = 1 - easedSettle;
+            const pulse = Math.sin(globalTime * 8 + p.phase) * 0.2 * fadeOut;
+            const reformBaseAlpha = 0.6 + gp * 0.3;
+            alpha = Math.min(1, Math.max(0.2, lerp(reformBaseAlpha + pulse, seedAlpha, easedSettle)));
+            // Continue breathe effect on size, fading out smoothly
+            const breathe = Math.sin(globalTime * 6 + p.phase) * 0.15 * fadeOut;
+            size *= (1 + breathe);
+            size = lerp(size, 1.1, easedSettle);
         }
 
         let breatheMix = 0;
@@ -3160,6 +3212,89 @@ function renderCharMorph(t, fadeIn, oldFont, newFont) {
     ctx.restore();
 }
 
+// --- Append stars to GPU buffer (for single draw result) ---
+// 3-layer per star: glow halo, main body with spin, bright core
+function appendStarsToGPU(startIdx, starsCount, centerY, colorHex, elapsedTime) {
+    if (!particlesMesh) return startIdx;
+
+    const instColor = particlesMesh.geometry.attributes.instanceColor;
+    const instAlpha = particlesMesh.geometry.attributes.instanceAlpha;
+    const instUV = particlesMesh.geometry.attributes.instanceUV;
+    const instScale = particlesMesh.geometry.attributes.instanceScale;
+    const maxCount = instColor.count;
+    let idx = startIdx;
+
+    const stars = starsCount;
+    const starSpacing = cellSize * 2.2;
+    const totalWidth = (stars - 1) * starSpacing;
+    const startX = -totalWidth / 2;
+
+    const c = new THREE.Color(colorHex);
+    const cBright = new THREE.Color(colorHex).lerp(new THREE.Color('#FFFFFF'), 0.4);
+    const uv = charToUV['\u2605'];
+
+    // Per-star staggered stamp-in: each star appears after the previous
+    const stampStart = 0.5;   // first star begins at this stateTime
+    const stampDelay = 0.25;  // delay between each star
+    const stampDur = 0.4;     // each star's pop-in duration
+
+    for (let i = 0; i < stars; i++) {
+        if (idx + 2 >= maxCount) break;
+
+        // Per-star entrance progress: 0 = not yet, 0..1 = animating, 1 = fully in
+        const starTime = elapsedTime - (stampStart + i * stampDelay);
+        if (starTime < 0) continue; // this star hasn't appeared yet
+        const t = Math.min(1, starTime / stampDur);
+        // Overshoot ease: pops in big then settles (like a stamp)
+        const ease = t < 1 ? 1 - Math.pow(1 - t, 3) : 1;
+        const overshoot = t < 1 ? 1 + Math.sin(t * Math.PI) * 0.3 : 1;
+        const entranceScale = ease * overshoot;
+        const entranceAlpha = ease;
+
+        const x = startX + i * starSpacing;
+        const baseY = -centerY + cellSize * 0.1;
+        const z = -SCENE_FOV * 0.1;
+
+        // Layer 1: Soft glow halo (behind, subtle)
+        const glowPulse = (0.12 + Math.sin(globalTime * 2.5 + i * 1.3) * 0.05) * entranceAlpha;
+        _dummy.position.set(x, baseY, z + 5);
+        _dummy.updateMatrix();
+        particlesMesh.setMatrixAt(idx, _dummy.matrix);
+        instColor.setXYZ(idx, cBright.r, cBright.g, cBright.b);
+        instAlpha.setX(idx, glowPulse);
+        if (uv) instUV.setXY(idx, uv.u, uv.v);
+        instScale.setX(idx, cellSize * 3.5 * entranceScale);
+        idx++;
+
+        // Layer 2: Main star (crisp, bright, dominant shape)
+        const rotAngle = globalTime * 1.8 + i * 0.9;
+        const yRotFactor = 0.8 + Math.abs(Math.cos(rotAngle)) * 0.2;
+        const shimmer = (0.95 + Math.sin(globalTime * 5 + i * 2.1) * 0.05) * entranceAlpha;
+        _dummy.position.set(x, baseY, z);
+        _dummy.updateMatrix();
+        particlesMesh.setMatrixAt(idx, _dummy.matrix);
+        instColor.setXYZ(idx, c.r, c.g, c.b);
+        instAlpha.setX(idx, shimmer);
+        if (uv) instUV.setXY(idx, uv.u, uv.v);
+        instScale.setX(idx, cellSize * 2.5 * yRotFactor * entranceScale);
+        idx++;
+
+        // Layer 3: Tiny specular highlight (center sparkle)
+        const corePulse = (0.4 + Math.sin(globalTime * 7 + i * 3.7) * 0.3) * entranceAlpha;
+        _dummy.position.set(x, baseY, z - 2);
+        _dummy.updateMatrix();
+        particlesMesh.setMatrixAt(idx, _dummy.matrix);
+        instColor.setXYZ(idx, 1.0, 1.0, 0.95);
+        instAlpha.setX(idx, corePulse * 0.3);
+        if (uv) instUV.setXY(idx, uv.u, uv.v);
+        instScale.setX(idx, cellSize * 0.9 * entranceScale);
+        idx++;
+    }
+
+    particlesMesh.count = idx;
+    return idx;
+}
+
 // --- Fortune overlay with gacha-specific reveal ---
 function renderFortuneOverlay() {
     // Multi-mode: canvas-integrated particle + card display
@@ -3178,63 +3313,89 @@ function renderFortuneOverlay() {
         return;
     }
 
-    // Combined GPU render: character cluster + fireworks in one pass
-    const dajiCount = updateDajiToGPU(true);
-
-    if ((currentDrawResult && currentDrawResult.rarity.stars >= 4 &&
-        (fwShells.length || fwTrail.length || fwParticles.length)) || hasTapFireworks()) {
-        appendFireworksToGPU(dajiCount);
-    } else {
-        renderAndCompositeGL();
+    if (!currentDrawResult) {
+        updateDajiToGPU(false);
+        return;
     }
-
-    if (!currentDrawResult) return;
 
     const fadeIn = Math.min(1, stateTime / 0.9);
     const dr = currentDrawResult;
     const L = getLayout();
 
     // --- Single mode ---
-    {
-        const topCardFade = Math.min(1, Math.max(0, (stateTime - 0.3) / 0.6));
-        drawCard(L.cardTop, L.cardBottom, topCardFade * 0.8, L.cardWidth);
+    
+    // 1. Draw Card Background (behind particles)
+    const cardTop = L.cardTop;
+    const cardBottom = L.cardBottom;
+    const cardW = window.innerWidth * L.cardWidth;
+    const cardX = (window.innerWidth - cardW) / 2;
+    const cardY = window.innerHeight * cardTop;
+    const cardH = window.innerHeight * (cardBottom - cardTop);
+    
+    const cardFade = Math.min(1, Math.max(0, (stateTime - 0.3) / 0.6));
+    if (cardFade > 0.01) {
+        // Frosted glass card background (blur + tint)
+        drawCard(L.cardTop, L.cardBottom, cardFade * 0.85, L.cardWidth);
 
-        // --- Single character title with font cycling ---
-        if (dajiFontTransition) {
-            const transDur = 1.2;
-            const tt = (globalTime - dajiFontTransition.startTime) / transDur;
-            if (tt >= 1) {
-                dajiFontTransition = null;
-                drawOverlayText(dr.char, L.charY, CONFIG.glowGold, fadeIn * 0.9, L.charFontSize, getDajiFont());
-            } else {
-                renderCharMorph(tt, fadeIn, dajiFontTransition.oldFont, getDajiFont());
-            }
-        } else if (stateTime < 1.5) {
-            renderCharTitleEntrance(stateTime, getDajiFont());
-        } else {
-            drawOverlayText(dr.char, L.charY, CONFIG.glowGold, fadeIn * 0.9, L.charFontSize, getDajiFont());
-        }
-
-        // --- Stars line ---
-        const starsFade = Math.min(1, Math.max(0, (stateTime - 0.3) / 0.6));
-        const starsFull = '\u2605'.repeat(dr.rarity.stars);
-        const starsEmpty = '\u2606'.repeat(6 - dr.rarity.stars);
-        const starsSize = isLandscape() ? Math.min(cellSize * 1.4, window.innerHeight * 0.03) : cellSize * 1.4;
-        drawOverlayText(starsFull + starsEmpty, L.starsY, dr.rarity.color, starsFade * 0.85, starsSize);
-
-        // --- Tier label ---
-        const tierFade = Math.min(1, Math.max(0, (stateTime - 0.5) / 0.7));
-        const tierLabel = dr.rarity.label + ' \u00B7 ' + dr.rarity.labelEn;
-        const tierSize = isLandscape() ? Math.min(cellSize * 1.0, window.innerHeight * 0.022) : cellSize * 1.0;
-        drawOverlayText(tierLabel, L.tierY, dr.rarity.color, tierFade * 0.7, tierSize);
+        // Rarity-colored border glow on top
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        ctx.globalAlpha = cardFade * 0.6;
+        roundRectPath(ctx, cardX, cardY, cardW, cardH, 16);
+        ctx.strokeStyle = dr.rarity.color;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = dr.rarity.color;
+        ctx.shadowBlur = 20;
+        ctx.stroke();
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+        ctx.restore();
     }
+
+    // 2. Update GPU particles (skip render)
+    let gpuIdx = updateDajiToGPU(true);
+
+    // 3. Add Stars as GPU particles (stamped in one by one)
+    if (cardFade > 0.01 && stateTime > 0.4) {
+        gpuIdx = appendStarsToGPU(gpuIdx, dr.rarity.stars, (L.starsY * window.innerHeight) - window.innerHeight/2, dr.rarity.color, stateTime);
+    }
+
+    // 4. Append Fireworks (if any)
+    if ((dr.rarity.stars >= 4 && (fwShells.length || fwTrail.length || fwParticles.length)) || hasTapFireworks()) {
+        appendFireworksToGPU(gpuIdx);
+    } else {
+        renderAndCompositeGL();
+    }
+    
+    // 5. Draw Text (Character, Tier, Phrase) on top
+    if (dajiFontTransition) {
+        const transDur = 1.2;
+        const tt = (globalTime - dajiFontTransition.startTime) / transDur;
+        if (tt >= 1) {
+            dajiFontTransition = null;
+            drawOverlayText(dr.char, L.charY, CONFIG.glowGold, fadeIn * 0.9, L.charFontSize, getDajiFont());
+        } else {
+            renderCharMorph(tt, fadeIn, dajiFontTransition.oldFont, getDajiFont());
+        }
+    } else if (stateTime < 1.5) {
+        renderCharTitleEntrance(stateTime, getDajiFont());
+    } else {
+        drawOverlayText(dr.char, L.charY, CONFIG.glowGold, fadeIn * 0.9, L.charFontSize, getDajiFont());
+    }
+
+    // --- Tier label (two lines: Chinese + English) ---
+    const tierFade = Math.min(1, Math.max(0, (stateTime - 0.5) / 0.7));
+    const tierSizeCn = isLandscape() ? Math.min(cellSize * 1.1, window.innerHeight * 0.025) : cellSize * 1.1;
+    const tierSizeEn = isLandscape() ? Math.min(cellSize * 0.8, window.innerHeight * 0.018) : cellSize * 0.8;
+    drawOverlayText3D(dr.rarity.label, L.tierY, dr.rarity.color, tierFade * 0.8, tierSizeCn);
+    drawOverlayText3D(dr.rarity.labelEn, L.tierEnY, dr.rarity.color, tierFade * 0.55, tierSizeEn);
 
     // --- Blessing phrase + english ---
     const blessFade = Math.min(1, Math.max(0, (stateTime - 0.5) / 0.9));
     const phraseSize = isLandscape() ? Math.min(cellSize * 1.5, window.innerHeight * 0.032) : cellSize * 1.5;
     const engSize = isLandscape() ? Math.min(cellSize * 1, window.innerHeight * 0.022) : cellSize * 1;
-    drawOverlayText(dr.blessing.phrase, L.phraseY, CONFIG.glowRed, blessFade * 0.7, phraseSize);
-    drawOverlayText(dr.blessing.english, L.englishY, CONFIG.glowGold, blessFade * 0.5, engSize);
+    drawOverlayText3D(dr.blessing.phrase, L.phraseY, CONFIG.glowRed, blessFade * 0.7, phraseSize);
+    drawOverlayText3D(dr.blessing.english, L.englishY, CONFIG.glowGold, blessFade * 0.5, engSize);
 
     // --- Hint to draw again ---
     if (stateTime > 2.5) {
