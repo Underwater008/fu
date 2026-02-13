@@ -1047,6 +1047,248 @@ function drawCard(yTop, yBottom, alpha, widthFraction) {
     ctx.restore();
 }
 
+// Chinese-style ornamental frame for the single fortune card.
+function drawChineseOrnamentalBorder(x, y, w, h, alpha, auraColor, stars) {
+    const baseAlpha = Math.max(0, alpha || 0);
+    if (baseAlpha <= 0.001) return;
+    const tier = Math.max(1, Math.min(6, Number.isFinite(stars) ? Math.floor(stars) : 3));
+    const tierT = (tier - 1) / 5;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    const minSide = Math.min(w, h);
+    const insetOuter = Math.max(2, minSide * 0.011);
+    const insetInner = insetOuter * 2.2;
+    const insetCore = insetInner + Math.max(1.2, minSide * 0.01);
+    const radius = Math.max(8, minSide * 0.04);
+
+    // Soft rarity-tinted halo; stronger at higher stars.
+    ctx.globalAlpha = baseAlpha * (0.16 + tier * 0.03);
+    ctx.shadowColor = auraColor || 'rgba(255, 215, 0, 0.6)';
+    ctx.shadowBlur = Math.max(8, minSide * (0.055 + tier * 0.011));
+    ctx.strokeStyle = auraColor || 'rgba(255, 215, 0, 0.6)';
+    ctx.lineWidth = 1.2 + tier * 0.12;
+    roundRectPath(ctx, x, y, w, h, radius);
+    ctx.stroke();
+
+    // Main frame: gold outside + cinnabar inside.
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = baseAlpha * 0.9;
+    ctx.strokeStyle = `rgba(255, 215, 0, ${0.7 + tierT * 0.18})`;
+    ctx.lineWidth = 1.05 + tier * 0.09;
+    roundRectPath(
+        ctx,
+        x + insetOuter,
+        y + insetOuter,
+        w - insetOuter * 2,
+        h - insetOuter * 2,
+        Math.max(4, radius - insetOuter)
+    );
+    ctx.stroke();
+
+    ctx.globalAlpha = baseAlpha * (0.48 + tierT * 0.2);
+    ctx.strokeStyle = 'rgba(145, 22, 22, 0.9)';
+    ctx.lineWidth = 0.95 + tier * 0.05;
+    roundRectPath(
+        ctx,
+        x + insetInner,
+        y + insetInner,
+        w - insetInner * 2,
+        h - insetInner * 2,
+        Math.max(3, radius - insetInner)
+    );
+    ctx.stroke();
+
+    // 3+ stars: add a third inner line to make frame denser.
+    if (tier >= 3) {
+        ctx.globalAlpha = baseAlpha * (0.38 + tierT * 0.18);
+        ctx.strokeStyle = 'rgba(255, 225, 160, 0.7)';
+        ctx.lineWidth = 0.85 + tier * 0.04;
+        roundRectPath(
+            ctx,
+            x + insetCore,
+            y + insetCore,
+            w - insetCore * 2,
+            h - insetCore * 2,
+            Math.max(2.2, radius - insetCore)
+        );
+        ctx.stroke();
+    }
+
+    // Corner ornaments inspired by key-pattern motifs.
+    const cornerLen = Math.max(12, minSide * (0.09 + tierT * 0.05));
+    const step = cornerLen * (0.36 + tierT * 0.06);
+    const edgePad = insetInner + 1.5;
+
+    ctx.globalAlpha = baseAlpha * (0.82 + tierT * 0.15);
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.9)';
+    ctx.lineWidth = 1.2 + tier * 0.09;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    function drawCorner(ax, ay, dirX, dirY) {
+        ctx.beginPath();
+        ctx.moveTo(ax + dirX * cornerLen, ay);
+        ctx.lineTo(ax, ay);
+        ctx.lineTo(ax, ay + dirY * cornerLen);
+
+        ctx.moveTo(ax + dirX * step, ay);
+        ctx.lineTo(ax + dirX * step, ay + dirY * step);
+        ctx.lineTo(ax, ay + dirY * step);
+
+        if (tier >= 3) {
+            ctx.moveTo(ax + dirX * (step * 1.75), ay);
+            ctx.lineTo(ax + dirX * (step * 1.75), ay + dirY * (step * 0.55));
+            ctx.lineTo(ax + dirX * (step * 1.1), ay + dirY * (step * 0.55));
+        }
+
+        if (tier >= 5) {
+            const hookX = ax + dirX * (step * 2.2);
+            const hookY = ay + dirY * (step * 0.78);
+            ctx.moveTo(hookX, ay);
+            ctx.quadraticCurveTo(hookX + dirX * (step * 0.18), hookY, hookX - dirX * (step * 0.18), hookY + dirY * (step * 0.3));
+        }
+        ctx.stroke();
+    }
+
+    drawCorner(x + edgePad, y + edgePad, 1, 1);
+    drawCorner(x + w - edgePad, y + edgePad, -1, 1);
+    drawCorner(x + edgePad, y + h - edgePad, 1, -1);
+    drawCorner(x + w - edgePad, y + h - edgePad, -1, -1);
+
+    // Top and bottom center "seal" accents.
+    const centerHalf = Math.min(w * 0.12, minSide * 0.22);
+    const centerGap = centerHalf * 0.24;
+    const tick = Math.max(3, minSide * 0.012);
+    const midX = x + w / 2;
+    const topY = y + edgePad;
+    const botY = y + h - edgePad;
+
+    ctx.beginPath();
+    ctx.moveTo(midX - centerHalf, topY);
+    ctx.lineTo(midX - centerGap, topY);
+    ctx.moveTo(midX + centerGap, topY);
+    ctx.lineTo(midX + centerHalf, topY);
+    ctx.moveTo(midX - centerHalf * 0.55, topY);
+    ctx.lineTo(midX - centerHalf * 0.55, topY + tick);
+    ctx.moveTo(midX + centerHalf * 0.55, topY);
+    ctx.lineTo(midX + centerHalf * 0.55, topY + tick);
+
+    ctx.moveTo(midX - centerHalf, botY);
+    ctx.lineTo(midX - centerGap, botY);
+    ctx.moveTo(midX + centerGap, botY);
+    ctx.lineTo(midX + centerHalf, botY);
+    ctx.moveTo(midX - centerHalf * 0.55, botY);
+    ctx.lineTo(midX - centerHalf * 0.55, botY - tick);
+    ctx.moveTo(midX + centerHalf * 0.55, botY);
+    ctx.lineTo(midX + centerHalf * 0.55, botY - tick);
+    ctx.stroke();
+
+    // 4+ stars: side center emblems.
+    if (tier >= 4) {
+        const leftX = x + edgePad;
+        const rightX = x + w - edgePad;
+        const sideHalf = Math.min(h * 0.08, minSide * 0.12);
+        const sideGap = sideHalf * 0.26;
+
+        ctx.beginPath();
+        ctx.moveTo(leftX, y + h / 2 - sideHalf);
+        ctx.lineTo(leftX, y + h / 2 - sideGap);
+        ctx.moveTo(leftX, y + h / 2 + sideGap);
+        ctx.lineTo(leftX, y + h / 2 + sideHalf);
+        ctx.moveTo(leftX, y + h / 2 - sideHalf * 0.5);
+        ctx.lineTo(leftX + tick, y + h / 2 - sideHalf * 0.5);
+        ctx.moveTo(leftX, y + h / 2 + sideHalf * 0.5);
+        ctx.lineTo(leftX + tick, y + h / 2 + sideHalf * 0.5);
+
+        ctx.moveTo(rightX, y + h / 2 - sideHalf);
+        ctx.lineTo(rightX, y + h / 2 - sideGap);
+        ctx.moveTo(rightX, y + h / 2 + sideGap);
+        ctx.lineTo(rightX, y + h / 2 + sideHalf);
+        ctx.moveTo(rightX, y + h / 2 - sideHalf * 0.5);
+        ctx.lineTo(rightX - tick, y + h / 2 - sideHalf * 0.5);
+        ctx.moveTo(rightX, y + h / 2 + sideHalf * 0.5);
+        ctx.lineTo(rightX - tick, y + h / 2 + sideHalf * 0.5);
+        ctx.stroke();
+    }
+
+    // 5+ stars: ruyi-cloud accents near center top/bottom.
+    if (tier >= 5) {
+        const cloudW = Math.min(centerHalf * 0.95, minSide * 0.16);
+        const cloudDepth = Math.max(4, minSide * 0.018);
+        const cloudTopY = topY + tick * 1.4;
+        const cloudBotY = botY - tick * 1.4;
+
+        ctx.globalAlpha = baseAlpha * (0.78 + (tier === 6 ? 0.14 : 0));
+        ctx.beginPath();
+        ctx.moveTo(midX - cloudW, cloudTopY);
+        ctx.bezierCurveTo(
+            midX - cloudW * 0.72, cloudTopY + cloudDepth,
+            midX - cloudW * 0.28, cloudTopY + cloudDepth,
+            midX, cloudTopY
+        );
+        ctx.bezierCurveTo(
+            midX + cloudW * 0.28, cloudTopY - cloudDepth,
+            midX + cloudW * 0.72, cloudTopY - cloudDepth,
+            midX + cloudW, cloudTopY
+        );
+
+        ctx.moveTo(midX - cloudW, cloudBotY);
+        ctx.bezierCurveTo(
+            midX - cloudW * 0.72, cloudBotY - cloudDepth,
+            midX - cloudW * 0.28, cloudBotY - cloudDepth,
+            midX, cloudBotY
+        );
+        ctx.bezierCurveTo(
+            midX + cloudW * 0.28, cloudBotY + cloudDepth,
+            midX + cloudW * 0.72, cloudBotY + cloudDepth,
+            midX + cloudW, cloudBotY
+        );
+        ctx.stroke();
+    }
+
+    // 6 stars: imperial pulse ring + corner seal dots.
+    if (tier >= 6) {
+        const pulse = 0.5 + Math.sin(globalTime * 3.4) * 0.25;
+        const pulseInset = Math.max(1, insetOuter * 0.45);
+        const dotR = Math.max(1.5, minSide * 0.007);
+
+        ctx.globalAlpha = baseAlpha * (0.28 + pulse * 0.22);
+        ctx.strokeStyle = 'rgba(255, 230, 150, 0.92)';
+        ctx.shadowColor = auraColor || 'rgba(255, 200, 120, 0.7)';
+        ctx.shadowBlur = Math.max(10, minSide * 0.1);
+        ctx.lineWidth = 1.1;
+        roundRectPath(
+            ctx,
+            x + pulseInset,
+            y + pulseInset,
+            w - pulseInset * 2,
+            h - pulseInset * 2,
+            Math.max(4, radius - pulseInset)
+        );
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        ctx.globalAlpha = baseAlpha * (0.75 + pulse * 0.2);
+        ctx.fillStyle = 'rgba(255, 228, 150, 0.95)';
+        const dotOffset = edgePad + cornerLen * 0.72;
+        const dots = [
+            [x + dotOffset, y + edgePad],
+            [x + w - dotOffset, y + edgePad],
+            [x + dotOffset, y + h - edgePad],
+            [x + w - dotOffset, y + h - edgePad],
+        ];
+        for (const [dx, dy] of dots) {
+            ctx.beginPath();
+            ctx.arc(dx, dy, dotR, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    ctx.restore();
+}
+
 // --- Draw text overlay ---
 function drawOverlayText(text, yFraction, color, alpha, size, fontOverride) {
     ctx.save();
@@ -3345,19 +3587,8 @@ function renderFortuneOverlay() {
         // Frosted glass card background (blur + tint)
         drawCard(L.cardTop, L.cardBottom, cardFade * 0.85, L.cardWidth);
 
-        // Rarity-colored border glow on top
-        ctx.save();
-        ctx.scale(dpr, dpr);
-        ctx.globalAlpha = cardFade * 0.6;
-        roundRectPath(ctx, cardX, cardY, cardW, cardH, 16);
-        ctx.strokeStyle = dr.rarity.color;
-        ctx.lineWidth = 2;
-        ctx.shadowColor = dr.rarity.color;
-        ctx.shadowBlur = 20;
-        ctx.stroke();
-        ctx.shadowBlur = 8;
-        ctx.stroke();
-        ctx.restore();
+        // Traditional Chinese ornamental frame with subtle rarity aura.
+        drawChineseOrnamentalBorder(cardX, cardY, cardW, cardH, cardFade * 0.95, dr.rarity.color);
     }
 
     // 2. Update GPU particles (skip render)
