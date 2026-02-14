@@ -5479,10 +5479,17 @@ function initStartOverlay() {
             } else if (cycleT < ENTRANCE_DUR + HOLD_DUR) {
                 // === HOLD: breathing glow + scale pulse ===
                 const holdT = cycleT - ENTRANCE_DUR;
-                const breath = Math.sin(holdT * 2.2) * 0.5 + 0.5; // 0→1 smooth
-                const scale = 1 + breath * 0.04; // 1.0 ↔ 1.04
-                const glowAlpha = 0.1 + breath * 0.2;
-                const blurSize = fontSize * (0.08 + breath * 0.15);
+                const settle = easeInOut(Math.min(1, holdT / 0.6)); // 0.6s ease from morph glow
+                const breath = Math.sin(holdT * 2.2) * 0.5 + 0.5;
+                const scale = lerp(1.0, 1 + breath * 0.04, settle);
+                const glowAlpha = lerp(0.35, 0.1 + breath * 0.2, settle);
+                const blurSize = lerp(fontSize * 0.3, fontSize * (0.08 + breath * 0.15), settle);
+
+                // Fading sparkles carried over from morph phase
+                if (holdT < 0.8) {
+                    const sparkFade = 1 - easeInOut(holdT / 0.8);
+                    horseSparkles(cx, cy, fontSize, 1.0 + holdT, 0.9 * sparkFade);
+                }
 
                 hCtx.save();
                 hCtx.translate(cx, cy);
@@ -5496,7 +5503,7 @@ function initStartOverlay() {
                 hCtx.fillText(horseChar, 0, 0);
 
                 hCtx.globalAlpha = 0.9;
-                hCtx.shadowBlur = fontSize * 0.06;
+                hCtx.shadowBlur = lerp(fontSize * 0.12, fontSize * 0.06, settle);
                 hCtx.fillText(horseChar, 0, 0);
 
                 hCtx.restore();
@@ -5511,8 +5518,8 @@ function initStartOverlay() {
                 const SCRAMBLE_END = 0.7;
                 const FORM_START = 0.45;
 
-                // Sparkles
-                const sparkleEnv = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+                // Sparkles — keep alive until end so hold phase can continue them
+                const sparkleEnv = t < 0.15 ? t / 0.15 : 1;
                 horseSparkles(cx, cy, fontSize, t, baseAlpha * sparkleEnv);
 
                 // Dissolve old char
