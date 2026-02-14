@@ -27,7 +27,7 @@ const BGM_VOLUME = 0.2;
 let activeTrack = 'inst'; // 'inst' or 'vocal'
 let fadeInterval = null;
 const CROSSFADE_TO_VOCAL_SEC = 0.6;
-const CROSSFADE_TO_INST_SEC = 2.0;
+const CROSSFADE_TO_INST_SEC = 0.8;
 
 // --- Initialization ---
 

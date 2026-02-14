@@ -1596,8 +1596,8 @@ let stateStartGlobal = 0;
 let drawToFortuneSeed = null;
 let fortuneUseDrawMorph = false;
 let pendingInstSwitchTimer = null;
-const VOCAL_HOLD_AFTER_FORTUNE_MS = 3000;
-const VOCAL_HOLD_AFTER_MULTI_FORTUNE_MS = 5000;
+const VOCAL_HOLD_AFTER_FORTUNE_MS = 2000;
+const VOCAL_HOLD_AFTER_MULTI_FORTUNE_MS = 2000;
 
 function changeState(newState) {
     if (pendingInstSwitchTimer) {
