@@ -1706,15 +1706,15 @@ const ARRIVAL_FLAMES = {
     buoyancy: 18,           // px/sec^2 upward accel (gentle lift)
     riseClamp: 300,         // max |vy| to avoid absurd speeds on long frames
     // Lateral drift is driven by a shared wind field for coherence.
-    windAmpMin: 24,
-    windAmpMax: 110,
+    windAmpMin: 12,
+    windAmpMax: 50,
     windFreq: 0.95,         // radians/sec multiplier (more turbulent)
     centerPull: 0.08,       // 1/sec, pulls vx back toward x=0 so plume stays coherent
     velDragMin: 2.8,        // 1/sec (higher = follows wind quicker)
     velDragMax: 5.0,
     // Lifetime (sec) — shorter for faster fade
-    lifeMin: 0.7,
-    lifeMax: 1.4,
+    lifeMin: 1.4,
+    lifeMax: 1.7,
     // Visuals
     alphaMul: 0.62,         // overall opacity (additive blending gets bright fast)
     flickerFreq: 5.0,
@@ -1769,13 +1769,13 @@ function updateArrivalFlames() {
                 ? cellSize * (1.0 + Math.random() * 1.2)
                 : cellSize * (2.2 + Math.random() * Math.random() * 3.5);
 
-            // Shorter life for sparks; base flames live longer.
-            const lifeScale = spark ? (0.42 + Math.random() * 0.35) : (1.0 + Math.random() * 0.15);
+            // Narrower life variance so all particles fade at similar times.
+            const lifeScale = spark ? (0.75 + Math.random() * 0.20) : (0.90 + Math.random() * 0.10);
             const lifeSec = (ARRIVAL_FLAMES.lifeMin + Math.random() * (ARRIVAL_FLAMES.lifeMax - ARRIVAL_FLAMES.lifeMin)) * lifeScale;
 
-            // Faster rise + slight upward accel in update gives "licking" flames.
+            // Gentle rise so characters stay readable.
             const riseBase = ARRIVAL_FLAMES.riseMin + Math.random() * (ARRIVAL_FLAMES.riseMax - ARRIVAL_FLAMES.riseMin);
-            const riseMul = spark ? (1.25 + Math.random() * 0.95) : (0.85 + Math.random() * 0.35);
+            const riseMul = spark ? (0.8 + Math.random() * 0.4) : (0.7 + Math.random() * 0.3);
             const vy = -Math.min(ARRIVAL_FLAMES.riseClamp, riseBase * riseMul);
 
             // Sparks follow wind less; flames sway more.
