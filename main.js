@@ -363,12 +363,13 @@ function getLayout() {
     if (isLandscape()) {
         const maxCharSize = Math.min(cellSize * 5, window.innerHeight * 0.11);
         return {
-            starsY: 0.08,
+            starsY: 0.27,
             charY: 0.17,
-            tierY: 0.25,
-            tierEnY: 0.28,
-            cardTop: 0.03,
-            cardBottom: 0.32,
+            tierY: 0.52,
+            tierEnY: 0.57,
+            cardTop: 0.23,
+            cardBottom: 0.63,
+            clusterYOffset: 0.07,
             cardWidth: 0.42,
             categoryY: 0.70,
             phraseY: 0.77,
@@ -386,12 +387,13 @@ function getLayout() {
         };
     }
     return {
-        starsY: 0.08,
+        starsY: 0.32,
         charY: 0.18,
-        tierY: 0.27,
-        tierEnY: 0.30,
-        cardTop: 0.05,
-        cardBottom: 0.34,
+        tierY: 0.60,
+        tierEnY: 0.65,
+        cardTop: 0.28,
+        cardBottom: 0.70,
+        clusterYOffset: 0.07,
         cardWidth: 0.62,
         categoryY: 0.61,
         phraseY: 0.71,
@@ -744,6 +746,7 @@ function updateDajiToGPU(skipRender) {
 
     const clusterH = spread * 0.5;
     const highlightPos = Math.sin(globalTime * 0.8) * 0.3;
+    const clusterYShift = (getLayout().clusterYOffset || 0) * window.innerHeight;
 
     for (let i = 0; i < count; i++) {
         const p = daji3DParticles[i];
@@ -751,7 +754,7 @@ function updateDajiToGPU(skipRender) {
         const isHovered = i === hoveredIdx;
         const hoverPush = isHovered ? -80 : 0;
 
-        _dummy.position.set(p.baseX, -p.baseY, -(z + hoverPush));
+        _dummy.position.set(p.baseX, -p.baseY + clusterYShift, -(z + hoverPush));
         _dummy.updateMatrix();
         particlesMesh.setMatrixAt(i, _dummy.matrix);
 
@@ -2375,6 +2378,10 @@ function initDrawAnimation() {
         if (isMultiMode) {
             targetCenterX = fuEndScreenPositions[idx].x - window.innerWidth / 2;
             targetCenterY = fuEndScreenPositions[idx].y - window.innerHeight / 2;
+        } else {
+            // Offset cluster upward to match fortune layout position
+            const yOff = (getLayout().clusterYOffset || 0) * window.innerHeight;
+            targetCenterY = -yOff;
         }
 
         // 2. Sample shape — proportionally scaled with cluster size
