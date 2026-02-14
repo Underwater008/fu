@@ -5181,7 +5181,7 @@ function initFlameEffect() {
     function resize() {
         canvas.width = canvas.offsetWidth * devicePixelRatio;
         canvas.height = canvas.offsetHeight * devicePixelRatio;
-        ctx.scale(devicePixelRatio, devicePixelRatio);
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
     }
     resize();
     window.addEventListener('resize', resize);
@@ -5189,6 +5189,67 @@ function initFlameEffect() {
     const W = () => canvas.offsetWidth;
     const H = () => canvas.offsetHeight;
 
+    // --- Drifting lucky characters (same as main bg) ---
+    const bgChars = [];
+    const BG_COUNT = 35;
+    for (let i = 0; i < BG_COUNT; i++) {
+        bgChars.push({
+            x: Math.random(), y: Math.random(), // 0-1 normalized
+            vx: (Math.random() - 0.5) * 0.008,
+            vy: (Math.random() - 0.5) * 0.008,
+            char: ALL_LUCKY[Math.floor(Math.random() * ALL_LUCKY.length)],
+            alpha: 0.03 + Math.random() * 0.07,
+            phase: Math.random() * Math.PI * 2,
+            changeTimer: Math.random() * 200,
+            fontSize: 14 + Math.random() * 10,
+        });
+    }
+
+    function updateBgChars(time) {
+        for (const c of bgChars) {
+            c.x += c.vx * 0.016; // ~60fps normalized
+            c.y += c.vy * 0.016;
+            if (c.x < 0) c.x += 1; if (c.x > 1) c.x -= 1;
+            if (c.y < 0) c.y += 1; if (c.y > 1) c.y -= 1;
+            c.changeTimer--;
+            if (c.changeTimer <= 0) {
+                c.char = ALL_LUCKY[Math.floor(Math.random() * ALL_LUCKY.length)];
+                c.changeTimer = 100 + Math.random() * 200;
+            }
+        }
+    }
+
+    function drawBgChars(time) {
+        const w = W(), h = H();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (const c of bgChars) {
+            const flicker = c.alpha + Math.sin(c.phase + time * 1.5) * 0.02;
+            const a = Math.max(0.01, flicker);
+            ctx.font = `${c.fontSize}px ${chosenFont}, "Courier New", monospace`;
+            ctx.fillStyle = `rgba(255, 215, 0, ${a})`;
+            if (a > 0.05) {
+                ctx.shadowColor = `rgba(255, 215, 0, ${a * 0.6})`;
+                ctx.shadowBlur = c.fontSize * a * 1.2;
+            }
+            ctx.fillText(c.char, c.x * w, c.y * h);
+        }
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+    }
+
+    function drawScanlines() {
+        ctx.save();
+        ctx.globalAlpha = 0.03;
+        ctx.fillStyle = '#fff';
+        const w = W(), h = H();
+        for (let y = 0; y < h; y += 4) {
+            ctx.fillRect(0, y, w, 1);
+        }
+        ctx.restore();
+    }
+
+    // --- Flame particles ---
     const COLORS = [
         [255, 200, 50],   // bright gold
         [255, 140, 20],   // orange
@@ -5198,7 +5259,6 @@ function initFlameEffect() {
     ];
 
     function spawn() {
-        // Spawn from bottom area, rising up
         const x = Math.random() * W();
         const baseY = H() + 5;
         const color = COLORS[Math.floor(Math.random() * COLORS.length)];
@@ -5216,21 +5276,19 @@ function initFlameEffect() {
             if (p.life <= 0) { particles.splice(i, 1); continue; }
             p.x += p.vx * dt;
             p.y += p.vy * dt;
-            p.vx += (Math.random() - 0.5) * 50 * dt; // horizontal drift
-            p.vy -= 10 * dt; // slow down rise slightly
+            p.vx += (Math.random() - 0.5) * 50 * dt;
+            p.vy -= 10 * dt;
             p.flicker += dt * 8;
         }
     }
 
-    function draw() {
-        ctx.clearRect(0, 0, W(), H());
+    function drawFlames() {
         for (const p of particles) {
-            const t = p.life / p.maxLife; // 1→0
+            const t = p.life / p.maxLife;
             const alpha = t * (0.4 + 0.3 * Math.sin(p.flicker));
             const size = p.size * (0.5 + 0.5 * t);
             const [r, g, b] = p.color;
 
-            // Glow
             const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 3);
             grad.addColorStop(0, `rgba(${r},${g},${b},${alpha})`);
             grad.addColorStop(0.4, `rgba(${r},${g},${b},${alpha * 0.4})`);
@@ -5238,7 +5296,6 @@ function initFlameEffect() {
             ctx.fillStyle = grad;
             ctx.fillRect(p.x - size * 3, p.y - size * 3, size * 6, size * 6);
 
-            // Core
             ctx.beginPath();
             ctx.arc(p.x, p.y, size * 0.5, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(${Math.min(255, r + 50)},${Math.min(255, g + 50)},${b},${alpha * 1.2})`;
@@ -5247,17 +5304,28 @@ function initFlameEffect() {
     }
 
     let last = performance.now();
+    let elapsed = 0;
     function loop(now) {
         if (!running) return;
         const dt = Math.min((now - last) / 1000, 0.05);
         last = now;
+        elapsed += dt;
 
-        // Spawn 2-4 particles per frame
+        // Spawn 2-4 flame particles per frame
         const count = 2 + Math.floor(Math.random() * 3);
         for (let i = 0; i < count; i++) spawn();
 
         update(dt);
-        draw();
+        updateBgChars(elapsed);
+
+        // Draw layers: bg fill → drifting chars → scanlines → flames
+        ctx.clearRect(0, 0, W(), H());
+        ctx.fillStyle = '#990000';
+        ctx.fillRect(0, 0, W(), H());
+        drawBgChars(elapsed);
+        drawScanlines();
+        drawFlames();
+
         raf = requestAnimationFrame(loop);
     }
     raf = requestAnimationFrame(loop);
@@ -5356,14 +5424,43 @@ function initStartOverlay() {
         const horseFontEntries = getHorseFontEntries();
         const horseFontCount = horseFontEntries.length;
 
-        // Zodiac cycle: rapid spin through 11 animals then land on 馬/马
-        // Use traditional forms matching the Google Fonts text subset
-        const ZODIAC_OTHERS = ['鼠','牛','虎','兔','龍','蛇','羊','猴','雞','狗','豬'];
-        const spinDuration = 0.5;     // seconds for rapid zodiac spin
-        const holdDuration = 2.5;     // seconds to hold 馬
-        const cycleDur = spinDuration + holdDuration;
+        // Zodiac characters for scramble phase (matching Google Fonts text subset)
+        const ZODIAC_ALL = ['鼠','牛','虎','兔','龍','蛇','馬','羊','猴','雞','狗','豬'];
+
+        // Phase durations (mirrors single-draw fortune flow)
+        const ENTRANCE_DUR = 1.3;   // scale bounce entrance (first cycle only)
+        const HOLD_DUR = 2.0;       // stable hold
+        const MORPH_DUR = 1.2;      // dissolve→scramble→form
+        const firstCycleDur = ENTRANCE_DUR + HOLD_DUR + MORPH_DUR;
+        const normalCycleDur = HOLD_DUR + MORPH_DUR;
         const startT = performance.now();
         let currentFontIdx = Math.floor(Math.random() * horseFontCount);
+        const GOLD = '#FFD700';
+
+        // --- Sparkles (copied from drawMorphSparkles) ---
+        function horseSparkles(cx, cy, fontSize, t, alpha) {
+            const count = 14;
+            const spread = fontSize * 1.5;
+            const time = (performance.now() - startT) / 1000;
+            for (let i = 0; i < count; i++) {
+                const seed = i * 137.508;
+                const lifePhase = ((t * 2.5 + i / count) % 1);
+                const sparkAlpha = Math.sin(lifePhase * Math.PI) * alpha * 0.6;
+                if (sparkAlpha < 0.02) continue;
+                const angle = seed + time * (1.2 + (i % 3) * 0.4);
+                const r = spread * (0.15 + lifePhase * 0.85);
+                const sx = cx + Math.cos(angle) * r;
+                const sy = cy + Math.sin(angle) * r * 0.3;
+                const size = 1 + (1 - lifePhase) * 2.5;
+                hCtx.globalAlpha = sparkAlpha;
+                hCtx.fillStyle = GOLD;
+                hCtx.shadowColor = GOLD;
+                hCtx.shadowBlur = size * 5;
+                hCtx.beginPath();
+                hCtx.arc(sx, sy, size, 0, Math.PI * 2);
+                hCtx.fill();
+            }
+        }
 
         function drawHorse(now) {
             if (!horseMorphRunning) return;
@@ -5380,56 +5477,209 @@ function initStartOverlay() {
             }
             if (cssW === 0 || cssH === 0) { requestAnimationFrame(drawHorse); return; }
 
-            const t = (now - startT) / 1000;
+            const elapsed = (now - startT) / 1000;
             const fontSize = cssW * 0.75;
             const cx = cssW / 2;
-            const cy = cssH / 2 + fontSize * 0.33;
+            const cy = cssH / 2;
 
             hCtx.clearRect(0, 0, cssW, cssH);
 
-            const cycleT = t % cycleDur;
-            const fontCycle = Math.floor(t / cycleDur);
+            // First cycle includes entrance; subsequent cycles skip it
+            let cycleT, fontCycle;
+            if (elapsed < firstCycleDur) {
+                cycleT = elapsed;
+                fontCycle = 0;
+            } else {
+                const afterFirst = elapsed - firstCycleDur;
+                fontCycle = 1 + Math.floor(afterFirst / normalCycleDur);
+                cycleT = ENTRANCE_DUR + (afterFirst % normalCycleDur); // offset past entrance
+            }
             const fontIdx = (currentFontIdx + fontCycle) % horseFontCount;
+            const nextFontIdx = (fontIdx + 1) % horseFontCount;
             const entry = horseFontEntries[fontIdx];
+            const nextEntry = horseFontEntries[nextFontIdx];
+            const horseChar = entry.char;
 
             hCtx.textAlign = 'center';
-            hCtx.textBaseline = 'alphabetic';
-            hCtx.fillStyle = '#FFD700';
-            hCtx.shadowColor = 'rgba(255, 165, 0, 0.8)';
+            hCtx.textBaseline = 'middle';
 
-            if (cycleT < spinDuration) {
-                // Rapid zodiac spin phase: cycle through 11 animals
-                const progress = cycleT / spinDuration; // 0→1
-                const zodiacIdx = Math.min(Math.floor(progress * ZODIAC_OTHERS.length), ZODIAC_OTHERS.length - 1);
-                const char = ZODIAC_OTHERS[zodiacIdx];
+            if (cycleT < ENTRANCE_DUR) {
+                // === ENTRANCE: scale bounce + glow burst (like renderCharTitleEntrance) ===
+                const dur = ENTRANCE_DUR - 0.1;
+                const charT = Math.max(0, Math.min(1, cycleT / dur));
 
-                // Slight alpha ramp-up as we approach 馬
-                const alpha = 0.4 + 0.6 * progress;
+                let scale;
+                if (charT < 0.35) {
+                    scale = lerp(1.8, 0.93, easeInOut(charT / 0.35));
+                } else if (charT < 0.6) {
+                    scale = lerp(0.93, 1.06, easeInOut((charT - 0.35) / 0.25));
+                } else {
+                    scale = lerp(1.06, 1.0, easeInOut((charT - 0.6) / 0.4));
+                }
 
+                const alpha = Math.min(0.9, charT * 3);
+                const glowMult = 1 + Math.max(0, 1 - charT * 1.5) * 2.5;
+                const dropY = Math.max(0, 1 - charT * 2.5) * fontSize * 0.1;
+
+                hCtx.save();
+                hCtx.translate(cx, cy + dropY);
+                hCtx.scale(scale, scale);
                 hCtx.font = `${fontSize}px ${entry.font}, "Noto Serif TC", serif`;
-                hCtx.globalAlpha = alpha * 0.3;
-                hCtx.shadowBlur = fontSize * 0.15;
-                hCtx.fillText(char, cx, cy);
-                hCtx.globalAlpha = alpha * 0.9;
-                hCtx.shadowBlur = fontSize * 0.05;
-                hCtx.fillText(char, cx, cy);
-            } else {
-                // Hold phase: show 馬 with glow
+
+                hCtx.globalAlpha = alpha * 0.35 * glowMult;
+                hCtx.fillStyle = GOLD;
+                hCtx.shadowColor = GOLD;
+                hCtx.shadowBlur = fontSize * 0.25 * glowMult;
+                hCtx.fillText(horseChar, 0, 0);
+
+                hCtx.globalAlpha = alpha;
+                hCtx.shadowBlur = fontSize * 0.12;
+                hCtx.fillText(horseChar, 0, 0);
+
+                hCtx.restore();
+
+            } else if (cycleT < ENTRANCE_DUR + HOLD_DUR) {
+                // === HOLD: breathing glow + scale pulse ===
+                const holdT = cycleT - ENTRANCE_DUR;
+                const breath = Math.sin(holdT * 2.2) * 0.5 + 0.5; // 0→1 smooth
+                const scale = 1 + breath * 0.04; // 1.0 ↔ 1.04
+                const glowAlpha = 0.1 + breath * 0.2;
+                const blurSize = fontSize * (0.08 + breath * 0.15);
+
+                hCtx.save();
+                hCtx.translate(cx, cy);
+                hCtx.scale(scale, scale);
                 hCtx.font = `${fontSize}px ${entry.font}, "Noto Serif TC", serif`;
 
-                // Outer glow
-                hCtx.globalAlpha = 0.3;
-                hCtx.shadowBlur = fontSize * 0.15;
-                hCtx.fillText(entry.char, cx, cy);
+                hCtx.globalAlpha = glowAlpha;
+                hCtx.fillStyle = GOLD;
+                hCtx.shadowColor = GOLD;
+                hCtx.shadowBlur = blurSize;
+                hCtx.fillText(horseChar, 0, 0);
 
-                // Solid
                 hCtx.globalAlpha = 0.9;
-                hCtx.shadowBlur = fontSize * 0.05;
-                hCtx.fillText(entry.char, cx, cy);
+                hCtx.shadowBlur = fontSize * 0.06;
+                hCtx.fillText(horseChar, 0, 0);
+
+                hCtx.restore();
+
+            } else {
+                // === MORPH: dissolve → scramble → form (like renderCharMorph) ===
+                const t = (cycleT - ENTRANCE_DUR - HOLD_DUR) / MORPH_DUR; // 0→1
+                const baseAlpha = 0.9;
+
+                const DISSOLVE_END = 0.3;
+                const SCRAMBLE_START = 0.1;
+                const SCRAMBLE_END = 0.7;
+                const FORM_START = 0.45;
+
+                // Sparkles
+                const sparkleEnv = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+                horseSparkles(cx, cy, fontSize, t, baseAlpha * sparkleEnv);
+
+                // Dissolve old char
+                if (t < DISSOLVE_END) {
+                    const dt = t / DISSOLVE_END;
+                    hCtx.font = `${fontSize}px ${entry.font}, "Noto Serif TC", serif`;
+                    hCtx.textAlign = 'center';
+                    hCtx.textBaseline = 'middle';
+
+                    const shakeX = Math.sin(elapsed * 35) * dt * fontSize * 0.05;
+                    const shakeY = Math.cos(elapsed * 28) * dt * fontSize * 0.035;
+                    const driftY = -dt * dt * fontSize * 0.1;
+                    const alpha = baseAlpha * (1 - dt * dt);
+                    const aber = dt * fontSize * 0.025;
+                    const px = cx + shakeX;
+                    const py = cy + shakeY + driftY;
+
+                    if (aber > 0.5) {
+                        hCtx.globalAlpha = alpha * 0.3;
+                        hCtx.fillStyle = '#FF4444';
+                        hCtx.shadowColor = '#FF4444';
+                        hCtx.shadowBlur = fontSize * 0.12;
+                        hCtx.fillText(horseChar, px - aber, py);
+                        hCtx.fillStyle = '#FFEE44';
+                        hCtx.shadowColor = '#FFEE44';
+                        hCtx.fillText(horseChar, px + aber, py + aber * 0.3);
+                    }
+
+                    hCtx.globalAlpha = alpha;
+                    hCtx.fillStyle = GOLD;
+                    hCtx.shadowColor = GOLD;
+                    hCtx.shadowBlur = fontSize * (0.15 + dt * 0.25);
+                    hCtx.fillText(horseChar, px, py);
+                }
+
+                // Scramble through zodiac chars
+                if (t >= SCRAMBLE_START && t < SCRAMBLE_END) {
+                    const st = (t - SCRAMBLE_START) / (SCRAMBLE_END - SCRAMBLE_START);
+                    const speed = lerp(18, 3, st * st);
+                    const scrambleIdx = Math.floor(elapsed * speed);
+                    const envelope = st < 0.15 ? st / 0.15 : (st > 0.7 ? (1 - st) / 0.3 : 1);
+
+                    hCtx.font = `${fontSize}px ${(st < 0.5 ? entry : nextEntry).font}, "Noto Serif TC", serif`;
+                    hCtx.textAlign = 'center';
+                    hCtx.textBaseline = 'middle';
+
+                    const scramChar = ZODIAC_ALL[scrambleIdx % ZODIAC_ALL.length];
+                    const waveY = Math.sin(elapsed * 5) * fontSize * 0.035;
+                    const waveX = Math.cos(elapsed * 3.5) * fontSize * 0.02;
+                    const pulse = 1 + Math.sin(elapsed * 8) * 0.05;
+
+                    hCtx.save();
+                    hCtx.translate(cx + waveX, cy + waveY);
+                    hCtx.scale(pulse, pulse);
+                    hCtx.globalAlpha = baseAlpha * envelope * 0.7;
+                    hCtx.fillStyle = GOLD;
+                    hCtx.shadowColor = GOLD;
+                    hCtx.shadowBlur = fontSize * 0.2;
+                    hCtx.fillText(scramChar, 0, 0);
+                    hCtx.restore();
+                }
+
+                // Form new char
+                if (t >= FORM_START) {
+                    const ft = (t - FORM_START) / (1 - FORM_START);
+                    hCtx.font = `${fontSize}px ${nextEntry.font}, "Noto Serif TC", serif`;
+                    hCtx.textAlign = 'center';
+                    hCtx.textBaseline = 'middle';
+
+                    const charT = Math.max(0, Math.min(1, ft));
+                    const easedT = easeInOut(charT);
+
+                    let scale;
+                    if (charT < 0.45) {
+                        scale = easedT / 0.45 * 1.1;
+                    } else if (charT < 0.7) {
+                        scale = lerp(1.1, 0.97, easeInOut((charT - 0.45) / 0.25));
+                    } else {
+                        scale = lerp(0.97, 1.0, easeInOut((charT - 0.7) / 0.3));
+                    }
+
+                    const riseY = (1 - easedT) * fontSize * 0.12;
+                    const glowPulse = 1 + Math.sin(charT * Math.PI) * 0.5;
+
+                    hCtx.save();
+                    hCtx.translate(cx, cy + riseY);
+                    hCtx.scale(scale, scale);
+
+                    hCtx.globalAlpha = baseAlpha * easedT * 0.35 * glowPulse;
+                    hCtx.fillStyle = GOLD;
+                    hCtx.shadowColor = GOLD;
+                    hCtx.shadowBlur = fontSize * 0.3 * glowPulse;
+                    hCtx.fillText(nextEntry.char, 0, 0);
+
+                    hCtx.globalAlpha = baseAlpha * easedT;
+                    hCtx.shadowBlur = fontSize * 0.12;
+                    hCtx.fillText(nextEntry.char, 0, 0);
+
+                    hCtx.restore();
+                }
             }
 
             hCtx.globalAlpha = 1;
             hCtx.shadowBlur = 0;
+            hCtx.shadowColor = 'transparent';
 
             requestAnimationFrame(drawHorse);
         }
@@ -5464,7 +5714,7 @@ function initStartOverlay() {
                 <span class="countdown-separator">:</span>
                 <div class="countdown-unit"><span class="countdown-number">${pad(secs)}</span><span class="countdown-label">SEC</span></div>`;
             labelEl.innerHTML = `
-                <div class="cny-label-en">UNTIL YEAR OF <span class="cny-label-highlight">THE ${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>
+                <div class="cny-label-en">UNTIL YEAR OF THE <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>
                 <div class="cny-label-cn">
                     <span class="cny-label-char">${escapeHtml(zodiac.ganZhi)}</span>
                     <span class="cny-label-date">${escapeHtml(dateStr)}</span>
@@ -5488,7 +5738,7 @@ function initStartOverlay() {
             countdownEl.innerHTML = `
                 <div class="countdown-unit"><span class="countdown-number">${days}</span><span class="countdown-label">DAYS AGO</span></div>`;
             labelEl.innerHTML = `
-                <div class="cny-label-en">SINCE YEAR OF <span class="cny-label-highlight">THE ${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>
+                <div class="cny-label-en">SINCE YEAR OF THE <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>
                 <div class="cny-label-cn">
                     <span class="cny-label-char">${escapeHtml(zodiac.ganZhi)}</span>
                     <span class="cny-label-date">${escapeHtml(dateStr)}</span>
