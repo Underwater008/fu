@@ -1324,7 +1324,7 @@ canvas {
         0 0 100px rgba(255, 215, 0, 0.25),
         0 0 150px rgba(255, 0, 0, 0.15),
         inset 0 0 30px rgba(0, 0, 0, 0.3);
-    animation: cardAppear 0.5s cubic-bezier(0.2, 0.9, 0.3, 1), stars7BackgroundPulse 3s ease-in-out infinite;
+    animation: cardAppear 0.5s cubic-bezier(0.2, 0.9, 0.3, 1), stars7BackgroundPulse 5s ease-in-out infinite;
 }
 @keyframes stars7BackgroundPulse {
     0%, 100% {
@@ -1335,27 +1335,39 @@ canvas {
     }
     50% {
         background: linear-gradient(155deg,
-            rgba(120, 10, 0, 0.92) 0%,
-            rgba(80, 5, 0, 0.95) 50%,
-            rgba(110, 10, 0, 0.92) 100%);
+            rgba(115, 8, 0, 0.92) 0%,
+            rgba(75, 4, 0, 0.95) 50%,
+            rgba(105, 8, 0, 0.92) 100%);
     }
 }
 .detail-card.stars-7::before {
-    border-color: rgba(255, 0, 0, 0.6);
-    animation: stars7Ring 1.8s ease-in-out infinite;
+    border-color: rgba(255, 30, 0, 0.55);
+    animation: stars7RingA 4s ease-in-out infinite;
+    will-change: box-shadow, border-color;
 }
 .detail-card.stars-7::after {
-    border-color: rgba(255, 215, 0, 0.35);
-    animation: stars7Ring 1.8s ease-in-out 0.9s infinite;
+    border-color: rgba(255, 180, 0, 0.3);
+    animation: stars7RingB 4s ease-in-out infinite;
+    will-change: box-shadow, border-color;
 }
-@keyframes stars7Ring {
+@keyframes stars7RingA {
     0%, 100% {
-        box-shadow: 0 0 0 rgba(255, 0, 0, 0), inset 0 0 0 rgba(255, 0, 0, 0);
-        border-color: rgba(255, 0, 0, 0.5);
+        box-shadow: 0 0 8px rgba(255, 0, 0, 0.1), inset 0 0 4px rgba(255, 0, 0, 0.05);
+        border-color: rgba(255, 30, 0, 0.45);
     }
     50% {
-        box-shadow: 0 0 28px rgba(255, 0, 0, 0.35), inset 0 0 12px rgba(255, 215, 0, 0.2);
-        border-color: rgba(255, 215, 0, 0.9);
+        box-shadow: 0 0 22px rgba(255, 0, 0, 0.3), inset 0 0 10px rgba(255, 215, 0, 0.15);
+        border-color: rgba(255, 120, 0, 0.7);
+    }
+}
+@keyframes stars7RingB {
+    0%, 100% {
+        box-shadow: 0 0 12px rgba(255, 215, 0, 0.08), inset 0 0 6px rgba(255, 215, 0, 0.05);
+        border-color: rgba(255, 180, 0, 0.25);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.2), inset 0 0 8px rgba(255, 100, 0, 0.12);
+        border-color: rgba(255, 215, 0, 0.55);
     }
 }
 /* Radiating glow overlay for 7-star */
@@ -1364,13 +1376,14 @@ canvas {
     position: absolute;
     inset: -20px;
     border-radius: 24px;
-    background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0.12) 0%, transparent 70%);
-    animation: stars7Radiate 2.5s ease-in-out infinite;
+    background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0.10) 0%, transparent 70%);
+    animation: stars7Radiate 5s ease-in-out infinite;
     pointer-events: none;
+    will-change: opacity, transform;
 }
 @keyframes stars7Radiate {
-    0%, 100% { opacity: 0.4; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.08); }
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(1.05); }
 }
 /* Golden sparkle particles for 7-star */
 .detail-card.stars-7 .detail-card-ornaments::after {
@@ -1387,14 +1400,14 @@ canvas {
         radial-gradient(2px 2px at 10% 55%, rgba(255, 200, 0, 0.8) 50%, transparent 100%),
         radial-gradient(1.5px 1.5px at 90% 45%, rgba(255, 215, 0, 0.7) 50%, transparent 100%),
         radial-gradient(2px 2px at 40% 10%, rgba(255, 255, 200, 0.8) 50%, transparent 100%);
-    animation: stars7Sparkle 4s ease-in-out infinite;
+    animation: stars7Sparkle 6s ease-in-out infinite;
     pointer-events: none;
+    will-change: opacity;
 }
 @keyframes stars7Sparkle {
-    0%, 100% { opacity: 0.3; }
-    25% { opacity: 0.9; }
-    50% { opacity: 0.4; }
-    75% { opacity: 1; }
+    0%, 100% { opacity: 0.45; }
+    33% { opacity: 0.75; }
+    66% { opacity: 0.55; }
 }
 /* 7-star text glow override */
 .detail-card.stars-7 .detail-character {
@@ -1784,17 +1797,17 @@ canvas {
 }
 @media (max-width: 380px) {
     .collection-progress-area {
-        gap: 18px;
+        gap: 10px;
     }
     .progress-ring-wrap {
-        width: 76px;
-        height: 76px;
+        width: 52px;
+        height: 52px;
     }
     .progress-pct {
-        font-size: 1.3rem;
+        font-size: 1rem;
     }
     .stat-row-value {
-        font-size: 1.3rem;
+        font-size: 1rem;
     }
     .collection-title-en span:first-child {
         font-size: 1.1rem;
@@ -1915,18 +1928,18 @@ canvas {
 .collection-progress-area {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 28px;
-    margin-top: 20px;
-    width: 100%;
-    max-width: 400px;
+    justify-content: flex-end;
+    gap: 16px;
+    width: auto;
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 /* SVG Ring Container */
 .progress-ring-wrap {
     position: relative;
-    width: 90px;
-    height: 90px;
+    width: 64px;
+    height: 64px;
     flex-shrink: 0;
 }
 .progress-ring-wrap svg {
@@ -1965,19 +1978,19 @@ canvas {
 }
 .progress-pct {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 1.55rem;
+    font-size: 1.2rem;
     font-weight: 700;
     color: #FFD700;
     line-height: 1;
     text-shadow: 0 0 14px rgba(255, 215, 0, 0.35);
 }
 .progress-pct-sign {
-    font-size: 0.65rem;
+    font-size: 0.55rem;
     font-weight: 500;
     opacity: 0.6;
 }
 .progress-label {
-    font-size: 0.5rem;
+    font-size: 0.45rem;
     color: rgba(255, 255, 255, 0.3);
     text-transform: uppercase;
     letter-spacing: 1.8px;
@@ -1988,35 +2001,35 @@ canvas {
 .progress-stats {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 8px;
 }
 .stat-row {
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: 6px;
 }
 .stat-row-value {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 1.5rem;
+    font-size: 1.15rem;
     font-weight: 700;
     color: #FFD700;
     line-height: 1;
     text-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
-    min-width: 36px;
+    min-width: 28px;
 }
 .stat-row-divider {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     color: rgba(255, 215, 0, 0.25);
     font-weight: 300;
 }
 .stat-row-total {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     color: rgba(255, 215, 0, 0.4);
     font-weight: 500;
 }
 .stat-row-label {
-    font-size: 0.58rem;
+    font-size: 0.52rem;
     color: rgba(255, 255, 255, 0.25);
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -2026,11 +2039,11 @@ canvas {
 /* Bottom progress bar (thin elegant accent under header) */
 .collection-progress-bar {
     width: 100%;
-    max-width: 400px;
+    max-width: 560px;
     height: 2px;
     background: rgba(255, 255, 255, 0.04);
     border-radius: 2px;
-    margin-top: 20px;
+    margin-top: 16px;
     overflow: hidden;
     position: relative;
 }
@@ -2313,11 +2326,11 @@ canvas {
 .collection-card.r7 {
     border-color: rgba(255, 0, 0, 0.6);
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 24px rgba(255, 0, 0, 0.15), 0 0 48px rgba(255, 215, 0, 0.08), inset 0 0 20px rgba(255, 0, 0, 0.1);
-    animation: collectionR7Pulse 2.5s ease-in-out infinite;
+    animation: collectionR7Pulse 4s ease-in-out infinite;
 }
 @keyframes collectionR7Pulse {
-    0%, 100% { box-shadow: 0 2px 12px rgba(0,0,0,0.3), 0 0 24px rgba(255,0,0,0.15), inset 0 0 20px rgba(255,0,0,0.1); }
-    50% { box-shadow: 0 2px 12px rgba(0,0,0,0.3), 0 0 32px rgba(255,0,0,0.25), 0 0 60px rgba(255,215,0,0.12), inset 0 0 24px rgba(255,0,0,0.15); }
+    0%, 100% { box-shadow: 0 2px 12px rgba(0,0,0,0.3), 0 0 24px rgba(255,0,0,0.12), 0 0 40px rgba(255,215,0,0.05), inset 0 0 18px rgba(255,0,0,0.08); }
+    50% { box-shadow: 0 2px 12px rgba(0,0,0,0.3), 0 0 30px rgba(255,0,0,0.22), 0 0 55px rgba(255,215,0,0.1), inset 0 0 22px rgba(255,0,0,0.13); }
 }
 .collection-card.r7 .card-char {
     color: #FF0000;
@@ -2327,16 +2340,17 @@ canvas {
         0 0 36px rgba(255, 215, 0, 0.4),
         0 0 60px rgba(255, 0, 0, 0.25);
     animation: cardCharAppear 0.6s ease-out both,
-               charBreatheR7 2.5s ease-in-out 0.6s infinite;
+               charBreatheR7 4s ease-in-out 0.6s infinite;
+    will-change: text-shadow, transform;
 }
 @keyframes charBreatheR7 {
     0%, 100% {
-        text-shadow: 0 0 6px rgba(255,0,0,0.95), 0 0 18px rgba(255,0,0,0.7), 0 0 36px rgba(255,215,0,0.4), 0 0 60px rgba(255,0,0,0.25);
+        text-shadow: 0 0 6px rgba(255,0,0,0.9), 0 0 18px rgba(255,0,0,0.65), 0 0 36px rgba(255,215,0,0.35), 0 0 55px rgba(255,0,0,0.2);
         transform: scale(1);
     }
     50% {
-        text-shadow: 0 0 10px rgba(255,50,0,1), 0 0 24px rgba(255,0,0,0.85), 0 0 48px rgba(255,215,0,0.5), 0 0 80px rgba(255,0,0,0.3);
-        transform: scale(1.08);
+        text-shadow: 0 0 8px rgba(255,30,0,0.95), 0 0 22px rgba(255,0,0,0.75), 0 0 42px rgba(255,215,0,0.45), 0 0 70px rgba(255,0,0,0.28);
+        transform: scale(1.04);
     }
 }
 
@@ -2451,23 +2465,53 @@ canvas {
    ============================================================ */
 
 /* --- Account Section (collection header) --- */
+/* Top bar: auth (left) + progress (right) */
+.collection-top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 560px;
+    margin-top: 16px;
+    gap: 12px;
+}
 .collection-account {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    width: 100%;
-    max-width: 560px;
-    margin-bottom: 16px;
+    flex-shrink: 0;
+    position: relative;
 }
 .auth-logged-out-row {
     display: flex;
-    justify-content: center;
 }
 .auth-logged-in-row {
     display: flex;
     align-items: center;
+    position: relative;
+}
+.btn-user-id {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.auth-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    background: rgba(30, 5, 5, 0.95);
+    border: 1px solid rgba(255, 215, 0, 0.2);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
     gap: 10px;
-    justify-content: center;
+    align-items: flex-start;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 10;
+    min-width: 160px;
 }
 
 #collection-panel .collection-header #btn-login {

@@ -51,15 +51,25 @@ function updateAuthUI(user) {
     drawCounterFloat.style.display = user ? '' : 'none';
   }
 
+  const btnAuthUser = document.getElementById('btn-auth-user');
+
   if (user && !user.is_anonymous) {
     // Fully authenticated user
     loggedOut.style.display = 'none';
     loggedIn.style.display = 'flex';
-    document.getElementById('auth-email').textContent = user.display_name || user.email;
+    const displayName = user.display_name || user.email || 'User';
+    document.getElementById('auth-email').textContent = displayName;
+    // Show truncated ID on the button
+    if (btnAuthUser) {
+      btnAuthUser.textContent = displayName;
+    }
   } else {
     // Anonymous user or no user — show sign-in button
     loggedOut.style.display = '';
     loggedIn.style.display = 'none';
+    // Close dropdown when logging out
+    const dropdown = document.getElementById('auth-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
   }
 }
 
@@ -115,7 +125,25 @@ function wireAuthButtons() {
 
   if (btnLogout) {
     btnLogout.addEventListener('click', async () => {
+      const dropdown = document.getElementById('auth-dropdown');
+      if (dropdown) dropdown.style.display = 'none';
       await logout();
+    });
+  }
+
+  // User ID button toggles dropdown
+  const btnAuthUser = document.getElementById('btn-auth-user');
+  const authDropdown = document.getElementById('auth-dropdown');
+  if (btnAuthUser && authDropdown) {
+    btnAuthUser.addEventListener('click', (e) => {
+      e.stopPropagation();
+      authDropdown.style.display = authDropdown.style.display === 'none' ? 'flex' : 'none';
+    });
+    // Close dropdown on outside click
+    document.addEventListener('click', (e) => {
+      if (!authDropdown.contains(e.target) && e.target !== btnAuthUser) {
+        authDropdown.style.display = 'none';
+      }
     });
   }
 }

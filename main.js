@@ -4807,13 +4807,14 @@ function showCollectionPanel() {
             if (fillCircle) fillCircle.style.strokeDashoffset = offset;
             if (glowCircle) glowCircle.style.strokeDashoffset = offset;
         });
-        // Thin accent bar
-        let bar = collectionProgress.parentElement.querySelector('.collection-progress-bar');
-        if (!bar) {
+        // Thin accent bar (append to .collection-header, not .collection-top-bar)
+        const headerEl = collectionPanel.querySelector('.collection-header');
+        let bar = headerEl && headerEl.querySelector('.collection-progress-bar');
+        if (!bar && headerEl) {
             bar = document.createElement('div');
             bar.className = 'collection-progress-bar';
             bar.innerHTML = '<div class="collection-progress-fill"></div>';
-            collectionProgress.parentElement.appendChild(bar);
+            headerEl.appendChild(bar);
         }
         bar.querySelector('.collection-progress-fill').style.width = `${progress.percentage}%`;
     }
@@ -4963,6 +4964,12 @@ function updateUIVisibility() {
         showMultiShareButton();
     } else {
         hideMultiShareButton();
+    }
+
+    // Hide draw counter float when collection is open
+    const drawCounterFloat = document.getElementById('draw-counter-float');
+    if (drawCounterFloat) {
+        drawCounterFloat.style.display = collVisible ? 'none' : '';
     }
 }
 

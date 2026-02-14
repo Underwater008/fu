@@ -137,15 +137,6 @@
     <!-- Collection panel -->
     <div id="collection-panel">
         <div class="collection-header">
-            <div id="collection-account" class="collection-account">
-                <div id="auth-logged-out" class="auth-logged-out-row">
-                    <button id="btn-login" class="btn-auth">Sign In</button>
-                </div>
-                <div id="auth-logged-in" class="auth-logged-in-row" style="display:none">
-                    <span id="auth-email" class="auth-email"></span>
-                    <button id="btn-logout" class="btn-auth btn-small">Logout</button>
-                </div>
-            </div>
             <div class="collection-title-row">
                 <h1 class="collection-title-en">
                     <span>FUDUODUO</span>
@@ -153,7 +144,21 @@
                 </h1>
                 <h2>福多多宝典</h2>
             </div>
-            <div id="collection-progress" class="collection-progress"></div>
+            <div class="collection-top-bar">
+                <div id="collection-account" class="collection-account">
+                    <div id="auth-logged-out" class="auth-logged-out-row">
+                        <button id="btn-login" class="btn-auth">Sign In</button>
+                    </div>
+                    <div id="auth-logged-in" class="auth-logged-in-row" style="display:none">
+                        <button id="btn-auth-user" class="btn-auth btn-user-id"></button>
+                        <div id="auth-dropdown" class="auth-dropdown" style="display:none">
+                            <span id="auth-email" class="auth-email"></span>
+                            <button id="btn-logout" class="btn-auth btn-small">Logout</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="collection-progress" class="collection-progress"></div>
+            </div>
         </div>
         <div id="collection-grid" class="collection-grid"></div>
         <div class="collection-actions">
