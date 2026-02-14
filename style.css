@@ -544,8 +544,20 @@ canvas {
 .multi-card.slow-flip-6 .card-flipper {
     transition: transform 1.6s cubic-bezier(0.12, 0.9, 0.35, 1);
 }
+.multi-card.slow-flip-7 .card-flipper {
+    transition: transform 2s cubic-bezier(0.08, 0.95, 0.3, 1);
+}
 
 /* Anticipation shake + glow buildup before flip */
+.multi-card.anticipate-7 {
+    z-index: 11;
+}
+.multi-card.anticipate-7 .card-flipper {
+    animation: cardAnticipate7 1s ease-in-out forwards;
+}
+.multi-card.anticipate-7 .card-back {
+    animation: glowBuild7 1s ease-in forwards;
+}
 .multi-card.anticipate-5 {
     z-index: 10;
 }
@@ -592,6 +604,24 @@ canvas {
 @keyframes glowBuild6 {
     0%   { box-shadow: 0 0 25px rgba(255,69,0,0.2), inset 0 0 30px rgba(0,0,0,0.3); }
     100% { box-shadow: 0 0 60px rgba(255,69,0,0.7), 0 0 100px rgba(255,150,0,0.4), inset 0 0 30px rgba(0,0,0,0.3); }
+}
+@keyframes cardAnticipate7 {
+    0%   { transform: scale(1); }
+    10%  { transform: translateY(-4px) scale(1.04); }
+    20%  { transform: translateX(-5px) rotate(-1.5deg) scale(1.06); }
+    30%  { transform: translateX(5px) rotate(1.5deg) scale(1.07); }
+    40%  { transform: translateX(-4px) rotate(-1.2deg) scale(1.08); }
+    50%  { transform: translateX(4px) rotate(1.2deg) scale(1.10); }
+    60%  { transform: translateX(-3px) rotate(-1deg) scale(1.11); }
+    70%  { transform: translateX(3px) rotate(1deg) scale(1.12); }
+    80%  { transform: translateX(-2px) rotate(-0.5deg) scale(1.13); }
+    90%  { transform: translateX(2px) rotate(0.5deg) scale(1.14); }
+    100% { transform: translateY(-8px) scale(1.16); }
+}
+@keyframes glowBuild7 {
+    0%   { box-shadow: 0 0 25px rgba(255,0,0,0.2), inset 0 0 30px rgba(0,0,0,0.3); }
+    50%  { box-shadow: 0 0 80px rgba(255,0,0,0.6), 0 0 120px rgba(255,215,0,0.4), inset 0 0 30px rgba(0,0,0,0.3); }
+    100% { box-shadow: 0 0 100px rgba(255,0,0,0.8), 0 0 150px rgba(255,215,0,0.5), 0 0 200px rgba(255,0,0,0.3), inset 0 0 30px rgba(0,0,0,0.3); }
 }
 
 .card-face {
@@ -853,6 +883,10 @@ canvas {
     background: radial-gradient(circle at center, rgba(255, 150, 0, 0.5), rgba(255, 69, 0, 0.2) 40%, transparent 70%);
     animation: screenFlash 0.8s ease-out forwards;
 }
+.multi-screen-flash.flash-7 {
+    background: radial-gradient(circle at center, rgba(255, 0, 0, 0.7), rgba(255, 215, 0, 0.3) 40%, transparent 70%);
+    animation: screenFlash 1s ease-out forwards;
+}
 @keyframes screenFlash {
     0% { opacity: 1; }
     100% { opacity: 0; }
@@ -864,7 +898,8 @@ canvas {
 }
 /* Ensure slow-flip hover also transitions smoothly */
 .multi-card.flipped.slow-flip-5:hover .card-flipper,
-.multi-card.flipped.slow-flip-6:hover .card-flipper {
+.multi-card.flipped.slow-flip-6:hover .card-flipper,
+.multi-card.flipped.slow-flip-7:hover .card-flipper {
     transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
     transform: rotateY(180deg) translateY(-4px) scale(1.04);
 }
@@ -1275,6 +1310,106 @@ canvas {
         box-shadow: 0 0 20px rgba(255, 220, 145, 0.22), inset 0 0 8px rgba(255, 220, 145, 0.14);
         border-color: rgba(255, 235, 175, 0.7);
     }
+}
+
+/* ===== 7-STAR: 五福临门 — Ultimate Legendary ===== */
+.detail-card.stars-7 {
+    --orn-intensity: 1; --orn-side: 1; --orn-cloud: 1; --orn-pulse: 1;
+    --orn-color: rgba(255, 0, 0, 1);
+    --orn-corner-size: 68px;
+    --orn-corner-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M0 100V0h100' fill='none' stroke='white' stroke-width='7'/%3E%3Cpath d='M20 0v20H0' fill='none' stroke='white' stroke-width='5'/%3E%3Cpath d='M0 38h38V0' fill='none' stroke='white' stroke-width='4' opacity='.9'/%3E%3Cpath d='M55 0v55H0' fill='none' stroke='white' stroke-width='3.5' opacity='.7'/%3E%3Cpath d='M70 0v70H0' fill='none' stroke='white' stroke-width='3' opacity='.5'/%3E%3Cpath d='M85 0v85H0' fill='none' stroke='white' stroke-width='2.5' opacity='.35'/%3E%3Cpath d='M10 90V10h80' fill='none' stroke='white' stroke-width='2' opacity='.4'/%3E%3Crect x='4' y='4' width='10' height='10' rx='2' fill='white' opacity='.7'/%3E%3Ccircle cx='50' cy='3' r='3' fill='white' opacity='.6'/%3E%3Ccircle cx='3' cy='50' r='3' fill='white' opacity='.6'/%3E%3Ccircle cx='75' cy='3' r='2' fill='white' opacity='.4'/%3E%3Ccircle cx='3' cy='75' r='2' fill='white' opacity='.4'/%3E%3C/svg%3E");
+    border-color: rgba(255, 0, 0, 0.8);
+    box-shadow:
+        0 0 50px rgba(255, 0, 0, 0.4),
+        0 0 100px rgba(255, 215, 0, 0.25),
+        0 0 150px rgba(255, 0, 0, 0.15),
+        inset 0 0 30px rgba(0, 0, 0, 0.3);
+    animation: cardAppear 0.5s cubic-bezier(0.2, 0.9, 0.3, 1), stars7BackgroundPulse 3s ease-in-out infinite;
+}
+@keyframes stars7BackgroundPulse {
+    0%, 100% {
+        background: linear-gradient(155deg,
+            rgba(100, 0, 0, 0.92) 0%,
+            rgba(60, 0, 0, 0.95) 50%,
+            rgba(90, 0, 0, 0.92) 100%);
+    }
+    50% {
+        background: linear-gradient(155deg,
+            rgba(120, 10, 0, 0.92) 0%,
+            rgba(80, 5, 0, 0.95) 50%,
+            rgba(110, 10, 0, 0.92) 100%);
+    }
+}
+.detail-card.stars-7::before {
+    border-color: rgba(255, 0, 0, 0.6);
+    animation: stars7Ring 1.8s ease-in-out infinite;
+}
+.detail-card.stars-7::after {
+    border-color: rgba(255, 215, 0, 0.35);
+    animation: stars7Ring 1.8s ease-in-out 0.9s infinite;
+}
+@keyframes stars7Ring {
+    0%, 100% {
+        box-shadow: 0 0 0 rgba(255, 0, 0, 0), inset 0 0 0 rgba(255, 0, 0, 0);
+        border-color: rgba(255, 0, 0, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 28px rgba(255, 0, 0, 0.35), inset 0 0 12px rgba(255, 215, 0, 0.2);
+        border-color: rgba(255, 215, 0, 0.9);
+    }
+}
+/* Radiating glow overlay for 7-star */
+.detail-card.stars-7 .detail-card-ornaments::before {
+    content: '';
+    position: absolute;
+    inset: -20px;
+    border-radius: 24px;
+    background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0.12) 0%, transparent 70%);
+    animation: stars7Radiate 2.5s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes stars7Radiate {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.08); }
+}
+/* Golden sparkle particles for 7-star */
+.detail-card.stars-7 .detail-card-ornaments::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    background-image:
+        radial-gradient(2px 2px at 15% 20%, rgba(255, 215, 0, 0.9) 50%, transparent 100%),
+        radial-gradient(2px 2px at 85% 15%, rgba(255, 255, 200, 0.8) 50%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 25% 80%, rgba(255, 200, 0, 0.7) 50%, transparent 100%),
+        radial-gradient(2px 2px at 75% 75%, rgba(255, 215, 0, 0.9) 50%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 50% 50%, rgba(255, 255, 200, 0.6) 50%, transparent 100%),
+        radial-gradient(2px 2px at 10% 55%, rgba(255, 200, 0, 0.8) 50%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 90% 45%, rgba(255, 215, 0, 0.7) 50%, transparent 100%),
+        radial-gradient(2px 2px at 40% 10%, rgba(255, 255, 200, 0.8) 50%, transparent 100%);
+    animation: stars7Sparkle 4s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes stars7Sparkle {
+    0%, 100% { opacity: 0.3; }
+    25% { opacity: 0.9; }
+    50% { opacity: 0.4; }
+    75% { opacity: 1; }
+}
+/* 7-star text glow override */
+.detail-card.stars-7 .detail-character {
+    color: #FF0000;
+    text-shadow:
+        0 0 20px rgba(255, 0, 0, 0.8),
+        0 0 40px rgba(255, 215, 0, 0.5),
+        0 0 60px rgba(255, 0, 0, 0.3);
+}
+.detail-card.stars-7 .detail-char-en,
+.detail-card.stars-7 .detail-english {
+    color: #FFD700;
+    text-shadow:
+        0 0 15px rgba(255, 215, 0, 0.8),
+        0 0 30px rgba(255, 0, 0, 0.4);
 }
 
 .detail-card-ornaments {
@@ -2175,6 +2310,36 @@ canvas {
 }
 
 /* Rarity Variations */
+.collection-card.r7 {
+    border-color: rgba(255, 0, 0, 0.6);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 24px rgba(255, 0, 0, 0.15), 0 0 48px rgba(255, 215, 0, 0.08), inset 0 0 20px rgba(255, 0, 0, 0.1);
+    animation: collectionR7Pulse 2.5s ease-in-out infinite;
+}
+@keyframes collectionR7Pulse {
+    0%, 100% { box-shadow: 0 2px 12px rgba(0,0,0,0.3), 0 0 24px rgba(255,0,0,0.15), inset 0 0 20px rgba(255,0,0,0.1); }
+    50% { box-shadow: 0 2px 12px rgba(0,0,0,0.3), 0 0 32px rgba(255,0,0,0.25), 0 0 60px rgba(255,215,0,0.12), inset 0 0 24px rgba(255,0,0,0.15); }
+}
+.collection-card.r7 .card-char {
+    color: #FF0000;
+    text-shadow:
+        0 0 6px rgba(255, 0, 0, 0.95),
+        0 0 18px rgba(255, 0, 0, 0.7),
+        0 0 36px rgba(255, 215, 0, 0.4),
+        0 0 60px rgba(255, 0, 0, 0.25);
+    animation: cardCharAppear 0.6s ease-out both,
+               charBreatheR7 2.5s ease-in-out 0.6s infinite;
+}
+@keyframes charBreatheR7 {
+    0%, 100% {
+        text-shadow: 0 0 6px rgba(255,0,0,0.95), 0 0 18px rgba(255,0,0,0.7), 0 0 36px rgba(255,215,0,0.4), 0 0 60px rgba(255,0,0,0.25);
+        transform: scale(1);
+    }
+    50% {
+        text-shadow: 0 0 10px rgba(255,50,0,1), 0 0 24px rgba(255,0,0,0.85), 0 0 48px rgba(255,215,0,0.5), 0 0 80px rgba(255,0,0,0.3);
+        transform: scale(1.08);
+    }
+}
+
 .collection-card.r6 {
     border-color: rgba(255, 100, 30, 0.4);
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 20px rgba(255, 69, 0, 0.08), inset 0 0 16px rgba(255, 69, 0, 0.08);
