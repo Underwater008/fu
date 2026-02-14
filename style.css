@@ -44,34 +44,19 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 1.5rem;
     width: 100%;
     height: 100%;
-    /* padding inside the frame border */
     padding: clamp(20px, 4vh, 50px) clamp(30px, 6vw, 60px);
+    padding-top: 12vh;
     background: transparent;
     box-shadow: none;
     border-radius: 0;
     overflow: hidden;
-
-    /* 9-slice frame: temporarily disabled
-    border: solid;
-    border-image-source: url("./image/chinese-frame-tight.png");
-    border-image-slice: 250 200 150 200;
-    border-image-width: 22.5vw 18vw 13.5vw 18vw;
-    border-image-repeat: stretch;
-    border-image-outset: 0;
-    */
 }
 
-/* Desktop: hide Chinese frame */
-@media (min-width: 768px) {
-    .start-content {
-        border: none;
-        border-image: none;
-    }
-}
+/* ... existing media query ... */
 
 /* Grand countdown blocks */
 .cny-countdown {
@@ -80,104 +65,56 @@ body {
     justify-content: center;
     gap: clamp(6px, 2vw, 12px);
     white-space: nowrap;
+    position: relative;
+    z-index: 2;
 }
 
-/* Horse character canvas — font-morphing gold "馬" */
+/* Horse character canvas */
 .horse-canvas {
+    position: absolute;
+    top: 45%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     width: clamp(100px, 28vw, 200px);
     height: clamp(100px, 28vw, 200px);
     filter: drop-shadow(0 0 15px rgba(255, 165, 0, 0.6))
             drop-shadow(0 0 35px rgba(255, 69, 0, 0.3));
     animation: horseBreath 3s ease-in-out infinite;
-    margin-bottom: -0.5rem;
+    margin: 0;
+    z-index: 1;
 }
 
-@keyframes horseBreath {
-    0%, 100% { filter: drop-shadow(0 0 15px rgba(255, 165, 0, 0.6)) drop-shadow(0 0 35px rgba(255, 69, 0, 0.3)); }
-    50% { filter: drop-shadow(0 0 25px rgba(255, 215, 0, 0.8)) drop-shadow(0 0 50px rgba(255, 69, 0, 0.5)); }
-}
+/* ... existing keyframes ... */
 
-.countdown-unit {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: clamp(48px, 14vw, 80px);
-}
-
-.countdown-number {
-    font-family: 'Times New Roman', 'Georgia', serif;
-    font-size: clamp(2.4rem, 10vw, 4.5rem);
-    font-weight: 700;
-    color: #FFD700;
-    line-height: 1;
-    text-shadow:
-        0 0 30px rgba(255, 215, 0, 0.7),
-        0 0 60px rgba(255, 69, 0, 0.4),
-        0 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-.countdown-label {
-    font-family: 'Courier New', monospace;
-    font-size: clamp(0.55rem, 1.8vw, 0.75rem);
-    color: rgba(255, 215, 0, 0.7);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-top: 2px;
-}
-
-.countdown-separator {
-    font-family: 'Times New Roman', serif;
-    font-size: clamp(1.6rem, 6vw, 3rem);
-    color: rgba(255, 215, 0, 0.5);
-    line-height: 1;
-    align-self: flex-start;
-    padding-top: clamp(4px, 1.5vw, 10px);
-}
+/* ... existing countdown styles ... */
 
 /* Label area */
 .cny-label {
     color: #FFD700;
     text-align: center;
     text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+    position: relative;
+    z-index: 2;
+}
+
+#cny-label-bottom {
+    position: absolute;
+    bottom: 5vh;
+    width: 100%;
 }
 
 .cny-label-en {
-    font-family: 'Courier New', monospace;
-    font-size: clamp(1.6rem, 7vw, 3rem);
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    margin-bottom: 10px;
-    text-shadow: 0 0 16px rgba(255, 215, 0, 0.6), 0 0 6px rgba(255, 69, 0, 0.3);
+/* ... */
 }
 
-.cny-label-highlight {
-    color: #fff;
-    text-shadow: 0 0 20px rgba(255, 100, 0, 0.8), 0 0 40px rgba(255, 69, 0, 0.5), 0 0 8px rgba(255, 215, 0, 0.9);
-}
-
-.cny-label-cn {
-    display: block;
-    text-align: center;
-}
-
-.cny-label-char {
-    font-family: 'Noto Serif TC', serif;
-    font-size: clamp(1.6rem, 5.5vw, 2.4rem);
-    font-weight: 700;
-    display: block;
-}
-
-.cny-label-date {
-    font-family: 'Courier New', monospace;
-    font-size: clamp(0.8rem, 2.5vw, 1.1rem);
-    opacity: 0.7;
-    letter-spacing: 2px;
-    display: block;
-    margin-top: 4px;
-}
+/* ... */
 
 /* Swipe-up hint on welcome page */
 .start-swipe-hint {
+    position: absolute;
+    top: 78%;
+    left: 0;
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -188,7 +125,8 @@ body {
     animation: swipeHintPulse 2.5s ease-in-out infinite, swipeHintHop 3s ease-in-out infinite;
     cursor: pointer;
     user-select: none;
-    margin-top: 1rem;
+    margin: 0;
+    z-index: 2;
 }
 
 .swipe-arrow {
@@ -2773,6 +2711,40 @@ canvas#c {
     width: min(420px, 92vw);
 }
 
+.promo-code-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+#promo-code {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 14px;
+    box-sizing: border-box;
+    outline: none;
+}
+
+#promo-code::placeholder {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+#promo-code:focus {
+    border-color: rgba(255, 215, 0, 0.6);
+}
+
+#btn-apply-promo {
+    width: 100%;
+    min-width: 0;
+    margin-bottom: 0;
+}
+
 #payment-element {
     margin-bottom: 16px;
     min-height: 100px;
@@ -3230,4 +3202,3 @@ canvas#c {
     margin-top: 2px;
     max-width: 220px;
 }
-

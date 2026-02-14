@@ -5363,7 +5363,8 @@ function initFlameEffect() {
 function initStartOverlay() {
     const overlay = document.getElementById('start-overlay');
     const countdownEl = document.getElementById('cny-countdown');
-    const labelEl = document.getElementById('cny-label');
+    const labelTopEl = document.getElementById('cny-label-top');
+    const labelBottomEl = document.getElementById('cny-label-bottom');
 
     if (!overlay) return;
 
@@ -5683,8 +5684,9 @@ function initStartOverlay() {
                 <div class="countdown-unit"><span class="countdown-number">${pad(mins)}</span><span class="countdown-label">MIN</span></div>
                 <span class="countdown-separator">:</span>
                 <div class="countdown-unit"><span class="countdown-number">${pad(secs)}</span><span class="countdown-label">SEC</span></div>`;
-            labelEl.innerHTML = `
-                <div class="cny-label-en">UNTIL YEAR OF THE <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>
+            labelTopEl.innerHTML = `
+                <div class="cny-label-en">UNTIL YEAR OF THE <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>`;
+            labelBottomEl.innerHTML = `
                 <div class="cny-label-cn">
                     <span class="cny-label-char">${escapeHtml(zodiac.ganZhi)}</span>
                     <span class="cny-label-date">${escapeHtml(dateStr)}</span>
@@ -5707,8 +5709,9 @@ function initStartOverlay() {
             
             countdownEl.innerHTML = `
                 <div class="countdown-unit"><span class="countdown-number">${days}</span><span class="countdown-label">DAYS AGO</span></div>`;
-            labelEl.innerHTML = `
-                <div class="cny-label-en">SINCE YEAR OF THE <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>
+            labelTopEl.innerHTML = `
+                <div class="cny-label-en">SINCE YEAR OF THE <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>`;
+            labelBottomEl.innerHTML = `
                 <div class="cny-label-cn">
                     <span class="cny-label-char">${escapeHtml(zodiac.ganZhi)}</span>
                     <span class="cny-label-date">${escapeHtml(dateStr)}</span>
