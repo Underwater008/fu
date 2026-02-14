@@ -11,27 +11,6 @@ const DRAW_BUNDLES = [
 
 export { DRAW_BUNDLES };
 
-let stripe = null;
-
-async function getStripe() {
-  if (stripe) return stripe;
-  if (!CONFIG.stripe.publishableKey) {
-    // No Stripe key configured
-    return null;
-  }
-  // Load Stripe.js
-  if (!window.Stripe) {
-    await new Promise((resolve) => {
-      const script = document.createElement('script');
-      script.src = 'https://js.stripe.com/v3/';
-      script.onload = resolve;
-      document.head.appendChild(script);
-    });
-  }
-  stripe = window.Stripe(CONFIG.stripe.publishableKey);
-  return stripe;
-}
-
 export async function purchaseDraws(bundleId) {
   const user = getUser();
   if (!user) throw new Error('Not logged in');
@@ -41,7 +20,6 @@ export async function purchaseDraws(bundleId) {
 
   // Dev mode: simulate purchase
   if (!CONFIG.isProd) {
-    // Dev mode: simulate purchase
     await updateDraws(bundle.draws);
     await storage.addTransaction(user.id, {
       type: 'stripe',
@@ -51,25 +29,24 @@ export async function purchaseDraws(bundleId) {
     return { success: true, draws: bundle.draws };
   }
 
-  if (!CONFIG.stripe.publishableKey) {
-    throw new Error('Stripe is not configured');
+  // Prod: create checkout session server-side, then redirect
+  const res = await fetch('/api/create-checkout-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      bundleId: bundle.id,
+      userId: user.id,
+      origin: window.location.origin,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to create checkout session');
   }
 
-  // Prod: redirect to Stripe Checkout
-  const stripeInstance = await getStripe();
-  if (!stripeInstance) throw new Error('Stripe not available');
-
-  const priceId = CONFIG.stripe.prices[bundle.priceKey];
-  if (!priceId) throw new Error('Price not configured');
-
-  const { error } = await stripeInstance.redirectToCheckout({
-    lineItems: [{ price: priceId, quantity: 1 }],
-    mode: 'payment',
-    successUrl: `${window.location.origin}${window.location.pathname}?payment=success&bundle=${bundleId}`,
-    cancelUrl: `${window.location.origin}${window.location.pathname}?payment=cancel`,
-    clientReferenceId: user.id,
-  });
-  if (error) throw error;
+  const { url } = await res.json();
+  window.location.href = url;
 }
 
 // Handle return from Stripe Checkout.
