@@ -329,7 +329,7 @@ body {
 }
 
 .start-seal-link {
-    width: clamp(28px, 5vw, 40px);
+    width: clamp(20px, 3.5vw, 28px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -492,6 +492,15 @@ body {
 }
 .mute-btn.muted .icon-muted {
     display: block;
+}
+
+@media (orientation: landscape) {
+    .mute-btn {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        z-index: 15;
+    }
 }
 
 canvas#c {
@@ -2955,6 +2964,8 @@ canvas#c {
 /* --- Payment Modal --- */
 .payment-modal-card {
     width: min(420px, 92vw);
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .promo-code-row {
