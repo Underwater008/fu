@@ -148,7 +148,7 @@ function wireAuthButtons() {
 }
 
 // --- Draw Counter (opens rewards panel on click) ---
-function openRewardsPanel() {
+export function openRewardsPanel() {
   const panel = document.getElementById('rewards-panel');
   const backdrop = document.getElementById('rewards-panel-backdrop');
   if (panel) panel.style.display = 'flex';

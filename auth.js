@@ -178,12 +178,7 @@ async function prodRestore() {
     notifyListeners();
     return profile;
   }
-  // No session — allow exactly one anonymous bootstrap per browser install in prod.
-  if (localStorage.getItem(LS_ANON_BOOTSTRAPPED) === '1') {
-    currentUser = null;
-    notifyListeners();
-    return null;
-  }
+  // No session — create anonymous session
   return prodCreateAnonymous();
 }
 

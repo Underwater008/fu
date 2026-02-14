@@ -300,13 +300,26 @@ SET search_path = public;
 -- LOW: Add CHECK constraints on economy columns
 -- ============================================================
 
-ALTER TABLE profiles
-  ADD CONSTRAINT IF NOT EXISTS chk_draws_remaining CHECK (draws_remaining >= 0),
-  ADD CONSTRAINT IF NOT EXISTS chk_total_draws CHECK (total_draws >= 0),
-  ADD CONSTRAINT IF NOT EXISTS chk_pity_counter CHECK (pity_counter >= 0),
-  ADD CONSTRAINT IF NOT EXISTS chk_login_streak CHECK (login_streak >= 0 AND login_streak <= 7),
-  ADD CONSTRAINT IF NOT EXISTS chk_referral_count CHECK (referral_count >= 0),
-  ADD CONSTRAINT IF NOT EXISTS chk_ad_draws_today CHECK (ad_draws_today >= 0);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_draws_remaining') THEN
+    ALTER TABLE profiles ADD CONSTRAINT chk_draws_remaining CHECK (draws_remaining >= 0);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_total_draws') THEN
+    ALTER TABLE profiles ADD CONSTRAINT chk_total_draws CHECK (total_draws >= 0);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_pity_counter') THEN
+    ALTER TABLE profiles ADD CONSTRAINT chk_pity_counter CHECK (pity_counter >= 0);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_login_streak') THEN
+    ALTER TABLE profiles ADD CONSTRAINT chk_login_streak CHECK (login_streak >= 0 AND login_streak <= 7);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_referral_count') THEN
+    ALTER TABLE profiles ADD CONSTRAINT chk_referral_count CHECK (referral_count >= 0);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_ad_draws_today') THEN
+    ALTER TABLE profiles ADD CONSTRAINT chk_ad_draws_today CHECK (ad_draws_today >= 0);
+  END IF;
+END $$;
 
 -- ============================================================
 -- Update REVOKE/GRANT for new function signatures

@@ -25,7 +25,7 @@ import { claimDailyLogin, getPityCounter, incrementPity, resetPity, setPityCount
 import { initAds } from './ads.js';
 import { getPaymentResult } from './payments.js';
 import { claimGift, getGiftTokenFromUrl, returnExpiredGifts } from './gifting.js';
-import { initMonetizationUI, setCurrentDrawResult, showSingleFortuneActions, hideSingleFortuneActions, showMultiShareButton, hideMultiShareButton, setDetailDraw } from './monetization-ui.js';
+import { initMonetizationUI, openRewardsPanel, setCurrentDrawResult, showSingleFortuneActions, hideSingleFortuneActions, showMultiShareButton, hideMultiShareButton, setDetailDraw } from './monetization-ui.js';
 import { loadCollection } from './gacha.js';
 // --- HTML escape helper (prevent XSS in innerHTML) ---
 function escapeHtml(str) {
@@ -5276,10 +5276,9 @@ function getZodiac(year) {
     return { ...animal, ganZhi, element };
 }
 
-// Rewards panel opener (implemented in monetization-ui.js)
+// Rewards panel opener — delegates to monetization-ui.js (shows panel + backdrop)
 function showRewardsPanel() {
-    const panel = document.getElementById('rewards-panel');
-    if (panel) panel.style.display = 'flex';
+    openRewardsPanel();
 }
 
 // ============================================================
@@ -5378,13 +5377,18 @@ function frame(now) {
 // --- Monetization init ---
 (async () => {
   initAds();
-  await restoreSession();
+
+  try {
+    await restoreSession();
+  } catch (e) {
+    console.warn('Session restore failed:', e);
+  }
 
   // Handle gift claim from URL
   const giftToken = getGiftTokenFromUrl();
   if (giftToken) {
     try {
-      const gift = await claimGift(giftToken);
+      await claimGift(giftToken);
     } catch (e) {
       // gift claim failed — user will see the normal UI state
     }
@@ -5396,15 +5400,22 @@ function frame(now) {
     // payment success handled by Stripe webhook in production
   }
 
-  // Return expired gifts (dev mode)
-  await returnExpiredGifts();
+  try {
+    // Return expired gifts (dev mode)
+    await returnExpiredGifts();
+  } catch (e) {
+    console.warn('Return expired gifts failed:', e);
+  }
 
-  // Daily login check
-  const loginReward = await claimDailyLogin();
-  if (loginReward) {
+  try {
+    // Daily login check
+    await claimDailyLogin();
+  } catch (e) {
+    console.warn('Daily login claim failed:', e);
   }
 
   // Initialize monetization UI (auth bar, rewards panel, etc.)
+  // This must always run so buttons and click handlers are wired up.
   initMonetizationUI();
 
   // Listen for auth changes to update UI
