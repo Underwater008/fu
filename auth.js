@@ -129,6 +129,18 @@ async function prodSendMagicLink(email) {
 
 async function prodCreateAnonymous() {
   const sb = await getSupabaseClient();
+  // Reuse existing session if available (prevents duplicate signups on reload)
+  const { data: existing } = await sb.auth.getSession();
+  if (existing?.session?.user) {
+    const userId = existing.session.user.id;
+    let profile = await storage.getProfile(userId);
+    if (profile) {
+      currentUser = profile;
+      notifyListeners();
+      return profile;
+    }
+    // Session exists but no profile — fall through to create profile below
+  }
   const { data, error } = await sb.auth.signInAnonymously();
   if (error) throw error;
   const userId = data.user.id;
@@ -180,11 +192,17 @@ async function prodRestore() {
         }
       },
     );
-    setTimeout(() => {
+    setTimeout(async () => {
       if (!settled) {
         settled = true;
         subscription.unsubscribe();
-        resolve(null);
+        // Fallback: try getSession() directly (session may exist even if event didn't fire)
+        try {
+          const { data } = await sb.auth.getSession();
+          resolve(data?.session ?? null);
+        } catch {
+          resolve(null);
+        }
       }
     }, 5000);
   });
