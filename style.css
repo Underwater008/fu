@@ -55,15 +55,14 @@ body {
     border-radius: 0;
     overflow: hidden;
 
-    /* 9-slice frame: corners fixed, middle stretches vertically only.
-       Source: 1408×887. Slice: top 250, side 200, bottom 150.
-       All border-image-width in vw to keep corner aspect ratio = 250:200 = 1.25 */
+    /* 9-slice frame: temporarily disabled
     border: solid;
     border-image-source: url("./image/chinese-frame-tight.png");
     border-image-slice: 250 200 150 200;
     border-image-width: 22.5vw 18vw 13.5vw 18vw;
     border-image-repeat: stretch;
     border-image-outset: 0;
+    */
 }
 
 /* Desktop: hide Chinese frame */
@@ -177,34 +176,56 @@ body {
     margin-top: 4px;
 }
 
-.btn-enter {
-    margin-top: 1.2rem;
-    padding: 16px 52px;
-    background: rgba(0, 0, 0, 0.25);
-    border: 2px solid rgba(255, 215, 0, 0.7);
+/* Swipe-up hint on welcome page */
+.start-swipe-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     color: #FFD700;
     font-family: 'Courier New', monospace;
-    font-size: clamp(1.1rem, 3.5vw, 1.4rem);
-    font-weight: bold;
+    text-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+    animation: swipeHintPulse 2.5s ease-in-out infinite, swipeHintHop 3s ease-in-out infinite;
     cursor: pointer;
-    transition: all 0.3s ease;
-    letter-spacing: 4px;
+    user-select: none;
+    margin-top: 1rem;
+}
+
+.swipe-arrow {
+    font-size: clamp(1.4rem, 5vw, 2rem);
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+    vertical-align: middle;
     position: relative;
-    overflow: hidden;
-    text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.15), inset 0 0 15px rgba(255, 215, 0, 0.05);
+    top: -0.1em;
 }
 
-.btn-enter:hover {
-    background: rgba(255, 215, 0, 0.15);
-    box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
-    border-color: #FFD700;
-    transform: scale(1.02);
+.swipe-text-en {
+    font-size: clamp(0.9rem, 3vw, 1.2rem);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-weight: bold;
 }
 
-.btn-enter:active {
-    transform: scale(0.96);
+.swipe-text-cn {
+    display: none;
 }
+
+@keyframes swipeHintPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+@keyframes swipeHintHop {
+    0%, 100% { transform: translateY(0); }
+    15% { transform: translateY(-6px); }
+    30% { transform: translateY(0); }
+    45% { transform: translateY(-4px); }
+    60% { transform: translateY(0); }
+}
+
+
 
 .start-seal-row {
     position: absolute;
