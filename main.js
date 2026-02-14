@@ -5688,11 +5688,19 @@ function frame(now) {
     console.warn('Session restore failed:', e);
   }
 
-  // Handle referral from ?ref= parameter — create account + apply referral immediately
+  // Always create anonymous user on page load if none exists
+  if (!getUser()) {
+    try {
+      await ensureUser();
+    } catch (e) {
+      console.warn('Anonymous user creation failed:', e);
+    }
+  }
+
+  // Handle referral from ?ref= parameter
   const referralCode = getReferralFromUrl();
   if (referralCode) {
     try {
-      await ensureUser();
       await applyReferral(referralCode);
     } catch (e) {
       console.warn('Referral failed:', e);

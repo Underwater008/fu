@@ -1,13 +1,13 @@
-// api/create-checkout-session.js — Creates a Stripe Checkout Session server-side
+// api/create-checkout-session.js — Creates a Stripe PaymentIntent for embedded payment
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Map bundle IDs to price IDs and draw counts
+// Map bundle IDs to amounts (cents) and draw counts
 const BUNDLES = {
-  draws10:  { priceId: process.env.VITE_STRIPE_PRICE_10,  draws: 10 },
-  draws60:  { priceId: process.env.VITE_STRIPE_PRICE_60,  draws: 60 },
-  draws130: { priceId: process.env.VITE_STRIPE_PRICE_130, draws: 130 },
+  draws10:  { amount: 99,  draws: 10 },
+  draws60:  { amount: 499, draws: 60 },
+  draws130: { amount: 999, draws: 130 },
 };
 
 export default async function handler(req, res) {
@@ -16,30 +16,28 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { bundleId, userId, origin } = req.body || {};
+  const { bundleId, userId } = req.body || {};
 
-  if (!bundleId || !userId || !origin) {
-    return res.status(400).json({ error: 'Missing bundleId, userId, or origin' });
+  if (!bundleId || !userId) {
+    return res.status(400).json({ error: 'Missing bundleId or userId' });
   }
 
   const bundle = BUNDLES[bundleId];
-  if (!bundle || !bundle.priceId) {
+  if (!bundle) {
     return res.status(400).json({ error: 'Invalid bundle' });
   }
 
   try {
-    const session = await stripe.checkout.sessions.create({
-      line_items: [{ price: bundle.priceId, quantity: 1 }],
-      mode: 'payment',
-      success_url: `${origin}?payment=success&bundle=${bundleId}`,
-      cancel_url: `${origin}?payment=cancel`,
-      client_reference_id: userId,
-      metadata: { bundleId, draws: String(bundle.draws) },
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: bundle.amount,
+      currency: 'usd',
+      metadata: { bundleId, draws: String(bundle.draws), userId },
+      automatic_payment_methods: { enabled: true },
     });
 
-    return res.status(200).json({ url: session.url });
+    return res.status(200).json({ clientSecret: paymentIntent.client_secret });
   } catch (err) {
-    console.error('Failed to create checkout session:', err);
+    console.error('Failed to create payment intent:', err);
     return res.status(500).json({ error: err.message });
   }
 }

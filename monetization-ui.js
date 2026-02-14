@@ -405,9 +405,9 @@ function renderPurchaseBundles() {
           }, 2000);
         }
       } catch (e) {
+        console.error('[purchase] failed:', e);
         btn.querySelector('.purchase-price').textContent = bundle.price;
         btn.disabled = false;
-        // purchase failed — user sees the price restored
       }
     });
     container.appendChild(btn);

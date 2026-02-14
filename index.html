@@ -32,6 +32,18 @@
         </div>
     </div>
 
+    <!-- Payment modal (Stripe Elements) -->
+    <div id="payment-modal" class="modal-overlay" style="display:none">
+        <div class="modal-card payment-modal-card">
+            <h2 id="payment-title">Buy Draws</h2>
+            <p id="payment-desc"></p>
+            <div id="payment-element"></div>
+            <p id="payment-status" class="payment-status"></p>
+            <button id="btn-pay" class="btn-action btn-primary" disabled>Pay</button>
+            <button id="btn-close-payment" class="btn-action btn-secondary">Cancel</button>
+        </div>
+    </div>
+
     <!-- Rewards panel (slide-up drawer) -->
     <div id="rewards-panel-backdrop" class="rewards-backdrop" style="display:none"></div>
     <div id="rewards-panel" class="rewards-panel" style="display:none">
