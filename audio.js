@@ -138,15 +138,19 @@ function playBoth() {
     // Stop any existing sources first to avoid overlap
     stopSources();
     
-    // Create new sources
+    // Create new sources — loop both at the shorter duration to stay in sync
+    const loopEnd = Math.min(instBuffer.duration, vocalBuffer.duration);
+
     instSource = audioCtx.createBufferSource();
     instSource.buffer = instBuffer;
     instSource.loop = true;
+    instSource.loopEnd = loopEnd;
     instSource.connect(instGain);
-    
+
     vocalSource = audioCtx.createBufferSource();
     vocalSource.buffer = vocalBuffer;
     vocalSource.loop = true;
+    vocalSource.loopEnd = loopEnd;
     vocalSource.connect(vocalGain);
     
     // Start perfectly synced

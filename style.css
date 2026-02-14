@@ -2000,7 +2000,7 @@ canvas#c {
     }
     .detail-character {
         font-size: 5.5rem;
-        margin: 12px 0 10px;
+        margin: 20px 0 10px;
     }
     .detail-phrase {
         font-size: 1.1rem;
@@ -2024,14 +2024,14 @@ canvas#c {
 @media (max-height: 650px) {
     .detail-character {
         font-size: 5rem;
-        margin: 8px 0 8px;
+        margin: 16px 0 8px;
     }
     .detail-card {
         padding: 48px 36px 40px;
     }
     .detail-stars {
         font-size: 1.1rem;
-        margin-bottom: 6px;
+        margin-bottom: 8px;
     }
     .detail-phrase {
         font-size: 1rem;
