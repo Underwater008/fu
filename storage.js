@@ -1,5 +1,6 @@
 // storage.js — Dual storage abstraction (localStorage dev / Supabase prod)
 import { CONFIG } from './config.js';
+import { getSupabaseClient } from './supabase-client.js';
 
 // ---- localStorage backend ----
 const LS_KEYS = {
@@ -70,28 +71,19 @@ const localBackend = {
 };
 
 // ---- Supabase backend ----
-let supabase = null;
-
-async function getSupabase() {
-  if (supabase) return supabase;
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-  supabase = createClient(CONFIG.supabase.url, CONFIG.supabase.anonKey);
-  return supabase;
-}
-
 const supabaseBackend = {
   async getProfile(userId) {
-    const sb = await getSupabase();
+    const sb = await getSupabaseClient();
     const { data } = await sb.from('profiles').select('*').eq('id', userId).single();
     return data;
   },
   async upsertProfile(profile) {
-    const sb = await getSupabase();
+    const sb = await getSupabaseClient();
     const { data } = await sb.from('profiles').upsert(profile).select().single();
     return data;
   },
   async getCollection(userId) {
-    const sb = await getSupabase();
+    const sb = await getSupabaseClient();
     const { data } = await sb.from('collections').select('*').eq('user_id', userId);
     const coll = {};
     for (const row of (data || [])) {
@@ -100,28 +92,29 @@ const supabaseBackend = {
     return coll;
   },
   async upsertCollectionItem(userId, char, itemData) {
-    const sb = await getSupabase();
+    const sb = await getSupabaseClient();
     const { data } = await sb.from('collections')
       .upsert({ user_id: userId, character: char, ...itemData }, { onConflict: 'user_id,character' })
       .select().single();
     return data;
   },
   async addTransaction(userId, tx) {
-    const sb = await getSupabase();
+    const sb = await getSupabaseClient();
     await sb.from('transactions').insert({ user_id: userId, ...tx });
   },
   async createGift(gift) {
-    const sb = await getSupabase();
+    const sb = await getSupabaseClient();
     const { data } = await sb.from('gifts').insert(gift).select().single();
     return data;
   },
   async getGiftByToken(token) {
-    const sb = await getSupabase();
-    const { data } = await sb.from('gifts').select('*').eq('token', token).single();
+    const sb = await getSupabaseClient();
+    // Uses SECURITY DEFINER function to bypass restricted SELECT RLS
+    const { data } = await sb.rpc('get_gift_by_token', { p_token: token });
     return data;
   },
   async claimGift(token, claimerId) {
-    const sb = await getSupabase();
+    const sb = await getSupabaseClient();
     const { data } = await sb.from('gifts')
       .update({ claimed_by: claimerId, claimed_at: new Date().toISOString() })
       .eq('token', token).is('claimed_by', null)

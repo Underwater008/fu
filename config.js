@@ -22,6 +22,7 @@ export const CONFIG = {
   },
   rewards: {
     welcomeDraws: 10,
+    anonymousWelcomeDraws: 15,
     shareDraws: 10,
     shareCooldownMs: 15 * 60 * 1000, // 15 minutes
     firstReferralDraws: 30,

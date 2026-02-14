@@ -1,7 +1,7 @@
 // gifting.js — Send duplicate characters to friends via 24h expiry links
 import { CONFIG } from './config.js';
 import { storage } from './storage.js';
-import { getUser } from './auth.js';
+import { getUser, isAnonymous } from './auth.js';
 
 export async function createGift(character, rarity, categoryName) {
   const user = getUser();
@@ -41,14 +41,16 @@ export async function createGift(character, rarity, categoryName) {
 export async function claimGift(token) {
   const user = getUser();
   if (!user) throw new Error('Not logged in');
+  if (isAnonymous()) throw new Error('Sign up to claim gifts');
 
   const gift = await storage.getGiftByToken(token);
   if (!gift) throw new Error('Gift not found');
   if (gift.claimed_by) throw new Error('Already claimed');
   if (new Date(gift.expires_at) < new Date()) throw new Error('Gift expired');
 
-  // Claim it
-  await storage.claimGift(token, user.id);
+  // Claim it — check return value to guard against race conditions
+  const claimed = await storage.claimGift(token, user.id);
+  if (!claimed) throw new Error('Gift already claimed or expired');
 
   // Add to claimer's collection
   const collection = await storage.getCollection(user.id);

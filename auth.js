@@ -1,9 +1,12 @@
 // auth.js — Magic link email auth (Supabase prod / mock localStorage dev)
+// Supports anonymous users: every visitor gets a UUID on first visit.
 import { CONFIG } from './config.js';
 import { storage } from './storage.js';
+import { getSupabaseClient } from './supabase-client.js';
 
 let currentUser = null;
 let authListeners = [];
+const LS_ANON_BOOTSTRAPPED = 'fu_anon_bootstrapped';
 
 export function onAuthChange(callback) {
   authListeners.push(callback);
@@ -18,94 +21,174 @@ export function getUser() {
   return currentUser;
 }
 
+export function isAnonymous() {
+  return currentUser?.is_anonymous === true;
+}
+
+export function applyProfilePatch(patch, shouldNotify = true) {
+  if (!patch) return currentUser;
+  currentUser = { ...(currentUser || {}), ...patch };
+  if (shouldNotify) notifyListeners();
+  return currentUser;
+}
+
+// --- Shared profile template ---
+function createDefaultProfile(userId, email, isAnonymous = false) {
+  return {
+    id: userId,
+    email: email || null,
+    display_name: email ? email.split('@')[0] : 'Guest',
+    draws_remaining: isAnonymous ? CONFIG.rewards.anonymousWelcomeDraws : CONFIG.rewards.welcomeDraws,
+    total_draws: 0,
+    pity_counter: 0,
+    login_streak: 0,
+    last_login_date: null,
+    last_share_time: null,
+    referral_code: crypto.randomUUID().replace(/-/g, '').slice(0, 12),
+    referred_by: null,
+    referral_count: 0,
+    ad_draws_today: 0,
+    ad_draws_date: null,
+    is_anonymous: isAnonymous,
+    created_at: new Date().toISOString(),
+  };
+}
+
 // --- Dev mode (localStorage) ---
 async function devLogin(email) {
   const userId = 'local-' + btoa(email).slice(0, 12);
   let profile = await storage.getProfile(userId);
   if (!profile) {
-    profile = {
-      id: userId,
-      email,
-      display_name: email.split('@')[0],
-      draws_remaining: CONFIG.rewards.welcomeDraws,
-      total_draws: 0,
-      pity_counter: 0,
-      login_streak: 0,
-      last_login_date: null,
-      last_share_time: null,
-      referral_code: crypto.randomUUID().slice(0, 8),
-      referred_by: null,
-      referral_count: 0,
-      ad_draws_today: 0,
-      ad_draws_date: null,
-      created_at: new Date().toISOString(),
-    };
+    profile = createDefaultProfile(userId, email, false);
     await storage.upsertProfile(profile);
     await storage.addTransaction(userId, { type: 'welcome', draws_granted: CONFIG.rewards.welcomeDraws });
   }
   currentUser = profile;
   localStorage.setItem('fu_auth_email', email);
+  localStorage.removeItem('fu_anon_id');
   notifyListeners();
   return profile;
+}
+
+async function devCreateAnonymous() {
+  const anonId = 'anon-' + crypto.randomUUID().slice(0, 12);
+  const profile = createDefaultProfile(anonId, null, true);
+  await storage.upsertProfile(profile);
+  await storage.addTransaction(anonId, { type: 'welcome', draws_granted: CONFIG.rewards.anonymousWelcomeDraws });
+  currentUser = profile;
+  localStorage.setItem('fu_anon_id', anonId);
+  notifyListeners();
+  return profile;
+}
+
+async function devLinkAnonymous(email) {
+  if (!currentUser) throw new Error('No anonymous user to link');
+  currentUser.email = email;
+  currentUser.display_name = email.split('@')[0];
+  currentUser.is_anonymous = false;
+  await storage.upsertProfile(currentUser);
+  localStorage.removeItem('fu_anon_id');
+  localStorage.setItem('fu_auth_email', email);
+  notifyListeners();
+  return currentUser;
 }
 
 function devLogout() {
   currentUser = null;
   localStorage.removeItem('fu_auth_email');
+  localStorage.removeItem('fu_anon_id');
   notifyListeners();
+  // Immediately create fresh anonymous session
+  devCreateAnonymous();
 }
 
 async function devRestore() {
+  // Try email session first
   const email = localStorage.getItem('fu_auth_email');
   if (email) return devLogin(email);
-  return null;
+  // Try restoring anonymous session
+  const anonId = localStorage.getItem('fu_anon_id');
+  if (anonId) {
+    const profile = await storage.getProfile(anonId);
+    if (profile) {
+      currentUser = profile;
+      notifyListeners();
+      return profile;
+    }
+  }
+  // No session — create anonymous user
+  return devCreateAnonymous();
 }
 
 // --- Prod mode (Supabase) ---
 async function prodSendMagicLink(email) {
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-  const sb = createClient(CONFIG.supabase.url, CONFIG.supabase.anonKey);
+  const sb = await getSupabaseClient();
   const { error } = await sb.auth.signInWithOtp({ email });
   if (error) throw error;
 }
 
+async function prodCreateAnonymous() {
+  const sb = await getSupabaseClient();
+  const { data, error } = await sb.auth.signInAnonymously();
+  if (error) throw error;
+  const userId = data.user.id;
+  let profile = await storage.getProfile(userId);
+  if (!profile) {
+    profile = createDefaultProfile(userId, null, true);
+    await storage.upsertProfile(profile);
+    await storage.addTransaction(userId, { type: 'welcome', draws_granted: CONFIG.rewards.anonymousWelcomeDraws });
+  }
+  currentUser = profile;
+  localStorage.setItem(LS_ANON_BOOTSTRAPPED, '1');
+  notifyListeners();
+  return profile;
+}
+
+async function prodLinkAnonymous(email) {
+  const sb = await getSupabaseClient();
+  // Supabase preserves the same UUID when linking anonymous → email
+  const { error } = await sb.auth.updateUser({ email });
+  if (error) throw error;
+  currentUser.email = email;
+  currentUser.display_name = email.split('@')[0];
+  currentUser.is_anonymous = false;
+  await storage.upsertProfile(currentUser);
+  notifyListeners();
+  return currentUser;
+}
+
 async function prodRestore() {
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-  const sb = createClient(CONFIG.supabase.url, CONFIG.supabase.anonKey);
+  const sb = await getSupabaseClient();
   const { data: { session } } = await sb.auth.getSession();
   if (session?.user) {
     let profile = await storage.getProfile(session.user.id);
     if (!profile) {
-      profile = {
-        id: session.user.id,
-        email: session.user.email,
-        display_name: session.user.email.split('@')[0],
-        draws_remaining: CONFIG.rewards.welcomeDraws,
-        total_draws: 0,
-        pity_counter: 0,
-        login_streak: 0,
-        last_login_date: null,
-        last_share_time: null,
-        referral_code: crypto.randomUUID().slice(0, 8),
-        referred_by: null,
-        referral_count: 0,
-        ad_draws_today: 0,
-        ad_draws_date: null,
-        created_at: new Date().toISOString(),
-      };
+      const isAnon = session.user.is_anonymous || !session.user.email;
+      profile = createDefaultProfile(session.user.id, session.user.email, isAnon);
       await storage.upsertProfile(profile);
-      await storage.addTransaction(session.user.id, { type: 'welcome', draws_granted: CONFIG.rewards.welcomeDraws });
+      await storage.addTransaction(session.user.id, {
+        type: 'welcome',
+        draws_granted: isAnon ? CONFIG.rewards.anonymousWelcomeDraws : CONFIG.rewards.welcomeDraws,
+      });
     }
     currentUser = profile;
+    if (profile.is_anonymous) {
+      localStorage.setItem(LS_ANON_BOOTSTRAPPED, '1');
+    }
     notifyListeners();
     return profile;
   }
-  return null;
+  // No session — allow exactly one anonymous bootstrap per browser install in prod.
+  if (localStorage.getItem(LS_ANON_BOOTSTRAPPED) === '1') {
+    currentUser = null;
+    notifyListeners();
+    return null;
+  }
+  return prodCreateAnonymous();
 }
 
 async function prodLogout() {
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-  const sb = createClient(CONFIG.supabase.url, CONFIG.supabase.anonKey);
+  const sb = await getSupabaseClient();
   await sb.auth.signOut();
   currentUser = null;
   notifyListeners();
@@ -117,6 +200,14 @@ export async function sendMagicLink(email) {
     return devLogin(email); // instant login in dev
   }
   return prodSendMagicLink(email);
+}
+
+export async function linkAnonymousToEmail(email) {
+  if (!currentUser?.is_anonymous) {
+    return sendMagicLink(email);
+  }
+  if (!CONFIG.isProd) return devLinkAnonymous(email);
+  return prodLinkAnonymous(email);
 }
 
 export async function logout() {
@@ -139,7 +230,7 @@ export async function applyReferral(referralCode) {
   if (!currentUser || currentUser.referred_by) return;
   // Referral tracking is prod-only (Supabase) — in dev, just log it.
   if (!CONFIG.isProd) {
-    console.log('[dev] referral code applied:', referralCode);
+    // dev mode: referral code noted locally
     return;
   }
   // Prod: Supabase edge function or direct query handles referral credit
@@ -153,10 +244,60 @@ export async function refreshProfile() {
   return currentUser;
 }
 
-// Update draws_remaining locally and persist
-export async function updateDraws(delta) {
-  if (!currentUser) return;
-  currentUser.draws_remaining = Math.max(0, (currentUser.draws_remaining || 0) + delta);
+function isInsufficientDrawError(error) {
+  const message = (error?.message || '').toUpperCase();
+  return message.includes('INSUFFICIENT_DRAWS');
+}
+
+async function devSpendDraws(amount) {
+  if (!currentUser || amount <= 0) return false;
+  const current = currentUser.draws_remaining || 0;
+  if (current < amount) return false;
+
+  currentUser.draws_remaining = current - amount;
+  currentUser.total_draws = (currentUser.total_draws || 0) + amount;
   await storage.upsertProfile(currentUser);
   notifyListeners();
+  return true;
+}
+
+async function prodSpendDraws(amount) {
+  if (!currentUser || amount <= 0) return false;
+
+  const sb = await getSupabaseClient();
+  const { data, error } = await sb.rpc('spend_draws', { p_amount: amount });
+  if (error) {
+    if (isInsufficientDrawError(error)) return false;
+    throw error;
+  }
+
+  if (data) {
+    currentUser = Array.isArray(data) ? data[0] : data;
+    notifyListeners();
+  }
+  return true;
+}
+
+export async function spendDraws(amount) {
+  if (!currentUser || !Number.isFinite(amount) || amount <= 0) return false;
+  if (!CONFIG.isProd) return devSpendDraws(amount);
+  return prodSpendDraws(amount);
+}
+
+// Backward-compatible helper:
+// negative delta => secure spend path, positive delta => dev-only direct grant.
+export async function updateDraws(delta) {
+  if (!Number.isFinite(delta) || delta === 0) return currentUser;
+  if (delta < 0) {
+    const ok = await spendDraws(Math.abs(delta));
+    return ok ? currentUser : null;
+  }
+  if (!currentUser) return;
+  if (CONFIG.isProd) {
+    throw new Error('Direct draw grants are disabled in production');
+  }
+  currentUser.draws_remaining = Math.max(0, (currentUser.draws_remaining || 0) + Math.abs(delta));
+  await storage.upsertProfile(currentUser);
+  notifyListeners();
+  return currentUser;
 }

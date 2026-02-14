@@ -16,7 +16,7 @@ let stripe = null;
 async function getStripe() {
   if (stripe) return stripe;
   if (!CONFIG.stripe.publishableKey) {
-    console.log('[payments] No Stripe key configured');
+    // No Stripe key configured
     return null;
   }
   // Load Stripe.js
@@ -40,8 +40,8 @@ export async function purchaseDraws(bundleId) {
   if (!bundle) throw new Error('Invalid bundle');
 
   // Dev mode: simulate purchase
-  if (!CONFIG.isProd || !CONFIG.stripe.publishableKey) {
-    console.log(`[payments] Simulating purchase: ${bundle.label}`);
+  if (!CONFIG.isProd) {
+    // Dev mode: simulate purchase
     await updateDraws(bundle.draws);
     await storage.addTransaction(user.id, {
       type: 'stripe',
@@ -49,6 +49,10 @@ export async function purchaseDraws(bundleId) {
       stripe_session_id: 'dev-' + crypto.randomUUID().slice(0, 8),
     });
     return { success: true, draws: bundle.draws };
+  }
+
+  if (!CONFIG.stripe.publishableKey) {
+    throw new Error('Stripe is not configured');
   }
 
   // Prod: redirect to Stripe Checkout
@@ -68,7 +72,11 @@ export async function purchaseDraws(bundleId) {
   if (error) throw error;
 }
 
-// Handle return from Stripe Checkout
+// Handle return from Stripe Checkout.
+// SECURITY: This only reads URL params for UI feedback (e.g., showing a toast).
+// Draws must NEVER be credited here — fulfillment must happen server-side
+// via a Stripe webhook (checkout.session.completed) that verifies the session
+// and credits draws through a SECURITY DEFINER function.
 export function getPaymentResult() {
   const params = new URLSearchParams(window.location.search);
   const payment = params.get('payment');

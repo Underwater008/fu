@@ -2798,7 +2798,10 @@ canvas {
 
 /* --- Share Result Button (fortune screen) --- */
 .single-fortune-actions {
-    position: static;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 7%;
     display: none;
     align-items: center;
     justify-content: center;
@@ -2806,6 +2809,7 @@ canvas {
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.2s ease;
+    z-index: 15;
 }
 .single-fortune-actions.visible {
     display: flex;
