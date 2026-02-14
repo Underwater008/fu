@@ -5181,7 +5181,7 @@ function initFlameEffect() {
     function resize() {
         canvas.width = canvas.offsetWidth * devicePixelRatio;
         canvas.height = canvas.offsetHeight * devicePixelRatio;
-        ctx.scale(devicePixelRatio, devicePixelRatio);
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
     }
     resize();
     window.addEventListener('resize', resize);
@@ -5189,6 +5189,67 @@ function initFlameEffect() {
     const W = () => canvas.offsetWidth;
     const H = () => canvas.offsetHeight;
 
+    // --- Drifting lucky characters (same as main bg) ---
+    const bgChars = [];
+    const BG_COUNT = 35;
+    for (let i = 0; i < BG_COUNT; i++) {
+        bgChars.push({
+            x: Math.random(), y: Math.random(), // 0-1 normalized
+            vx: (Math.random() - 0.5) * 0.008,
+            vy: (Math.random() - 0.5) * 0.008,
+            char: ALL_LUCKY[Math.floor(Math.random() * ALL_LUCKY.length)],
+            alpha: 0.03 + Math.random() * 0.07,
+            phase: Math.random() * Math.PI * 2,
+            changeTimer: Math.random() * 200,
+            fontSize: 14 + Math.random() * 10,
+        });
+    }
+
+    function updateBgChars(time) {
+        for (const c of bgChars) {
+            c.x += c.vx * 0.016; // ~60fps normalized
+            c.y += c.vy * 0.016;
+            if (c.x < 0) c.x += 1; if (c.x > 1) c.x -= 1;
+            if (c.y < 0) c.y += 1; if (c.y > 1) c.y -= 1;
+            c.changeTimer--;
+            if (c.changeTimer <= 0) {
+                c.char = ALL_LUCKY[Math.floor(Math.random() * ALL_LUCKY.length)];
+                c.changeTimer = 100 + Math.random() * 200;
+            }
+        }
+    }
+
+    function drawBgChars(time) {
+        const w = W(), h = H();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (const c of bgChars) {
+            const flicker = c.alpha + Math.sin(c.phase + time * 1.5) * 0.02;
+            const a = Math.max(0.01, flicker);
+            ctx.font = `${c.fontSize}px ${chosenFont}, "Courier New", monospace`;
+            ctx.fillStyle = `rgba(255, 215, 0, ${a})`;
+            if (a > 0.05) {
+                ctx.shadowColor = `rgba(255, 215, 0, ${a * 0.6})`;
+                ctx.shadowBlur = c.fontSize * a * 1.2;
+            }
+            ctx.fillText(c.char, c.x * w, c.y * h);
+        }
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+    }
+
+    function drawScanlines() {
+        ctx.save();
+        ctx.globalAlpha = 0.03;
+        ctx.fillStyle = '#fff';
+        const w = W(), h = H();
+        for (let y = 0; y < h; y += 4) {
+            ctx.fillRect(0, y, w, 1);
+        }
+        ctx.restore();
+    }
+
+    // --- Flame particles ---
     const COLORS = [
         [255, 200, 50],   // bright gold
         [255, 140, 20],   // orange
@@ -5198,7 +5259,6 @@ function initFlameEffect() {
     ];
 
     function spawn() {
-        // Spawn from bottom area, rising up
         const x = Math.random() * W();
         const baseY = H() + 5;
         const color = COLORS[Math.floor(Math.random() * COLORS.length)];
@@ -5216,21 +5276,19 @@ function initFlameEffect() {
             if (p.life <= 0) { particles.splice(i, 1); continue; }
             p.x += p.vx * dt;
             p.y += p.vy * dt;
-            p.vx += (Math.random() - 0.5) * 50 * dt; // horizontal drift
-            p.vy -= 10 * dt; // slow down rise slightly
+            p.vx += (Math.random() - 0.5) * 50 * dt;
+            p.vy -= 10 * dt;
             p.flicker += dt * 8;
         }
     }
 
-    function draw() {
-        ctx.clearRect(0, 0, W(), H());
+    function drawFlames() {
         for (const p of particles) {
-            const t = p.life / p.maxLife; // 1→0
+            const t = p.life / p.maxLife;
             const alpha = t * (0.4 + 0.3 * Math.sin(p.flicker));
             const size = p.size * (0.5 + 0.5 * t);
             const [r, g, b] = p.color;
 
-            // Glow
             const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 3);
             grad.addColorStop(0, `rgba(${r},${g},${b},${alpha})`);
             grad.addColorStop(0.4, `rgba(${r},${g},${b},${alpha * 0.4})`);
@@ -5238,7 +5296,6 @@ function initFlameEffect() {
             ctx.fillStyle = grad;
             ctx.fillRect(p.x - size * 3, p.y - size * 3, size * 6, size * 6);
 
-            // Core
             ctx.beginPath();
             ctx.arc(p.x, p.y, size * 0.5, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(${Math.min(255, r + 50)},${Math.min(255, g + 50)},${b},${alpha * 1.2})`;
@@ -5247,17 +5304,28 @@ function initFlameEffect() {
     }
 
     let last = performance.now();
+    let elapsed = 0;
     function loop(now) {
         if (!running) return;
         const dt = Math.min((now - last) / 1000, 0.05);
         last = now;
+        elapsed += dt;
 
-        // Spawn 2-4 particles per frame
+        // Spawn 2-4 flame particles per frame
         const count = 2 + Math.floor(Math.random() * 3);
         for (let i = 0; i < count; i++) spawn();
 
         update(dt);
-        draw();
+        updateBgChars(elapsed);
+
+        // Draw layers: bg fill → drifting chars → scanlines → flames
+        ctx.clearRect(0, 0, W(), H());
+        ctx.fillStyle = '#990000';
+        ctx.fillRect(0, 0, W(), H());
+        drawBgChars(elapsed);
+        drawScanlines();
+        drawFlames();
+
         raf = requestAnimationFrame(loop);
     }
     raf = requestAnimationFrame(loop);
