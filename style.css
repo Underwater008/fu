@@ -279,7 +279,7 @@ canvas {
     right: 0;
     padding: 0 20px calc(20px + env(safe-area-inset-bottom)); /* Respect safe area */
     display: flex;
-    justify-content: flex-start;
+    justify-content: center;
     gap: 18px;
     align-items: center;
     z-index: 15;
@@ -293,7 +293,6 @@ canvas {
     display: flex;
     flex: 0 0 auto;
     min-width: 140px;
-    margin-left: auto;
     background: rgba(0, 0, 0, 0.3);
     border: 1.5px solid rgba(255, 215, 0, 0.4);
     border-radius: 24px;
@@ -2341,14 +2340,20 @@ canvas {
     transition-duration: 0.1s;
 }
 
-/* --- Floating Draw Counter (bottom, near controls) --- */
+/* --- Draw Counter (inline in bottom controls, left of toggle) --- */
 .draw-counter-float {
-    position: fixed;
-    bottom: 90px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 500;
-    pointer-events: none;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    transform: translateY(20px);
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+.draw-counter-float.visible {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
 }
 .btn-auth {
     background: linear-gradient(135deg,
@@ -2406,14 +2411,19 @@ canvas {
 
 /* --- Draw Counter Badge --- */
 .draw-counter {
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 180, 0, 0.1));
-    border: 1px solid rgba(255, 215, 0, 0.5);
+    background: rgba(0, 0, 0, 0.3);
+    border: 1.5px solid rgba(255, 215, 0, 0.4);
     color: #FFD700;
-    padding: 3px 10px;
-    border-radius: 12px;
-    font-size: 13px;
+    padding: 0 16px;
+    border-radius: 24px;
+    font-size: 15px;
     font-weight: 700;
     white-space: nowrap;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     animation: drawCounterPulse 2s ease-in-out infinite;
 }
 @keyframes drawCounterPulse {

@@ -4946,6 +4946,16 @@ function updateUIVisibility() {
         }
     }
 
+    // Draw counter: visible together with collection and toggle
+    const drawCounterFloat = document.getElementById('draw-counter-float');
+    if (drawCounterFloat) {
+        if (!collVisible && (state === 'arrival' || (state === 'fortune' && (!isMultiMode || allMultiRevealed)))) {
+            drawCounterFloat.classList.add('visible');
+        } else {
+            drawCounterFloat.classList.remove('visible');
+        }
+    }
+
     // Reveal All button: visible when multi-fortune cards are showing and not all revealed
     const btnRevealAll = document.getElementById('btn-reveal-all');
     if (btnRevealAll) {

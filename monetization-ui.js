@@ -19,6 +19,7 @@ export function setCurrentDrawResult(drawResult) {
 export function initMonetizationUI() {
   wireAuthButtons();
   wireRewardsPanel();
+  wireDrawCounter();
   wireShareButtons();
   wireDetailActions();
   renderPurchaseBundles();
@@ -47,9 +48,7 @@ function updateAuthUI(user) {
   if (drawCounter && user) {
     drawCounter.textContent = `🎫 ×${user.draws_remaining || 0}`;
   }
-  if (drawCounterFloat) {
-    drawCounterFloat.style.display = user ? '' : 'none';
-  }
+  // Visibility is controlled by .visible class in updateUIVisibility()
 
   if (user && !user.is_anonymous) {
     // Fully authenticated user
@@ -116,6 +115,18 @@ function wireAuthButtons() {
   if (btnLogout) {
     btnLogout.addEventListener('click', async () => {
       await logout();
+    });
+  }
+}
+
+// --- Draw Counter (opens rewards panel on click) ---
+function wireDrawCounter() {
+  const drawCounterFloat = document.getElementById('draw-counter-float');
+  if (drawCounterFloat) {
+    drawCounterFloat.style.cursor = 'pointer';
+    drawCounterFloat.addEventListener('click', () => {
+      const panel = document.getElementById('rewards-panel');
+      if (panel) panel.style.display = 'flex';
     });
   }
 }
