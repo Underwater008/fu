@@ -84,9 +84,47 @@ body {
     z-index: 1;
 }
 
-/* ... existing keyframes ... */
+@keyframes horseBreath {
+    0%, 100% { filter: drop-shadow(0 0 15px rgba(255, 165, 0, 0.6)) drop-shadow(0 0 35px rgba(255, 69, 0, 0.3)); }
+    50% { filter: drop-shadow(0 0 25px rgba(255, 215, 0, 0.8)) drop-shadow(0 0 50px rgba(255, 69, 0, 0.5)); }
+}
 
-/* ... existing countdown styles ... */
+.countdown-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: clamp(48px, 14vw, 80px);
+}
+
+.countdown-number {
+    font-family: 'Times New Roman', 'Georgia', serif;
+    font-size: clamp(2.4rem, 10vw, 4.5rem);
+    font-weight: 700;
+    color: #FFD700;
+    line-height: 1;
+    text-shadow:
+        0 0 30px rgba(255, 215, 0, 0.7),
+        0 0 60px rgba(255, 69, 0, 0.4),
+        0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.countdown-label {
+    font-family: 'Courier New', monospace;
+    font-size: clamp(0.55rem, 1.8vw, 0.75rem);
+    color: rgba(255, 215, 0, 0.7);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+.countdown-separator {
+    font-family: 'Times New Roman', serif;
+    font-size: clamp(1.6rem, 6vw, 3rem);
+    color: rgba(255, 215, 0, 0.5);
+    line-height: 1;
+    align-self: flex-start;
+    padding-top: clamp(4px, 1.5vw, 10px);
+}
 
 /* Label area */
 .cny-label {
@@ -104,15 +142,18 @@ body {
 }
 
 .cny-label-en {
-/* ... */
+    font-family: 'Courier New', monospace;
+    font-size: clamp(1.6rem, 7vw, 3rem);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    text-shadow: 0 0 16px rgba(255, 215, 0, 0.6), 0 0 6px rgba(255, 69, 0, 0.3);
 }
-
-/* ... */
 
 /* Swipe-up hint on welcome page */
 .start-swipe-hint {
     position: absolute;
-    top: 78%;
+    top: 83%;
     left: 0;
     width: 100%;
     display: flex;
