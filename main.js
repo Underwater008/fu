@@ -1810,7 +1810,15 @@ function updateArrivalFlames() {
         }
     }
 
-    // Update physics
+    // Update physics — hoist shared multiplications out of the loop
+    const wf = globalTime * ARRIVAL_FLAMES.windFreq;
+    const wf063 = globalTime * (ARRIVAL_FLAMES.windFreq * 0.63);
+    const wf24 = globalTime * (ARRIVAL_FLAMES.windFreq * 2.4);
+    const centerPull = ARRIVAL_FLAMES.centerPull;
+    const buoyancy = ARRIVAL_FLAMES.buoyancy;
+    const buoyancyDt = buoyancy * dt;
+    const riseClamp = -ARRIVAL_FLAMES.riseClamp;
+
     let alive = 0;
     for (let i = 0; i < arrivalParticles.length; i++) {
         const p = arrivalParticles[i];
@@ -1822,27 +1830,27 @@ function updateArrivalFlames() {
         // Coherent wind field: smooth, shared motion (less chaotic than per-particle jitter).
         const heatWind = p.windAmp * (0.55 + 0.45 * heat);
         const windBase =
-            Math.sin(globalTime * ARRIVAL_FLAMES.windFreq + p.phase + p.y * 0.003) * heatWind +
-            Math.sin(globalTime * (ARRIVAL_FLAMES.windFreq * 0.63) + p.phase * 1.7) * (heatWind * 0.35);
+            Math.sin(wf + p.phase + p.y * 0.003) * heatWind +
+            Math.sin(wf063 + p.phase * 1.7) * (heatWind * 0.35);
         const windCrackle =
-            Math.sin(globalTime * (ARRIVAL_FLAMES.windFreq * 2.4) + p.phase * 2.1 + p.y * 0.007) * (heatWind * 0.12) * (0.4 + 0.6 * heat);
+            Math.sin(wf24 + p.phase * 2.1 + p.y * 0.007) * (heatWind * 0.12) * (0.4 + 0.6 * heat);
 
         // Keep the plume coherent by gently pulling velocity back to center.
-        const windTarget = (windBase + windCrackle) - p.x * ARRIVAL_FLAMES.centerPull;
+        const windTarget = (windBase + windCrackle) - p.x * centerPull;
 
         // Exponential approach to the wind target velocity (damped).
         const follow = 1 - Math.exp(-p.drag * dt);
         p.vx += (windTarget - p.vx) * follow;
 
         // Slight upward acceleration to feel more like flame lift (buoyancy).
-        if (ARRIVAL_FLAMES.buoyancy > 0) {
-            p.vy -= ARRIVAL_FLAMES.buoyancy * dt * (0.35 + 0.65 * heat);
-            p.vy = Math.max(p.vy, -ARRIVAL_FLAMES.riseClamp);
+        if (buoyancyDt > 0) {
+            p.vy -= buoyancyDt * (0.35 + 0.65 * heat);
+            if (p.vy < riseClamp) p.vy = riseClamp;
         }
 
         p.x += p.vx * dt;
         p.y += p.vy * dt;
-        
+
         arrivalParticles[alive++] = p;
     }
     arrivalParticles.length = alive;
@@ -1850,68 +1858,88 @@ function updateArrivalFlames() {
 
 function appendArrivalFlamesToGPU(startIdx) {
     if (!particlesMesh) return startIdx;
-    
+
     const instColor = particlesMesh.geometry.attributes.instanceColor;
     const instAlpha = particlesMesh.geometry.attributes.instanceAlpha;
     const instUV = particlesMesh.geometry.attributes.instanceUV;
     const instScale = particlesMesh.geometry.attributes.instanceScale;
     const maxCount = instColor.count;
-    
+
+    // Direct typed array access — avoids per-call overhead of setXYZ/setX/setXY
+    const colorArr = instColor.array;
+    const alphaArr = instAlpha.array;
+    const uvArr = instUV.array;
+    const scaleArr = instScale.array;
+    const matArr = particlesMesh.instanceMatrix.array;
+
+    // Hoist shared per-frame values out of the loop
+    const bottomY = window.innerHeight * 0.5;
+    const invHeight = 1 / Math.max(1, window.innerHeight);
+    const flickBase = globalTime * ARRIVAL_FLAMES.flickerFreq;
+    const flickBase17 = globalTime * (ARRIVAL_FLAMES.flickerFreq * 1.7);
+    const flickAmp = ARRIVAL_FLAMES.flickerAmp;
+    const flickAmp035 = flickAmp * 0.35;
+    const alphaMul = ARRIVAL_FLAMES.alphaMul;
+    const topFadeStart = ARRIVAL_FLAMES.topFadeStart;
+    const topFadeEnd = ARRIVAL_FLAMES.topFadeEnd;
+
     let idx = startIdx;
-    
+
     for (const p of arrivalParticles) {
         if (idx >= maxCount) break;
-        
+
         // Flicker effect
         const age = 1 - p.life;
-        const heatRaw = Math.max(0, Math.min(1, p.life * (p.heat0 || 1)));
+        const heat = Math.max(0, Math.min(1, p.life * (p.heat0 || 1)));
 
         // Height within the screen (0 = bottom edge, 1 = top edge)
-        const bottomY = window.innerHeight / 2;
-        const h01 = Math.max(0, Math.min(1.2, (bottomY - p.y) / Math.max(1, window.innerHeight)));
-        const core = 1 - smoothstep(0.00, 0.22, h01); // brightness boost near the base
-        const heat = heatRaw;
+        const h01 = Math.max(0, Math.min(1.2, (bottomY - p.y) * invHeight));
+        const core = 1 - smoothstep(0.00, 0.22, h01);
 
         const fadeIn = smoothstep(0.00, 0.08, age);
         const fadeOut = smoothstep(0.00, 0.30, p.life);
-        const topFade = 1 - smoothstep(ARRIVAL_FLAMES.topFadeStart, ARRIVAL_FLAMES.topFadeEnd, h01);
+        const topFade = 1 - smoothstep(topFadeStart, topFadeEnd, h01);
 
         let flicker =
             0.84 +
-            Math.sin(globalTime * ARRIVAL_FLAMES.flickerFreq + p.phase) * ARRIVAL_FLAMES.flickerAmp +
-            Math.sin(globalTime * (ARRIVAL_FLAMES.flickerFreq * 1.7) + p.phase * 2.3) * (ARRIVAL_FLAMES.flickerAmp * 0.35);
-        flicker = Math.max(0.35, Math.min(1.25, flicker));
+            Math.sin(flickBase + p.phase) * flickAmp +
+            Math.sin(flickBase17 + p.phase * 2.3) * flickAmp035;
+        if (flicker < 0.35) flicker = 0.35;
+        else if (flicker > 1.25) flicker = 1.25;
 
         // Hotter and brighter at the base, cooling as it rises.
-        const alpha = fadeIn * fadeOut * topFade * flicker * ARRIVAL_FLAMES.alphaMul * (0.75 + core * 0.55) * (0.72 + heat * 0.55);
-        
+        const alpha = fadeIn * fadeOut * topFade * flicker * alphaMul * (0.75 + core * 0.55) * (0.72 + heat * 0.55);
+
+        // Skip fully transparent particles — no GPU work needed
+        if (alpha < 0.01) continue;
+
         // Scale: keep particles large and stable so glyphs stay readable.
         const swell = 0.85 + Math.sin(Math.min(1, age) * Math.PI) * 0.20;
         const scale = p.size * swell * (0.90 + heat * 0.15);
 
-        _dummy.position.set(p.x, -p.y, -p.z);
-        _dummy.updateMatrix();
-        
-        particlesMesh.setMatrixAt(idx, _dummy.matrix);
+        // Write matrix directly (translation-only, identity rotation/scale in matrix)
+        // InstancedMesh matrix is column-major 4x4: [sx,0,0,0, 0,sy,0,0, 0,0,sz,0, tx,ty,tz,1]
+        const mi = idx * 16;
+        matArr[mi]     = 1; matArr[mi+1]  = 0; matArr[mi+2]  = 0; matArr[mi+3]  = 0;
+        matArr[mi+4]   = 0; matArr[mi+5]  = 1; matArr[mi+6]  = 0; matArr[mi+7]  = 0;
+        matArr[mi+8]   = 0; matArr[mi+9]  = 0; matArr[mi+10] = 1; matArr[mi+11] = 0;
+        matArr[mi+12]  = p.x; matArr[mi+13] = -p.y; matArr[mi+14] = -p.z; matArr[mi+15] = 1;
 
-        // Heat-based flame tint (no extra height-based color shifting at the bottom).
+        // Heat-based flame tint
         const cool = 1 - heat;
         let rr, gg, bb;
         if (cool < 0.40) {
             const t = cool / 0.40;
-            // hot gold -> orange
             rr = 255;
             gg = lerp(205, 150, t);
             bb = lerp(80, 35, t);
         } else if (cool < 0.82) {
             const t = (cool - 0.40) / 0.42;
-            // orange -> red-orange
             rr = 255;
             gg = lerp(150, 75, t);
             bb = lerp(35, 10, t);
         } else {
             const t = (cool - 0.82) / 0.18;
-            // red-orange -> ember
             rr = lerp(255, 140, t);
             gg = lerp(75, 22, t);
             bb = lerp(10, 8, t);
@@ -1924,16 +1952,23 @@ function appendArrivalFlamesToGPU(startIdx) {
             bb = lerp(bb, 230, 0.15);
         }
 
-        instColor.setXYZ(idx, rr / 255, gg / 255, bb / 255);
-        instAlpha.setX(idx, alpha);
-        instScale.setX(idx, scale);
-        
+        const ci = idx * 3;
+        colorArr[ci]     = rr / 255;
+        colorArr[ci + 1] = gg / 255;
+        colorArr[ci + 2] = bb / 255;
+        alphaArr[idx] = alpha;
+        scaleArr[idx] = scale;
+
         const uv = (p.fontIdx != null && charToUV[p.char + '|' + p.fontIdx]) || charToUV[p.char];
-        if (uv) instUV.setXY(idx, uv.u, uv.v);
-        
+        if (uv) {
+            const ui = idx * 2;
+            uvArr[ui]     = uv.u;
+            uvArr[ui + 1] = uv.v;
+        }
+
         idx++;
     }
-    
+
     // We don't commit here; we return index so fireworks can append after us
     return idx;
 }
