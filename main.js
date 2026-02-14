@@ -1182,8 +1182,8 @@ function drawCard(yTop, yBottom, alpha, widthFraction) {
 function drawChineseOrnamentalBorder(x, y, w, h, alpha, auraColor, stars) {
     const baseAlpha = Math.max(0, alpha || 0);
     if (baseAlpha <= 0.001) return;
-    const tier = Math.max(1, Math.min(6, Number.isFinite(stars) ? Math.floor(stars) : 3));
-    const tierT = (tier - 1) / 5;
+    const tier = Math.max(1, Math.min(7, Number.isFinite(stars) ? Math.floor(stars) : 3));
+    const tierT = (tier - 1) / 6;
 
     ctx.save();
     ctx.scale(dpr, dpr);
@@ -2014,7 +2014,7 @@ function initDrawAnimation() {
         const pity = getPityCounter();
         currentDrawResult = performDrawWithPity(pity);
         saveToCollection(currentDrawResult);
-        if (currentDrawResult.tierIndex <= 1) {
+        if (currentDrawResult.tierIndex <= 2) {
             resetPity().catch(() => {});
         } else {
             incrementPity().catch(() => {});
@@ -2848,7 +2848,7 @@ function renderMultiCardText() {
         } else {
             // === STANDARD LAYOUT (mobile 5×2) ===
             // Stars (vertical stack)
-            const starsChars = Array.from('\u2605'.repeat(dr.rarity.stars) + '\u2606'.repeat(6 - dr.rarity.stars));
+            const starsChars = Array.from('\u2605'.repeat(dr.rarity.stars) + '\u2606'.repeat(Math.max(0, 7 - dr.rarity.stars)));
             const starsSize = Math.max(13, unit * 0.17);
             ctx.font = `${starsSize}px "Courier New", monospace`;
             ctx.textAlign = 'center';
@@ -2916,7 +2916,7 @@ function revealCard(index) {
     if (stars >= 5) {
         card.anticipating = true;
         card.anticipateStart = globalTime;
-        card.anticipateDuration = stars >= 6 ? 0.9 : 0.55;
+        card.anticipateDuration = stars >= 7 ? 1.2 : (stars >= 6 ? 0.9 : 0.55);
         for (const p of daji3DParticles) {
             if (p.drawIndex === index) p.anticipating = true;
         }
@@ -2939,7 +2939,7 @@ function startConvergence(index) {
     card.anticipating = false;
     card.converging = true;
     card.convergeStartTime = globalTime;
-    card.convergeDuration = stars >= 6 ? 0.6 : stars >= 5 ? 0.5 : 0.3;
+    card.convergeDuration = stars >= 7 ? 0.8 : (stars >= 6 ? 0.6 : (stars >= 5 ? 0.5 : 0.3));
 
     // Mark particles as converging toward where the main character text will appear
     const isStick = card.cardH > card.cardW * 2.5;
@@ -2986,21 +2986,21 @@ function finishReveal(index) {
     playSfxReveal(stars);
 
     // BLOOM SPIKE then decay (keep subtle so text stays readable)
-    ppBloomTarget = stars >= 6 ? 1.5 : stars >= 5 ? 1.0 : 0.6;
-    setTimeout(() => { ppBloomTarget = 0.12; }, 350);
+    ppBloomTarget = stars >= 7 ? 2.0 : (stars >= 6 ? 1.5 : (stars >= 5 ? 1.0 : 0.6));
+    setTimeout(() => { ppBloomTarget = 0.12; }, stars >= 7 ? 500 : 350);
 
     // CAMERA SHAKE + zoom back
     if (stars >= 5) {
-        cam.shake = stars >= 6 ? 14 : 8;
-        camTarget.scale = stars >= 6 ? 1.3 : 1.18;
-        const easeBackDelay = stars >= 6 ? 900 : 600;
+        cam.shake = stars >= 7 ? 20 : (stars >= 6 ? 14 : 8);
+        camTarget.scale = stars >= 7 ? 1.45 : (stars >= 6 ? 1.3 : 1.18);
+        const easeBackDelay = stars >= 7 ? 1200 : (stars >= 6 ? 900 : 600);
         setTimeout(() => { camTarget.scale = 1.0; }, easeBackDelay);
     } else if (stars >= 4) {
         cam.shake = 4;
     }
 
     // CHROMATIC ABERRATION spike
-    ppChromatic = stars >= 6 ? 0.018 : stars >= 5 ? 0.01 : 0.004;
+    ppChromatic = stars >= 7 ? 0.025 : (stars >= 6 ? 0.018 : (stars >= 5 ? 0.01 : 0.004));
 
     // Character position offset (same as text rendering position)
     const _isStick = card.cardH > card.cardW * 2.5;
@@ -3013,22 +3013,35 @@ function finishReveal(index) {
             cx: card.centerX / window.innerWidth,
             cy: 1 - _charCY / window.innerHeight,
             startTime: globalTime,
-            duration: stars >= 6 ? 0.7 : 0.5,
-            maxRadius: stars >= 6 ? 0.55 : stars >= 5 ? 0.4 : 0.25,
-            strength: stars >= 6 ? 0.8 : stars >= 5 ? 0.5 : 0.25,
+            duration: stars >= 7 ? 0.9 : (stars >= 6 ? 0.7 : 0.5),
+            maxRadius: stars >= 7 ? 0.7 : (stars >= 6 ? 0.55 : (stars >= 5 ? 0.4 : 0.25)),
+            strength: stars >= 7 ? 1.0 : (stars >= 6 ? 0.8 : (stars >= 5 ? 0.5 : 0.25)),
         });
-        // Double shockwave for 6-star
+        // Double shockwave for 6+ star
         if (stars >= 6) {
             setTimeout(() => {
                 ppShockwaves.push({
                     cx: card.centerX / window.innerWidth,
                     cy: 1 - _charCY / window.innerHeight,
                     startTime: globalTime,
-                    duration: 0.6,
-                    maxRadius: 0.7,
-                    strength: 0.4,
+                    duration: stars >= 7 ? 0.8 : 0.6,
+                    maxRadius: stars >= 7 ? 0.9 : 0.7,
+                    strength: stars >= 7 ? 0.6 : 0.4,
                 });
             }, 150);
+        }
+        // Triple shockwave for 7-star only
+        if (stars >= 7) {
+            setTimeout(() => {
+                ppShockwaves.push({
+                    cx: card.centerX / window.innerWidth,
+                    cy: 1 - _charCY / window.innerHeight,
+                    startTime: globalTime,
+                    duration: 0.7,
+                    maxRadius: 1.0,
+                    strength: 0.3,
+                });
+            }, 350);
         }
     }
 
@@ -3042,7 +3055,7 @@ function finishReveal(index) {
             p.fadeStartTime = globalTime;
             // Burst from card center outward (radial explosion)
             const angle = Math.random() * Math.PI * 2;
-            const burstPower = stars >= 6 ? 4.5 : stars >= 5 ? 3.0 : 1.5;
+            const burstPower = stars >= 7 ? 6.0 : (stars >= 6 ? 4.5 : (stars >= 5 ? 3.0 : 1.5));
             const speed = burstPower * (0.5 + Math.random());
             p.burstVx = Math.cos(angle) * speed;
             p.burstVy = Math.sin(angle) * speed;
@@ -4528,7 +4541,7 @@ function showMultiCardsWithFlip(draws) {
         front.style.setProperty('--mc-color', draw.rarity.color);
         front.style.setProperty('--mc-glow', draw.rarity.glow);
 
-        const starsStr = '\u2605'.repeat(draw.rarity.stars) + '\u2606'.repeat(6 - draw.rarity.stars);
+        const starsStr = '\u2605'.repeat(draw.rarity.stars) + '\u2606'.repeat(Math.max(0, 7 - draw.rarity.stars));
         front.innerHTML = `
             <div class="card-front-inner">
                 <div class="mc-stars">${starsStr}</div>
@@ -4550,7 +4563,7 @@ function showMultiCardsWithFlip(draws) {
                 return;
             }
             // Prevent double-click during anticipation
-            if (card.classList.contains('anticipate-5') || card.classList.contains('anticipate-6')) return;
+            if (card.classList.contains('anticipate-5') || card.classList.contains('anticipate-6') || card.classList.contains('anticipate-7')) return;
 
             const stars = draw.rarity.stars;
             if (stars >= 5) {
@@ -4558,7 +4571,7 @@ function showMultiCardsWithFlip(draws) {
                 const anticClass = 'anticipate-' + stars;
                 const slowClass = 'slow-flip-' + stars;
                 card.classList.add(anticClass);
-                const anticDuration = stars >= 6 ? 700 : 500;
+                const anticDuration = stars >= 7 ? 1000 : (stars >= 6 ? 700 : 500);
                 setTimeout(() => {
                     card.classList.remove(anticClass);
                     card.classList.add(slowClass);
@@ -4611,10 +4624,10 @@ function showMultiDetail(draw) {
 
     detailCard.style.setProperty('--card-color', draw.rarity.color);
     detailCard.style.setProperty('--card-glow', draw.rarity.glow);
-    for (let i = 1; i <= 6; i++) detailCard.classList.remove('stars-' + i);
-    detailCard.classList.add('stars-' + Math.max(1, Math.min(6, draw.rarity.stars || 1)));
+    for (let i = 1; i <= 7; i++) detailCard.classList.remove('stars-' + i);
+    detailCard.classList.add('stars-' + Math.max(1, Math.min(7, draw.rarity.stars || 1)));
 
-    detailStars.textContent = '\u2605'.repeat(draw.rarity.stars) + '\u2606'.repeat(6 - draw.rarity.stars);
+    detailStars.textContent = '\u2605'.repeat(draw.rarity.stars) + '\u2606'.repeat(Math.max(0, 7 - draw.rarity.stars));
     detailStars.style.color = draw.rarity.color;
     detailCategory.textContent = '[ ' + draw.rarity.label + ' \u00B7 ' + draw.rarity.labelEn + ' ]';
     detailCategory.style.color = draw.rarity.color;
@@ -4722,7 +4735,7 @@ if (btnRevealAll) {
                 const stars = card.draw.rarity.stars;
                 setTimeout(() => revealCard(idx), delay);
                 // Add extra time for anticipation + convergence animations
-                delay += stars >= 6 ? 1800 : stars >= 5 ? 1200 : 400;
+                delay += stars >= 7 ? 2500 : (stars >= 6 ? 1800 : (stars >= 5 ? 1200 : 400));
             }
         }
     });
@@ -4810,16 +4823,6 @@ function showCollectionPanel() {
         collectionGrid.className = 'collection-content';
         collectionGrid.innerHTML = '';
         
-        // Helper to determine stars from category index (reverse mapped from TIER_CATEGORIES)
-        // 0->6, 7/8->5, 4/5->4, 2/6->3, 1/3->2
-        const getStars = (idx) => {
-            if (idx === 0) return 6;
-            if (idx === 7 || idx === 8) return 5;
-            if (idx === 4 || idx === 5) return 4;
-            if (idx === 2 || idx === 6) return 3;
-            return 2;
-        };
-
         let cardIdx = 0;
         categories.forEach((cat, idx) => {
             const groupDiv = document.createElement('div');
@@ -4827,24 +4830,23 @@ function showCollectionPanel() {
 
             const titleDiv = document.createElement('div');
             titleDiv.className = 'collection-category-title';
-            const catStarsForTitle = getStars(idx);
             const collectedInCat = cat.items.filter(it => it.collected).length;
-            titleDiv.innerHTML = `<span class="cat-stars">${'\u2605'.repeat(catStarsForTitle)}</span>${escapeHtml(cat.nameEn)} <span>${escapeHtml(cat.name)}</span><span class="collection-category-count">${Number(collectedInCat)}/${Number(cat.items.length)}</span>`;
+            titleDiv.innerHTML = `${escapeHtml(cat.nameEn)} <span>${escapeHtml(cat.name)}</span><span class="collection-category-count">${Number(collectedInCat)}/${Number(cat.items.length)}</span>`;
             groupDiv.appendChild(titleDiv);
 
             const gridDiv = document.createElement('div');
             gridDiv.className = 'collection-grid-new';
 
-            const catStars = getStars(idx);
-
             for (const item of cat.items) {
                 const card = document.createElement('div');
                 const isCollected = item.collected;
-                // Use maxStars if collected, otherwise default to category stars
-                const stars = isCollected ? item.maxStars : catStars;
-                
+                // Use maxStars if collected, otherwise baseStars from character data
+                const baseStars = (item.blessing && item.blessing.baseStars) || 2;
+                const stars = isCollected ? Math.max(item.maxStars, baseStars) : baseStars;
+
                 let rarityClass = '';
-                if (stars >= 6) rarityClass = ' r6';
+                if (stars >= 7) rarityClass = ' r7';
+                else if (stars >= 6) rarityClass = ' r6';
                 else if (stars === 5) rarityClass = ' r5';
                 
                 card.className = `collection-card ${isCollected ? 'collected' : 'uncollected'}${rarityClass}`;
@@ -4877,7 +4879,7 @@ function showCollectionPanel() {
                     card.addEventListener('click', (e) => {
                         e.stopPropagation();
                         // Find rarity object from RARITY_TIERS matching stars
-                        const rarity = RARITY_TIERS.find(t => t.stars === stars) || RARITY_TIERS[4]; // default to lowest
+                        const rarity = RARITY_TIERS.find(t => t.stars === stars) || RARITY_TIERS[5]; // default to lowest
                         
                         const drawObj = {
                             char: item.char,
