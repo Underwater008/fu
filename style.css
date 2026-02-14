@@ -1843,7 +1843,7 @@ canvas#c {
         0 0 16px var(--card-glow, rgba(255,215,0,0.6)),
         0 0 36px var(--card-glow, rgba(255,200,50,0.3)),
         0 0 65px var(--card-glow, rgba(255,180,0,0.15));
-    margin: 16px 0 12px;
+    margin: 28px 0 12px;
     animation: detailCharAppear 0.5s ease-out both,
                detailCharBreathe 3.5s ease-in-out 0.5s infinite;
 }
@@ -2000,7 +2000,7 @@ canvas#c {
     }
     .detail-character {
         font-size: 5.5rem;
-        margin: 20px 0 10px;
+        margin: 28px 0 10px;
     }
     .detail-phrase {
         font-size: 1.1rem;
@@ -2024,7 +2024,7 @@ canvas#c {
 @media (max-height: 650px) {
     .detail-character {
         font-size: 5rem;
-        margin: 16px 0 8px;
+        margin: 24px 0 8px;
     }
     .detail-card {
         padding: 48px 36px 40px;
