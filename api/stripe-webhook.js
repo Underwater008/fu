@@ -3,6 +3,10 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
+// Disable Vercel's automatic body parsing so we can read the raw body
+// for Stripe signature verification
+export const config = { api: { bodyParser: false } };
+
 function getStripeClient() {
   const secretKey = (process.env.STRIPE_SECRET_KEY || '').trim();
   if (!secretKey) {

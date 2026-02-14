@@ -279,15 +279,29 @@ async function showPaymentModal(bundle, user) {
       return;
     }
 
-    // Payment succeeded without redirect
-    statusEl.textContent = `Payment successful! +${bundle.draws} draws`;
+    // Payment succeeded without redirect — poll until webhook credits draws
+    statusEl.textContent = 'Payment successful! Crediting draws...';
     statusEl.className = 'payment-status success';
     payBtn.textContent = 'Done!';
+
+    const drawsBefore = user.draws_remaining || 0;
+    let credited = false;
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 1500));
+      await refreshProfile();
+      const updated = getUser();
+      if (updated && (updated.draws_remaining || 0) > drawsBefore) {
+        credited = true;
+        break;
+      }
+    }
+
+    statusEl.textContent = credited
+      ? `Payment successful! +${bundle.draws} draws`
+      : `Payment successful! Draws will appear shortly.`;
     setTimeout(() => {
       closeModal({ success: true, draws: bundle.draws });
-      // Reload to pick up credited draws from webhook
-      window.location.reload();
-    }, 1500);
+    }, 900);
   });
 
   return resultPromise;
