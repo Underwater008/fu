@@ -1134,7 +1134,7 @@ canvas {
     --orn-pulse: 0;
 
     width: 100%;
-    padding: 48px 36px 40px;
+    padding: 60px 48px 52px;
     background: linear-gradient(155deg,
         rgba(70, 6, 6, 0.82) 0%,
         rgba(38, 5, 5, 0.85) 50%,
@@ -1166,7 +1166,7 @@ canvas {
 .detail-card::before {
     content: '';
     position: absolute;
-    inset: 7px;
+    inset: 9px;
     border: 1.2px solid rgba(255, 215, 0, 0.25);
     border-radius: 12px;
     pointer-events: none;
@@ -1176,7 +1176,7 @@ canvas {
 .detail-card::after {
     content: '';
     position: absolute;
-    inset: 13px;
+    inset: 16px;
     border: 1px solid rgba(145, 22, 22, 0.35);
     border-radius: 9px;
     pointer-events: none;
@@ -1300,10 +1300,10 @@ canvas {
     filter: drop-shadow(0 0 6px var(--orn-color, rgba(255, 215, 0, 0.3)));
 }
 .orn-corner::before, .orn-corner::after { content: none; }
-.orn-tl { top: 6px; left: 6px; }
-.orn-tr { top: 6px; right: 6px; transform: scaleX(-1); }
-.orn-bl { bottom: 6px; left: 6px; transform: scaleY(-1); }
-.orn-br { bottom: 6px; right: 6px; transform: scale(-1, -1); }
+.orn-tl { top: 8px; left: 8px; }
+.orn-tr { top: 8px; right: 8px; transform: scaleX(-1); }
+.orn-bl { bottom: 8px; left: 8px; transform: scaleY(-1); }
+.orn-br { bottom: 8px; right: 8px; transform: scale(-1, -1); }
 
 /* ===== Top/bottom center bar ===== */
 .orn-center {
@@ -1606,7 +1606,7 @@ canvas {
         padding: 8px 0;
     }
     .detail-card {
-        padding: 40px 28px 32px;
+        padding: 52px 36px 40px;
     }
     .detail-character {
         font-size: 5.5rem;
@@ -1637,7 +1637,7 @@ canvas {
         margin: 8px 0 8px;
     }
     .detail-card {
-        padding: 36px 24px 28px;
+        padding: 44px 32px 36px;
     }
     .detail-stars {
         font-size: 1.1rem;
