@@ -1397,13 +1397,9 @@ canvas {
     50% { opacity: 0.62; }
     75% { opacity: 0.72; }
 }
-/* 7-star text glow override */
+/* 7-star text color — text-shadow inherited from .detail-character using var(--card-glow) */
 .detail-card.stars-7 .detail-character {
     color: #FF0000;
-    text-shadow:
-        0 0 20px rgba(255, 0, 0, 0.8),
-        0 0 40px rgba(255, 215, 0, 0.5),
-        0 0 60px rgba(255, 0, 0, 0.3);
 }
 .detail-card.stars-7 .detail-char-en,
 .detail-card.stars-7 .detail-english {
