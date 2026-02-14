@@ -1,5 +1,5 @@
 // monetization-ui.js — Auth bar, rewards panel, gift UI, share card generation
-import { getUser, onAuthChange, sendMagicLink, logout, updateDraws } from './auth.js';
+import { getUser, onAuthChange, sendMagicLink, linkAnonymousToEmail, isAnonymous, logout } from './auth.js';
 import { claimShareReward, canShare, getShareCooldownRemaining } from './rewards.js';
 import { showRewardedAd } from './ads.js';
 import { purchaseDraws, DRAW_BUNDLES } from './payments.js';
@@ -43,16 +43,23 @@ function updateAuthUI(user) {
 
   if (!loggedOut || !loggedIn) return;
 
-  if (user) {
+  // Always show draw counter when user exists (including anonymous)
+  if (drawCounter && user) {
+    drawCounter.textContent = `🎫 ×${user.draws_remaining || 0}`;
+  }
+  if (drawCounterFloat) {
+    drawCounterFloat.style.display = user ? '' : 'none';
+  }
+
+  if (user && !user.is_anonymous) {
+    // Fully authenticated user
     loggedOut.style.display = 'none';
     loggedIn.style.display = 'flex';
     document.getElementById('auth-email').textContent = user.display_name || user.email;
-    if (drawCounter) drawCounter.textContent = `🎫 ×${user.draws_remaining || 0}`;
-    if (drawCounterFloat) drawCounterFloat.style.display = '';
   } else {
+    // Anonymous user or no user — show sign-in button
     loggedOut.style.display = '';
     loggedIn.style.display = 'none';
-    if (drawCounterFloat) drawCounterFloat.style.display = 'none';
   }
 }
 
@@ -85,12 +92,16 @@ function wireAuthButtons() {
       try {
         btnSendLink.disabled = true;
         btnSendLink.textContent = 'Sending...';
-        await sendMagicLink(email);
+        if (isAnonymous()) {
+          await linkAnonymousToEmail(email);
+        } else {
+          await sendMagicLink(email);
+        }
 
-        if (CONFIG.isProd) {
+        if (CONFIG.isProd && !isAnonymous()) {
           if (status) status.textContent = 'Check your email for the magic link!';
         } else {
-          // Dev mode: instant login
+          // Dev mode or anonymous link: instant login
           if (loginModal) loginModal.style.display = 'none';
         }
       } catch (e) {
@@ -346,7 +357,7 @@ function renderPurchaseBundles() {
       } catch (e) {
         btn.querySelector('.purchase-price').textContent = bundle.price;
         btn.disabled = false;
-        console.error('Purchase failed:', e);
+        // purchase failed — user sees the price restored
       }
     });
     container.appendChild(btn);

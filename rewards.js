@@ -1,12 +1,39 @@
 // rewards.js — Daily login, share-to-draw, referral, ad rewards
 import { CONFIG } from './config.js';
 import { storage } from './storage.js';
-import { getUser, updateDraws } from './auth.js';
+import { getUser, applyProfilePatch } from './auth.js';
+import { getSupabaseClient } from './supabase-client.js';
+
+async function callRpc(name, args = {}) {
+  const sb = await getSupabaseClient();
+  const { data, error } = await sb.rpc(name, args);
+  if (error) throw error;
+  if (Array.isArray(data)) return data[0] || null;
+  return data || null;
+}
 
 // --- Daily Login ---
 export async function claimDailyLogin() {
   const user = getUser();
   if (!user) return null;
+
+  if (CONFIG.isProd) {
+    const result = await callRpc('claim_daily_login_reward');
+    if (!result) return null;
+
+    applyProfilePatch({
+      draws_remaining: result.draws_remaining,
+      login_streak: result.streak,
+      last_login_date: result.login_date,
+    });
+
+    return {
+      streak: result.streak,
+      draws: result.draws_granted,
+      isDay7: result.is_day7,
+      guaranteed4Star: result.is_day7 && CONFIG.rewards.dailyLoginDay7Guaranteed4Star,
+    };
+  }
 
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   if (user.last_login_date === today) return null; // already claimed
@@ -52,6 +79,19 @@ export function getShareCooldownRemaining() {
 export async function claimShareReward() {
   const user = getUser();
   if (!user) return null;
+
+  if (CONFIG.isProd) {
+    const result = await callRpc('claim_share_reward');
+    if (!result) return null;
+
+    applyProfilePatch({
+      draws_remaining: result.draws_remaining,
+      last_share_time: result.last_share_time,
+    });
+
+    return { draws: result.draws_granted };
+  }
+
   if (!(await canShare())) return null;
 
   user.last_share_time = new Date().toISOString();
@@ -66,6 +106,11 @@ export async function claimShareReward() {
 export async function claimReferralReward(newUserId) {
   const user = getUser();
   if (!user) return null;
+
+  if (CONFIG.isProd) {
+    // Referral rewards are claimed server-side in production
+    return null;
+  }
 
   const isFirst = (user.referral_count || 0) === 0;
   const draws = isFirst ? CONFIG.rewards.firstReferralDraws : CONFIG.rewards.subsequentReferralDraws;
@@ -90,6 +135,23 @@ export async function canWatchAd() {
 export async function claimAdReward() {
   const user = getUser();
   if (!user) return null;
+
+  if (CONFIG.isProd) {
+    const result = await callRpc('claim_ad_reward');
+    if (!result) return null;
+
+    applyProfilePatch({
+      draws_remaining: result.draws_remaining,
+      ad_draws_today: result.ads_watched_today,
+      ad_draws_date: result.ad_draws_date,
+    });
+
+    return {
+      draws: result.draws_granted,
+      adsWatchedToday: result.ads_watched_today,
+    };
+  }
+
   if (!(await canWatchAd())) return null;
 
   const today = new Date().toISOString().slice(0, 10);
@@ -109,8 +171,15 @@ export async function claimAdReward() {
 export async function incrementPity() {
   const user = getUser();
   if (!user) return 0;
+
+  if (CONFIG.isProd) {
+    const result = await callRpc('increment_pity_counter');
+    const pity = result?.pity_counter || 0;
+    applyProfilePatch({ pity_counter: pity });
+    return pity;
+  }
+
   user.pity_counter = (user.pity_counter || 0) + 1;
-  user.total_draws = (user.total_draws || 0) + 1;
   await storage.upsertProfile(user);
   return user.pity_counter;
 }
@@ -118,8 +187,30 @@ export async function incrementPity() {
 export async function resetPity() {
   const user = getUser();
   if (!user) return;
+
+  if (CONFIG.isProd) {
+    await callRpc('reset_pity_counter');
+    applyProfilePatch({ pity_counter: 0 });
+    return;
+  }
+
   user.pity_counter = 0;
   await storage.upsertProfile(user);
+}
+
+export async function setPityCounter(value) {
+  const user = getUser();
+  if (!user) return 0;
+  const nextValue = Math.max(0, Number(value) || 0);
+
+  if (CONFIG.isProd) {
+    // set_pity_counter is disabled in production for security
+    throw new Error('setPityCounter is not available in production');
+  }
+
+  user.pity_counter = nextValue;
+  await storage.upsertProfile(user);
+  return user.pity_counter;
 }
 
 export function getPityCounter() {

@@ -20,13 +20,20 @@ import {
     initAudio, resumeAudio, startBGM, toggleMute, isBGMMuted,
     playSfxDraw, playSfxReveal, switchToVocal, switchToInst, initMusicSystem
 } from './audio.js';
-import { getUser, onAuthChange, restoreSession, updateDraws } from './auth.js';
-import { claimDailyLogin, getPityCounter, incrementPity, resetPity } from './rewards.js';
+import { getUser, onAuthChange, restoreSession, spendDraws } from './auth.js';
+import { claimDailyLogin, getPityCounter, incrementPity, resetPity, setPityCounter } from './rewards.js';
 import { initAds } from './ads.js';
 import { getPaymentResult } from './payments.js';
 import { claimGift, getGiftTokenFromUrl, returnExpiredGifts } from './gifting.js';
 import { initMonetizationUI, setCurrentDrawResult, showSingleFortuneActions, hideSingleFortuneActions, showMultiShareButton, hideMultiShareButton, setDetailDraw } from './monetization-ui.js';
 import { loadCollection } from './gacha.js';
+
+// --- HTML escape helper (prevent XSS in innerHTML) ---
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
 
 // Preload Local Audio
 initMusicSystem();
@@ -636,6 +643,7 @@ let fontsReady = false;
 let currentDrawResult = null;
 let multiDrawResults = null;
 let isMultiMode = false;
+let currentDrawsList = null; // module-scoped (was currentDrawsList)
 let multiFlipState = null; // { revealedCount, cardElements[] }
 let multiFortuneState = null; // Canvas-integrated multi fortune display
 
@@ -2008,9 +2016,9 @@ function initDrawAnimation() {
         currentDrawResult = performDrawWithPity(pity);
         saveToCollection(currentDrawResult);
         if (currentDrawResult.tierIndex <= 1) {
-            resetPity();
+            resetPity().catch(() => {});
         } else {
-            incrementPity();
+            incrementPity().catch(() => {});
         }
         drawsToAnimate = [currentDrawResult];
     } else {
@@ -2115,7 +2123,7 @@ function initDrawAnimation() {
     // We'll update updateDraw to handle `drawsToAnimate` count.
     
     // Store for updateDraw to use
-    window.currentDrawsList = drawsToAnimate;
+    currentDrawsList = drawsToAnimate;
 }
 
 function updateDraw() {
@@ -2163,7 +2171,7 @@ function updateDraw() {
         const riseT = Math.min(1, t / Math.max(0.001, DRAW_RISE));
         const launchT = easeInOut(riseT);
 
-        const draws = window.currentDrawsList || [currentDrawResult];
+        const draws = currentDrawsList || [currentDrawResult];
         const count = draws.length;
 
         // Grid config for multi — use responsive layout
@@ -2366,7 +2374,6 @@ function buildMultiDajiFromMorph() {
             burstVy: 0,
         });
     }
-    console.log(`[buildMultiDajiFromMorph] morphParticles: ${morphParticles.length}, active: ${activeCount}, daji3DParticles: ${daji3DParticles.length}`);
 }
 
 function initMultiFortuneState() {
@@ -3289,7 +3296,7 @@ function renderDrawOverlay() {
         const vmin = Math.min(window.innerWidth, window.innerHeight);
         
         // Single vs Multi Logic
-        const draws = window.currentDrawsList || [currentDrawResult];
+        const draws = currentDrawsList || [currentDrawResult];
         const count = draws.length;
 
         // Grid config for multi — use responsive layout
@@ -3439,7 +3446,7 @@ function renderDrawOverlay() {
         ctx.save();
         ctx.scale(dpr, dpr);
 
-        const draws = window.currentDrawsList || [currentDrawResult];
+        const draws = currentDrawsList || [currentDrawResult];
         for (let i = 0; i < fuEndScreenPositions.length; i++) {
             const pos = fuEndScreenPositions[i];
             const draw = draws[i] || currentDrawResult;
@@ -4346,7 +4353,7 @@ function updateModeSwitchUI() {
     }
 }
 
-function startMultiPull() {
+async function startMultiPull() {
     const pity = getPityCounter();
     const { draws, newPityCounter } = performMultiDrawWithPity(pity);
     multiDrawResults = draws;
@@ -4354,6 +4361,7 @@ function startMultiPull() {
     const user = getUser();
     if (user) {
         user.pity_counter = newPityCounter;
+        await setPityCounter(newPityCounter);
     }
 
     // Find the best (highest rarity, i.e., lowest tierIndex) result
@@ -4385,6 +4393,51 @@ function startMultiPull() {
     if (btnMultiAgain) btnMultiAgain.style.display = 'none';
 
     changeState('draw');
+}
+
+async function attemptPaidPull(mode = selectedMode) {
+    const drawsNeeded = mode === 'multi' ? 10 : 1;
+    const user = getUser();
+
+    if (!user || user.draws_remaining < drawsNeeded) {
+        showRewardsPanel();
+        return false;
+    }
+
+    let spent = false;
+    try {
+        spent = await spendDraws(drawsNeeded);
+    } catch (err) {
+        showRewardsPanel();
+        return false;
+    }
+    if (!spent) {
+        showRewardsPanel();
+        return false;
+    }
+
+    try {
+        if (state === 'fortune' && isMultiMode) {
+            resetMultiFortune();
+        }
+
+        if (state === 'fortune') {
+            daji3DParticles = [];
+            hoveredIdx = -1;
+            if (particlesMesh) particlesMesh.count = 0;
+            hideTooltip();
+        }
+
+        if (mode === 'multi') {
+            await startMultiPull();
+        } else {
+            isMultiMode = false;
+            changeState('draw');
+        }
+    } catch (err) {
+        return false;
+    }
+    return true;
 }
 // ... (triggerScreenFlash, etc.)
 
@@ -4443,8 +4496,8 @@ function hideHoverDetail() {
 }
 
 function showMultiCardsWithFlip(draws) {
-    console.log('[showMultiCardsWithFlip] Called with', draws?.length, 'draws, multiOverlay:', !!multiOverlay, 'multiGrid:', !!multiGrid);
     if (!draws || !draws.length) return;
+    if (!multiGrid || !multiOverlay) return;
 
     multiFlipState = { revealedCount: 0, cardElements: [] };
     multiGrid.innerHTML = '';
@@ -4480,8 +4533,8 @@ function showMultiCardsWithFlip(draws) {
         front.innerHTML = `
             <div class="card-front-inner">
                 <div class="mc-stars">${starsStr}</div>
-                <div class="mc-char">${draw.char}</div>
-                <div class="mc-phrase">${draw.blessing.phrase}</div>
+                <div class="mc-char">${escapeHtml(draw.char)}</div>
+                <div class="mc-phrase">${escapeHtml(draw.blessing.phrase)}</div>
             </div>
             <div class="card-rarity-glow"></div>
         `;
@@ -4580,7 +4633,7 @@ function showMultiDetail(draw) {
     if (detailMeaning && draw.blessing) {
         const meaningCn = '\u300C' + draw.char + '\u300D\u2014\u2014' + draw.blessing.phrase;
         const meaningEn = '"' + (charEn || draw.char) + '" \u2014 ' + draw.blessing.english;
-        detailMeaning.innerHTML = '<span style="color:rgba(255,215,0,0.5)">' + meaningCn + '</span><br>' + meaningEn;
+        detailMeaning.innerHTML = '<span style="color:rgba(255,215,0,0.5)">' + escapeHtml(meaningCn) + '</span><br>' + escapeHtml(meaningEn);
     }
 
     // TTS: Character pronunciation (button under the detail card)
@@ -4620,9 +4673,8 @@ function hideMultiDetail() {
 }
 
 function hideMultiOverlay() {
-    console.log('[hideMultiOverlay] Called, stack:', new Error().stack?.split('\n').slice(1, 3).join(' | '));
-    multiOverlay.classList.remove('visible');
-    multiDetail.classList.remove('visible');
+    if (multiOverlay) multiOverlay.classList.remove('visible');
+    if (multiDetail) multiDetail.classList.remove('visible');
     hideHoverDetail();
     multiFlipState = null;
     isMultiMode = false;
@@ -4631,19 +4683,18 @@ function hideMultiOverlay() {
 
 // Multi-fortune action buttons (now floating over canvas)
 if (btnMultiSingle) {
-    btnMultiSingle.addEventListener('click', (e) => {
+    btnMultiSingle.addEventListener('click', async (e) => {
         e.stopPropagation();
-        resetMultiFortune();
         selectedMode = 'single';
         updateModeSwitchUI();
-        changeState('draw');
+        await attemptPaidPull('single');
     });
 }
 
 if (btnMultiAgain) {
-    btnMultiAgain.addEventListener('click', (e) => {
+    btnMultiAgain.addEventListener('click', async (e) => {
         e.stopPropagation();
-        startMultiPull();
+        await attemptPaidPull('multi');
     });
 }
 
@@ -4779,7 +4830,7 @@ function showCollectionPanel() {
             titleDiv.className = 'collection-category-title';
             const catStarsForTitle = getStars(idx);
             const collectedInCat = cat.items.filter(it => it.collected).length;
-            titleDiv.innerHTML = `<span class="cat-stars">${'\u2605'.repeat(catStarsForTitle)}</span>${cat.nameEn} <span>${cat.name}</span><span class="collection-category-count">${collectedInCat}/${cat.items.length}</span>`;
+            titleDiv.innerHTML = `<span class="cat-stars">${'\u2605'.repeat(catStarsForTitle)}</span>${escapeHtml(cat.nameEn)} <span>${escapeHtml(cat.name)}</span><span class="collection-category-count">${Number(collectedInCat)}/${Number(cat.items.length)}</span>`;
             groupDiv.appendChild(titleDiv);
 
             const gridDiv = document.createElement('div');
@@ -4806,10 +4857,10 @@ function showCollectionPanel() {
 
                 card.innerHTML = `
                     <div class="card-inner">
-                        <div class="card-char">${charText}</div>
-                        <div class="card-english">${charEnText}</div>
+                        <div class="card-char">${escapeHtml(charText)}</div>
+                        <div class="card-english">${escapeHtml(charEnText)}</div>
                         <div class="card-meta">
-                            <div class="card-name">${nameText}</div>
+                            <div class="card-name">${escapeHtml(nameText)}</div>
                             <div class="card-stars">${'\u2605'.repeat(stars)}</div>
                         </div>
                     </div>
@@ -5083,62 +5134,20 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
-function handleSwipeUp() {
+async function handleSwipeUp() {
     ensureAudio();
-    if (state === 'arrival' && fontsReady) {
-        const user = getUser();
-        const drawsNeeded = selectedMode === 'multi' ? 10 : 1;
-
-        if (user && user.draws_remaining < drawsNeeded) {
-            showRewardsPanel();
-            return;
+    try {
+        if (state === 'arrival' && fontsReady) {
+            await attemptPaidPull(selectedMode);
+        } else if (state === 'fortune') {
+            // Block swipe-up if multi-mode cards not all revealed yet
+            if (isMultiMode && multiFortuneState && multiFortuneState.revealedCount < multiFortuneState.cards.length) {
+                return;
+            }
+            await attemptPaidPull(selectedMode);
         }
-
-        if (user) {
-            updateDraws(-drawsNeeded);
-        }
-
-        if (selectedMode === 'multi') {
-            startMultiPull();
-        } else {
-            isMultiMode = false;
-            changeState('draw');
-        }
-    } else if (state === 'fortune') {
-        // Block swipe-up if multi-mode cards not all revealed yet
-        if (isMultiMode && multiFortuneState && multiFortuneState.revealedCount < multiFortuneState.cards.length) {
-            return;
-        }
-
-        // Clean up multi-fortune state
-        if (isMultiMode) {
-            resetMultiFortune();
-        }
-
-        const user = getUser();
-        const drawsNeeded = selectedMode === 'multi' ? 10 : 1;
-
-        if (user && user.draws_remaining < drawsNeeded) {
-            showRewardsPanel();
-            return;
-        }
-
-        if (user) {
-            updateDraws(-drawsNeeded);
-        }
-
-        // Draw again loop
-        daji3DParticles = [];
-        hoveredIdx = -1;
-        if (particlesMesh) particlesMesh.count = 0;
-        hideTooltip();
-
-        if (selectedMode === 'multi') {
-            startMultiPull();
-        } else {
-            isMultiMode = false;
-            changeState('draw');
-        }
+    } catch (err) {
+        // swipe handling failed — silently ignore
     }
 }
 
@@ -5177,10 +5186,10 @@ function initStartOverlay() {
             
             countdownEl.innerHTML = `${days}<span style="font-size:1.2rem; margin-right:6px">d</span> ${hours}<span style="font-size:1.2rem; margin-right:6px">h</span> ${mins}<span style="font-size:1.2rem; margin-right:6px">m</span> ${secs}<span style="font-size:1.2rem">s</span>`;
             labelEl.innerHTML = `
-                <div style="margin-bottom: 12px">UNTIL YEAR OF THE ${zodiac.en}</div>
+                <div style="margin-bottom: 12px">UNTIL YEAR OF THE ${escapeHtml(zodiac.en)}</div>
                 <div style="display: flex; align-items: center; justify-content: center; gap: 16px;">
-                    <span style="font-family:'Ma Shan Zheng', 'Noto Serif TC', serif; font-size:1.6em; font-weight:normal">${zodiac.cn} ${zodiac.ganZhi}</span>
-                    <span style="opacity:0.8; font-family:'Courier New', monospace; font-size: 0.9em">${dateStr}</span>
+                    <span style="font-family:'Ma Shan Zheng', 'Noto Serif TC', serif; font-size:1.6em; font-weight:normal">${escapeHtml(zodiac.cn)} ${escapeHtml(zodiac.ganZhi)}</span>
+                    <span style="opacity:0.8; font-family:'Courier New', monospace; font-size: 0.9em">${escapeHtml(dateStr)}</span>
                 </div>`;
         } else {
             // If no future date in our list, find the most recent past date
@@ -5199,7 +5208,7 @@ function initStartOverlay() {
             const dateStr = `${lastTarget.date.getFullYear()}.${String(lastTarget.date.getMonth() + 1).padStart(2, '0')}.${String(lastTarget.date.getDate()).padStart(2, '0')}`;
             
             countdownEl.innerHTML = `${days}<span style="font-size:1.5rem"> DAYS AGO</span>`;
-            labelEl.innerHTML = `SINCE YEAR OF THE ${zodiac.en} <span style="font-family:'Ma Shan Zheng', 'Noto Serif TC', serif; margin-left:24px; font-size:1.5em; font-weight:normal">${zodiac.cn} ${zodiac.ganZhi}</span> <span style="margin-left:8px; opacity:0.8; font-family:'Courier New', monospace">${dateStr}</span>`;
+            labelEl.innerHTML = `SINCE YEAR OF THE ${escapeHtml(zodiac.en)} <span style="font-family:'Ma Shan Zheng', 'Noto Serif TC', serif; margin-left:24px; font-size:1.5em; font-weight:normal">${escapeHtml(zodiac.cn)} ${escapeHtml(zodiac.ganZhi)}</span> <span style="margin-left:8px; opacity:0.8; font-family:'Courier New', monospace">${escapeHtml(dateStr)}</span>`;
         }
 
         requestAnimationFrame(updateTime);
@@ -5340,7 +5349,6 @@ function frame(now) {
         console.error('[frame error]', err);
         // Safety: if draw crashed, force transition to fortune for multi-mode
         if (state === 'draw' && isMultiMode && multiDrawResults) {
-            console.warn('[safety] Forcing transition to fortune after draw error');
             changeState('fortune');
         }
     }
@@ -5358,16 +5366,15 @@ function frame(now) {
   if (giftToken) {
     try {
       const gift = await claimGift(giftToken);
-      console.log('Gift claimed:', gift.character);
     } catch (e) {
-      console.warn('Gift claim failed:', e.message);
+      // gift claim failed — user will see the normal UI state
     }
   }
 
   // Handle payment return
   const paymentResult = getPaymentResult();
   if (paymentResult?.status === 'success') {
-    console.log('Payment successful');
+    // payment success handled by Stripe webhook in production
   }
 
   // Return expired gifts (dev mode)
@@ -5376,7 +5383,6 @@ function frame(now) {
   // Daily login check
   const loginReward = await claimDailyLogin();
   if (loginReward) {
-    console.log('Daily login reward:', loginReward);
   }
 
   // Initialize monetization UI (auth bar, rewards panel, etc.)
