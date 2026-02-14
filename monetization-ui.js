@@ -1,6 +1,6 @@
 // monetization-ui.js — Auth bar, rewards panel, gift UI, share card generation
 import { getUser, onAuthChange, sendMagicLink, linkAnonymousToEmail, isAnonymous, logout } from './auth.js';
-import { claimShareReward, canShare, getShareCooldownRemaining } from './rewards.js';
+import { claimShareReward, canShare, getShareCooldownRemaining, getAdCooldownRemaining, claimDailyLogin } from './rewards.js';
 import { showRewardedAd } from './ads.js';
 import { purchaseDraws, DRAW_BUNDLES } from './payments.js';
 import { createGift, canGift } from './gifting.js';
@@ -51,8 +51,9 @@ export function initMonetizationUI() {
   // Listen for changes
   onAuthChange(updateAuthUI);
 
-  // Update share cooldown timer
+  // Update cooldown timers
   setInterval(updateShareCooldown, 1000);
+  setInterval(updateAdCooldown, 1000);
 }
 
 // --- Auth UI ---
@@ -194,6 +195,7 @@ function wireRewardsPanel() {
   const btnShare = document.getElementById('btn-share-draw');
   const btnAd = document.getElementById('btn-watch-ad');
   const btnReferral = document.getElementById('btn-copy-referral');
+  const btnLogin = document.getElementById('login-streak-btn');
 
   const backdrop = document.getElementById('rewards-panel-backdrop');
 
@@ -202,6 +204,34 @@ function wireRewardsPanel() {
   }
   if (backdrop) {
     backdrop.addEventListener('click', closeRewardsPanel);
+  }
+
+  if (btnLogin) {
+    btnLogin.addEventListener('click', async () => {
+      const user = getUser();
+      if (!user) return;
+      btnLogin.disabled = true;
+      try {
+        const result = await claimDailyLogin();
+        if (result) {
+          btnLogin.querySelector('.rewards-btn-badge').textContent = `+${result.draws} Claimed!`;
+          updateAuthUI(getUser());
+          setTimeout(() => {
+            btnLogin.querySelector('.rewards-btn-badge').textContent = '+6 daily';
+            btnLogin.disabled = false;
+          }, 2000);
+        } else {
+          btnLogin.querySelector('.rewards-btn-badge').textContent = 'Already claimed';
+          setTimeout(() => {
+            btnLogin.querySelector('.rewards-btn-badge').textContent = '+6 daily';
+            btnLogin.disabled = false;
+          }, 2000);
+        }
+      } catch (e) {
+        console.warn('Daily login claim failed:', e);
+        btnLogin.disabled = false;
+      }
+    });
   }
 
   if (btnShare) {
@@ -231,8 +261,6 @@ function wireRewardsPanel() {
       const result = await showRewardedAd();
       if (result.success) {
         btnAd.innerHTML = '<span>+6 Draws!</span>';
-        const adCount = document.getElementById('ad-count');
-        if (adCount) adCount.textContent = `${result.adsWatchedToday}/${CONFIG.ads.maxPerDay} today`;
         updateAuthUI(getUser());
       } else {
         btnAd.innerHTML = '<span>Daily limit reached</span>';
@@ -260,17 +288,36 @@ function wireRewardsPanel() {
   }
 }
 
+function formatCooldown(ms) {
+  const mins = Math.floor(ms / 60000);
+  const secs = Math.floor((ms % 60000) / 1000);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 function updateShareCooldown() {
-  const cooldownEl = document.getElementById('share-cooldown');
-  if (!cooldownEl) return;
+  const btn = document.getElementById('btn-share-draw');
+  if (!btn) return;
   const remaining = getShareCooldownRemaining();
   if (remaining <= 0) {
-    cooldownEl.textContent = '';
-    return;
+    btn.disabled = false;
+    btn.innerHTML = '<span>Share</span><span class="rewards-btn-badge">+10</span>';
+  } else {
+    btn.disabled = true;
+    btn.innerHTML = `<span>Share</span><span class="rewards-btn-badge">${formatCooldown(remaining)}</span>`;
   }
-  const mins = Math.floor(remaining / 60000);
-  const secs = Math.floor((remaining % 60000) / 1000);
-  cooldownEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function updateAdCooldown() {
+  const btn = document.getElementById('btn-watch-ad');
+  if (!btn) return;
+  const remaining = getAdCooldownRemaining();
+  if (remaining <= 0) {
+    btn.disabled = false;
+    btn.innerHTML = '<span>Ad</span><span class="rewards-btn-badge">+6</span>';
+  } else {
+    btn.disabled = true;
+    btn.innerHTML = `<span>Ad</span><span class="rewards-btn-badge">${formatCooldown(remaining)}</span>`;
+  }
 }
 
 // --- Share Result Buttons (fortune screen) ---

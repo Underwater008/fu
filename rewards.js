@@ -136,12 +136,27 @@ export async function claimReferralReward(newUserId) {
 }
 
 // --- Ad Reward ---
+const AD_DRAWS_PER_WATCH = 6;
+const AD_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes
+
 export async function canWatchAd() {
   const user = getUser();
   if (!user) return false;
+  // Check cooldown
+  if (user.last_ad_time) {
+    const elapsed = Date.now() - new Date(user.last_ad_time).getTime();
+    if (elapsed < AD_COOLDOWN_MS) return false;
+  }
   const today = new Date().toISOString().slice(0, 10);
   if (user.ad_draws_date !== today) return true; // new day
   return (user.ad_draws_today || 0) < CONFIG.ads.maxPerDay;
+}
+
+export function getAdCooldownRemaining() {
+  const user = getUser();
+  if (!user || !user.last_ad_time) return 0;
+  const elapsed = Date.now() - new Date(user.last_ad_time).getTime();
+  return Math.max(0, AD_COOLDOWN_MS - elapsed);
 }
 
 export async function claimAdReward() {
@@ -156,6 +171,7 @@ export async function claimAdReward() {
       draws_remaining: result.draws_remaining,
       ad_draws_today: result.ads_watched_today,
       ad_draws_date: result.ad_draws_date,
+      last_ad_time: new Date().toISOString(),
     });
 
     return {
@@ -172,11 +188,12 @@ export async function claimAdReward() {
     user.ad_draws_date = today;
   }
   user.ad_draws_today += 1;
-  user.draws_remaining += 1;
+  user.last_ad_time = new Date().toISOString();
+  user.draws_remaining += AD_DRAWS_PER_WATCH;
   await storage.upsertProfile(user);
-  await storage.addTransaction(user.id, { type: 'ad_reward', draws_granted: 1 });
+  await storage.addTransaction(user.id, { type: 'ad_reward', draws_granted: AD_DRAWS_PER_WATCH });
 
-  return { draws: 1, adsWatchedToday: user.ad_draws_today };
+  return { draws: AD_DRAWS_PER_WATCH, adsWatchedToday: user.ad_draws_today };
 }
 
 // --- Pity tracking ---
