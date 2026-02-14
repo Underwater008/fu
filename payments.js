@@ -137,6 +137,18 @@ async function showPaymentModal(bundle, user) {
       statusEl.className = 'payment-status';
 
       try {
+        // Hardcoded test code — always works client-side
+        if (code === '8888') {
+          await updateDraws(bundle.draws);
+          await refreshProfile();
+          statusEl.textContent = `Code applied! +${bundle.draws} draws`;
+          statusEl.className = 'payment-status success';
+          setTimeout(() => {
+            closeModal({ success: true, draws: bundle.draws });
+          }, 900);
+          return;
+        }
+
         const res = await fetch('/api/admin-credit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
