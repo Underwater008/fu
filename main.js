@@ -363,11 +363,11 @@ function getLayout() {
     if (isLandscape()) {
         const maxCharSize = Math.min(cellSize * 5, window.innerHeight * 0.11);
         return {
-            starsY: 0.27,
+            starsY: 0.22,
             charY: 0.17,
             tierY: 0.52,
-            tierEnY: 0.57,
-            cardTop: 0.23,
+            tierEnY: 0.55,
+            cardTop: 0.20,
             cardBottom: 0.63,
             clusterYOffset: 0.07,
             cardWidth: 0.42,
@@ -387,11 +387,11 @@ function getLayout() {
         };
     }
     return {
-        starsY: 0.32,
+        starsY: 0.27,
         charY: 0.18,
         tierY: 0.60,
-        tierEnY: 0.65,
-        cardTop: 0.28,
+        tierEnY: 0.63,
+        cardTop: 0.25,
         cardBottom: 0.70,
         clusterYOffset: 0.07,
         cardWidth: 0.62,
@@ -1542,11 +1542,12 @@ function renderAndCompositeGL() {
 }
 
 // Updates GPU buffers for generic particle list
-function updateProjectedGlyphsToGPU(glyphs) {
-    if (!particlesMesh) return;
+function updateProjectedGlyphsToGPU(glyphs, skipRender) {
+    if (!particlesMesh) return 0;
     if (!glyphs.length) {
         particlesMesh.count = 0;
-        return;
+        if (!skipRender) renderAndCompositeGL();
+        return 0;
     }
 
     const instColor = particlesMesh.geometry.attributes.instanceColor;
@@ -1580,7 +1581,8 @@ function updateProjectedGlyphsToGPU(glyphs) {
     instUV.needsUpdate = true;
     instScale.needsUpdate = true;
 
-    renderAndCompositeGL();
+    if (!skipRender) renderAndCompositeGL();
+    return count;
 }
 
 // ============================================================
@@ -1611,6 +1613,11 @@ function changeState(newState) {
         playSfxDraw();
         initDrawAnimation();
         switchToVocal();
+        // Restart arrival flames during draw
+        arrivalParticles = [];
+        arrivalSpawnCarry = 0;
+        arrivalLastT = globalTime;
+        flamesActive = true;
     }
     if (newState === 'fortune') {
         const holdMs = isMultiMode ? VOCAL_HOLD_AFTER_MULTI_FORTUNE_MS : VOCAL_HOLD_AFTER_FORTUNE_MS;
@@ -1691,6 +1698,7 @@ function changeState(newState) {
 let arrivalParticles = [];
 let arrivalSpawnCarry = 0;
 let arrivalLastT = 0;
+let flamesActive = false;
 
 // Calm, cohesive "ember" glyphs behind the start overlay (welcome screen).
 const ARRIVAL_FLAMES = {
@@ -1743,8 +1751,8 @@ function updateArrivalFlames() {
     );
     arrivalLastT = globalTime;
 
-    // Spawn new particles (only if overlay is active)
-    if (isOverlayActive) {
+    // Spawn new particles (overlay or draw/fortune flames)
+    if (isOverlayActive || flamesActive) {
         // Small emitter breathing; keep subtle so motion reads as "fire" not bursts.
         const rateFlicker = 0.92 + 0.12 * (0.5 + 0.5 * Math.sin(globalTime * 2.0));
         arrivalSpawnCarry += (ARRIVAL_FLAMES.spawnRate * rateFlicker) * dt;
@@ -2453,6 +2461,7 @@ function initDrawAnimation() {
 function updateDraw() {
     updateBgParticles(globalTime);
     updateCam();
+    if (flamesActive) updateArrivalFlames();
 
     const t = stateTime;
 
@@ -3598,7 +3607,22 @@ function renderDrawParticles3D(t) {
         });
     }
 
-    updateProjectedGlyphsToGPU(glyphs);
+    // Append flames behind draw particles if active
+    if (flamesActive || arrivalParticles.length > 0) {
+        let gpuIdx = updateProjectedGlyphsToGPU(glyphs, true);
+        gpuIdx = appendArrivalFlamesToGPU(gpuIdx);
+        if (particlesMesh) {
+            particlesMesh.count = gpuIdx;
+            particlesMesh.instanceMatrix.needsUpdate = true;
+            particlesMesh.geometry.attributes.instanceColor.needsUpdate = true;
+            particlesMesh.geometry.attributes.instanceAlpha.needsUpdate = true;
+            particlesMesh.geometry.attributes.instanceUV.needsUpdate = true;
+            particlesMesh.geometry.attributes.instanceScale.needsUpdate = true;
+        }
+        renderAndCompositeGL();
+    } else {
+        updateProjectedGlyphsToGPU(glyphs);
+    }
 }
 
 function renderDrawOverlay() {
@@ -3836,6 +3860,7 @@ function renderDaji(alpha) {
 function updateFortune() {
     updateBgParticles(globalTime);
     updateCam();
+    if (flamesActive || arrivalParticles.length > 0) updateArrivalFlames();
     // Update firework physics if we have fireworks active (4+ stars or tap fireworks)
     if ((currentDrawResult && currentDrawResult.rarity.stars >= 4) || hasTapFireworks()) {
         updateFireworkPhysics();
@@ -3849,6 +3874,20 @@ function updateFortune() {
     if (isMultiMode && multiDrawResults && multiDrawResults.length > 1 && !multiFortuneState && stateTime > 0.1) {
         buildMultiDajiFromMorph();
         initMultiFortuneState();
+    }
+    // Stop flame spawning after card reveal
+    if (flamesActive) {
+        if (isMultiMode) {
+            // Stop after all cards revealed
+            if (multiFortuneState && multiFortuneState.revealedCount >= multiFortuneState.cards.length) {
+                flamesActive = false;
+            }
+        } else {
+            // Stop after single card is fully visible (card fade complete ~0.9s)
+            if (stateTime > 1.0) {
+                flamesActive = false;
+            }
+        }
     }
 }
 
@@ -4201,6 +4240,18 @@ function renderFortuneOverlay() {
         renderMultiCards();
         // 2. GPU particles on top (additive blend + bloom + post-fx)
         updateMultiDajiToGPU(true);
+        // 2b. Append arrival flames if active
+        if (flamesActive || arrivalParticles.length > 0) {
+            const flameIdx = appendArrivalFlamesToGPU(particlesMesh ? particlesMesh.count : 0);
+            if (particlesMesh) {
+                particlesMesh.count = flameIdx;
+                particlesMesh.instanceMatrix.needsUpdate = true;
+                particlesMesh.geometry.attributes.instanceColor.needsUpdate = true;
+                particlesMesh.geometry.attributes.instanceAlpha.needsUpdate = true;
+                particlesMesh.geometry.attributes.instanceUV.needsUpdate = true;
+                particlesMesh.geometry.attributes.instanceScale.needsUpdate = true;
+            }
+        }
         renderAndCompositeGL();
         // 4. Revealed card text (on top of everything)
         renderMultiCardText();
@@ -4242,12 +4293,25 @@ function renderFortuneOverlay() {
         ? appendStaticMorphToGPU(0)
         : updateDajiToGPU(true);
 
-    // 3. Add Stars as GPU particles (stamped in one by one)
+    // 3. Append arrival flames (during draw-to-fortune transition)
+    if (flamesActive || arrivalParticles.length > 0) {
+        gpuIdx = appendArrivalFlamesToGPU(gpuIdx);
+    }
+
+    // 4. Add Stars as GPU particles (stamped in one by one)
     if (cardFade > 0.01 && stateTime > 0.4) {
         gpuIdx = appendStarsToGPU(gpuIdx, dr.rarity.stars, (L.starsY * window.innerHeight) - window.innerHeight/2, dr.rarity.color, stateTime);
     }
 
-    // 4. Append Fireworks (if any)
+    // 5. Commit final particle count and render
+    if (particlesMesh) {
+        particlesMesh.count = gpuIdx;
+        particlesMesh.instanceMatrix.needsUpdate = true;
+        particlesMesh.geometry.attributes.instanceColor.needsUpdate = true;
+        particlesMesh.geometry.attributes.instanceAlpha.needsUpdate = true;
+        particlesMesh.geometry.attributes.instanceUV.needsUpdate = true;
+        particlesMesh.geometry.attributes.instanceScale.needsUpdate = true;
+    }
     if ((dr.rarity.stars >= 4 && (fwShells.length || fwTrail.length || fwParticles.length)) || hasTapFireworks()) {
         appendFireworksToGPU(gpuIdx);
     } else {
@@ -4273,9 +4337,9 @@ function renderFortuneOverlay() {
     // --- Top card subtitle (use blessing text, not rarity tier) ---
     const tierFade = Math.min(1, Math.max(0, (stateTime - 0.5) / 0.7));
     const tierSizeCn = isLandscape() ? Math.min(cellSize * 1.1, window.innerHeight * 0.025) : cellSize * 1.1;
-    const tierSizeEn = isLandscape() ? Math.min(cellSize * 0.8, window.innerHeight * 0.018) : cellSize * 0.8;
+    const tierSizeEn = isLandscape() ? Math.min(cellSize * 1.0, window.innerHeight * 0.022) : cellSize * 1.0;
     drawOverlayText3D(dr.blessing.phrase, L.tierY, CONFIG.glowRed, tierFade * 0.8, tierSizeCn);
-    drawOverlayText3D(dr.blessing.english, L.tierEnY, CONFIG.glowGold, tierFade * 0.55, tierSizeEn);
+    drawOverlayText3D(dr.blessing.english, L.tierEnY, CONFIG.glowGold, tierFade * 0.8, tierSizeEn);
 
     // --- Hint to draw again ---
     if (stateTime > 2.5) {
