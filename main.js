@@ -25,7 +25,7 @@ import { getPityCounter, incrementPity, resetPity, setPityCounter } from './rewa
 import { initAds } from './ads.js';
 import { getPaymentResult } from './payments.js';
 import { claimGift, getGiftTokenFromUrl, returnExpiredGifts } from './gifting.js';
-import { initMonetizationUI, openRewardsPanel, setCurrentDrawResult, showSingleFortuneActions, hideSingleFortuneActions, showMultiShareButton, hideMultiShareButton, setDetailDraw } from './monetization-ui.js';
+import { initMonetizationUI, openRewardsPanel, setCurrentDrawResult, showSingleFortuneActions, hideSingleFortuneActions, showMultiShareButton, hideMultiShareButton, setDetailDraw, setSceneCanvas } from './monetization-ui.js';
 import { loadCollection } from './gacha.js';
 // --- HTML escape helper (prevent XSS in innerHTML) ---
 function escapeHtml(str) {
@@ -437,9 +437,10 @@ const CELL_PX = 64;
 
 function initThreeJS() {
     // 1. Renderer
-    glRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: false });
+    glRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, preserveDrawingBuffer: true });
     glRenderer.setSize(window.innerWidth, window.innerHeight);
     glRenderer.setPixelRatio(dpr);
+    setSceneCanvas(glRenderer.domElement);
 
     // 2. Camera
     const fov = 2 * Math.atan(window.innerHeight / (2 * SCENE_FOV)) * (180 / Math.PI);

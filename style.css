@@ -1698,6 +1698,7 @@ canvas#c {
     text-shadow: 0 0 10px var(--card-glow, rgba(255,215,0,0.5));
 }
 .detail-character {
+    font-family: "Ma Shan Zheng", "ZCOOL XiaoWei", serif;
     font-size: 7.5rem;
     line-height: 1;
     color: #FFD700;
@@ -2726,6 +2727,55 @@ canvas#c {
 @keyframes drawCounterPulse {
     0%, 100% { box-shadow: 0 0 4px rgba(255, 215, 0, 0.2); }
     50% { box-shadow: 0 0 12px rgba(255, 215, 0, 0.4); }
+}
+
+/* --- Share Preview Modal --- */
+.share-preview-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+.share-preview-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 3001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.share-preview-inner {
+    max-width: 380px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    animation: cardAppear 0.35s ease-out;
+}
+.share-preview-img {
+    width: 100%;
+    max-height: 65vh;
+    object-fit: contain;
+    border-radius: 12px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 215, 0, 0.15);
+    border: 1px solid rgba(255, 215, 0, 0.25);
+}
+.share-preview-actions {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.share-preview-btn {
+    min-width: 100px;
+    padding: 12px 20px;
+    font-size: 14px;
+    border-radius: 10px;
 }
 
 /* --- Login Modal --- */
