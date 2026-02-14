@@ -1,6 +1,6 @@
 // payments.js — Stripe Payment Element integration for draw purchases
 import { CONFIG } from './config.js';
-import { getUser, updateDraws } from './auth.js';
+import { getUser, updateDraws, refreshProfile } from './auth.js';
 import { storage } from './storage.js';
 
 const DRAW_BUNDLES = [
@@ -56,8 +56,23 @@ async function showPaymentModal(bundle, user) {
   const descEl = document.getElementById('payment-desc');
   const mountEl = document.getElementById('payment-element');
   const statusEl = document.getElementById('payment-status');
-  const payBtn = document.getElementById('btn-pay');
-  const cancelBtn = document.getElementById('btn-close-payment');
+  const promoInput = document.getElementById('promo-code');
+
+  const resetButton = (id) => {
+    const btn = document.getElementById(id);
+    if (!btn) return null;
+    const clone = btn.cloneNode(true);
+    btn.replaceWith(clone);
+    return clone;
+  };
+
+  const payBtn = resetButton('btn-pay');
+  const cancelBtn = resetButton('btn-close-payment');
+  const promoBtn = resetButton('btn-apply-promo');
+
+  if (!modal || !titleEl || !descEl || !mountEl || !statusEl || !payBtn || !cancelBtn) {
+    throw new Error('Payment modal is missing required elements');
+  }
 
   // Reset state
   titleEl.textContent = `Buy ${bundle.label}`;
@@ -67,29 +82,134 @@ async function showPaymentModal(bundle, user) {
   payBtn.disabled = true;
   payBtn.textContent = 'Pay';
   mountEl.innerHTML = '';
+  if (promoInput) promoInput.value = '';
+  if (promoBtn) {
+    promoBtn.disabled = false;
+    promoBtn.textContent = 'Apply';
+  }
 
   modal.style.display = 'flex';
+
+  let paymentReady = false;
+  let promoPending = false;
+  let settled = false;
+  let resolveModal;
+  const resultPromise = new Promise((resolve) => {
+    resolveModal = resolve;
+  });
+
+  const backdropHandler = (e) => {
+    if (e.target === modal) {
+      closeModal(null);
+    }
+  };
+
+  const closeModal = (result) => {
+    if (settled) return;
+    settled = true;
+    modal.style.display = 'none';
+    modal.removeEventListener('click', backdropHandler);
+    resolveModal(result);
+  };
+
+  modal.addEventListener('click', backdropHandler);
+  cancelBtn.addEventListener('click', () => {
+    closeModal(null);
+  });
+
+  // Promo code handler — bypasses Stripe entirely
+  if (promoBtn && promoInput) {
+    promoBtn.addEventListener('click', async () => {
+      if (promoPending || settled) return;
+
+      const code = promoInput.value.trim();
+      if (!code) {
+        statusEl.textContent = 'Enter a code first';
+        statusEl.className = 'payment-status error';
+        return;
+      }
+
+      promoPending = true;
+      promoBtn.disabled = true;
+      promoBtn.textContent = 'Applying...';
+      payBtn.disabled = true;
+      statusEl.textContent = '';
+      statusEl.className = 'payment-status';
+
+      try {
+        const res = await fetch('/api/admin-credit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bundleId: bundle.id, userId: user.id, code }),
+        });
+        let data = {};
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          data = await res.json().catch(() => ({}));
+        } else {
+          const raw = await res.text().catch(() => '');
+          if (raw) {
+            data = { error: raw.slice(0, 160) };
+          }
+        }
+        if (!res.ok) {
+          const fallback =
+            res.status === 404
+              ? 'Promo endpoint not deployed'
+              : `Promo request failed (${res.status})`;
+          statusEl.textContent = data.error || fallback;
+          statusEl.className = 'payment-status error';
+          promoPending = false;
+          promoBtn.disabled = false;
+          promoBtn.textContent = 'Apply';
+          payBtn.disabled = !paymentReady;
+          return;
+        }
+        const draws = Number(data.draws) > 0 ? data.draws : bundle.draws;
+        statusEl.textContent = `Code applied! +${draws} draws`;
+        statusEl.className = 'payment-status success';
+        await refreshProfile();
+        setTimeout(() => {
+          closeModal({ success: true, draws });
+        }, 900);
+      } catch {
+        statusEl.textContent = 'Failed to apply code';
+        statusEl.className = 'payment-status error';
+        promoPending = false;
+        promoBtn.disabled = false;
+        promoBtn.textContent = 'Apply';
+        payBtn.disabled = !paymentReady;
+      }
+    });
+  }
 
   // Load Stripe and create PaymentIntent
   const stripeInstance = await getStripe();
   if (!stripeInstance) {
     statusEl.textContent = 'Stripe not available';
     statusEl.className = 'payment-status error';
-    return;
+    return resultPromise;
   }
 
   statusEl.textContent = 'Loading...';
-  const res = await fetch('/api/create-checkout-session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ bundleId: bundle.id, userId: user.id }),
-  });
+  let res;
+  try {
+    res = await fetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bundleId: bundle.id, userId: user.id }),
+    });
+  } catch {
+    statusEl.textContent = 'Failed to initialize payment';
+    statusEl.className = 'payment-status error';
+    return resultPromise;
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     statusEl.textContent = err.error || 'Failed to initialize payment';
     statusEl.className = 'payment-status error';
-    return;
+    return resultPromise;
   }
 
   const { clientSecret } = await res.json();
@@ -128,67 +248,49 @@ async function showPaymentModal(bundle, user) {
   paymentElement.mount(mountEl);
 
   paymentElement.on('ready', () => {
-    payBtn.disabled = false;
+    paymentReady = true;
+    if (!promoPending) {
+      payBtn.disabled = false;
+    }
   });
 
   // Handle payment submission
-  return new Promise((resolve) => {
-    const cleanup = () => {
-      modal.style.display = 'none';
-      payBtn.replaceWith(payBtn.cloneNode(true));
-      cancelBtn.replaceWith(cancelBtn.cloneNode(true));
-    };
+  payBtn.addEventListener('click', async () => {
+    if (promoPending || settled) return;
 
-    // Cancel button
-    cancelBtn.addEventListener('click', () => {
-      cleanup();
-      resolve(null);
-    }, { once: true });
+    payBtn.disabled = true;
+    payBtn.textContent = 'Processing...';
+    statusEl.textContent = '';
+    statusEl.className = 'payment-status';
 
-    // Close on backdrop click
-    const backdropHandler = (e) => {
-      if (e.target === modal) {
-        cleanup();
-        resolve(null);
-      }
-    };
-    modal.addEventListener('click', backdropHandler);
+    const { error } = await stripeInstance.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}${window.location.pathname}?payment=success&bundle=${bundle.id}`,
+      },
+      redirect: 'if_required',
+    });
 
-    // Pay button
-    payBtn.addEventListener('click', async () => {
-      payBtn.disabled = true;
-      payBtn.textContent = 'Processing...';
-      statusEl.textContent = '';
-      statusEl.className = 'payment-status';
+    if (error) {
+      statusEl.textContent = error.message;
+      statusEl.className = 'payment-status error';
+      payBtn.disabled = false;
+      payBtn.textContent = 'Pay';
+      return;
+    }
 
-      const { error } = await stripeInstance.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: `${window.location.origin}${window.location.pathname}?payment=success&bundle=${bundle.id}`,
-        },
-        redirect: 'if_required',
-      });
-
-      if (error) {
-        statusEl.textContent = error.message;
-        statusEl.className = 'payment-status error';
-        payBtn.disabled = false;
-        payBtn.textContent = 'Pay';
-      } else {
-        // Payment succeeded without redirect
-        statusEl.textContent = `Payment successful! +${bundle.draws} draws`;
-        statusEl.className = 'payment-status success';
-        payBtn.textContent = 'Done!';
-        modal.removeEventListener('click', backdropHandler);
-        setTimeout(() => {
-          cleanup();
-          // Reload to pick up credited draws from webhook
-          window.location.reload();
-        }, 1500);
-        resolve({ success: true, draws: bundle.draws });
-      }
-    }, { once: true });
+    // Payment succeeded without redirect
+    statusEl.textContent = `Payment successful! +${bundle.draws} draws`;
+    statusEl.className = 'payment-status success';
+    payBtn.textContent = 'Done!';
+    setTimeout(() => {
+      closeModal({ success: true, draws: bundle.draws });
+      // Reload to pick up credited draws from webhook
+      window.location.reload();
+    }, 1500);
   });
+
+  return resultPromise;
 }
 
 // Handle return from Stripe (3D Secure redirect).

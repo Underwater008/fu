@@ -403,6 +403,9 @@ function renderPurchaseBundles() {
             btn.querySelector('.purchase-price').textContent = bundle.price;
             btn.disabled = false;
           }, 2000);
+        } else {
+          btn.querySelector('.purchase-price').textContent = bundle.price;
+          btn.disabled = false;
         }
       } catch (e) {
         console.error('[purchase] failed:', e);
