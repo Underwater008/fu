@@ -4197,6 +4197,8 @@ function appendStaticMorphToGPU(startIdx = 0) {
     const instUV = particlesMesh.geometry.attributes.instanceUV;
     const instScale = particlesMesh.geometry.attributes.instanceScale;
     const maxCount = instColor.count;
+    const spread = getClusterSpread();
+    const breatheAmp = spread * 0.06;
 
     let idx = startIdx;
     for (const p of morphParticles) {
@@ -4208,7 +4210,8 @@ function appendStaticMorphToGPU(startIdx = 0) {
             ? p.char
             : ((p.finalChar && p.finalChar !== ' ') ? p.finalChar : '\u00B7');
 
-        _dummy.position.set(p.x, -p.y, -p.z);
+        const breathing = Math.sin(globalTime * 1.5 + p.phase) * breatheAmp;
+        _dummy.position.set(p.x, -p.y, -(p.z + breathing));
         _dummy.updateMatrix();
         particlesMesh.setMatrixAt(idx, _dummy.matrix);
 
