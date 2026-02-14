@@ -37,6 +37,11 @@ function escapeHtml(str) {
 // Preload Local Audio
 initMusicSystem();
 
+// Prevent pinch-zoom on iOS Safari (ignores viewport meta)
+document.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
+document.addEventListener('gesturechange', e => e.preventDefault(), { passive: false });
+document.addEventListener('gestureend', e => e.preventDefault(), { passive: false });
+
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const IS_COARSE_POINTER = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
@@ -5173,7 +5178,7 @@ function initStartOverlay() {
     // First visit: show special button text
     const hasEntered = localStorage.getItem('fu_has_entered');
     if (!hasEntered) {
-        btnEnter.textContent = 'ENTER FOR 10× LUCK';
+        btnEnter.textContent = 'ENTER FOR 10× FORTUNE';
     }
 
     const updateTime = () => {
