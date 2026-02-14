@@ -74,13 +74,24 @@ const localBackend = {
 const supabaseBackend = {
   async getProfile(userId) {
     const sb = await getSupabaseClient();
-    const { data } = await sb.from('profiles').select('*').eq('id', userId).single();
-    return data;
+    const { data, error } = await sb.from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .limit(1);
+    if (error) {
+      console.warn('Failed to load profile:', error);
+      return null;
+    }
+    return data?.[0] || null;
   },
   async upsertProfile(profile) {
     const sb = await getSupabaseClient();
-    const { data } = await sb.from('profiles').upsert(profile).select().single();
-    return data;
+    const { data, error } = await sb.from('profiles')
+      .upsert(profile)
+      .select('*')
+      .limit(1);
+    if (error) throw error;
+    return data?.[0] || profile;
   },
   async getCollection(userId) {
     const sb = await getSupabaseClient();

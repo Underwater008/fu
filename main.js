@@ -21,7 +21,7 @@ import {
     playSfxDraw, playSfxReveal, switchToVocal, switchToInst, initMusicSystem
 } from './audio.js';
 import { getUser, onAuthChange, restoreSession, ensureUser, spendDraws, getReferralFromUrl, applyReferral } from './auth.js';
-import { claimDailyLogin, getPityCounter, incrementPity, resetPity, setPityCounter } from './rewards.js';
+import { getPityCounter, incrementPity, resetPity, setPityCounter } from './rewards.js';
 import { initAds } from './ads.js';
 import { getPaymentResult } from './payments.js';
 import { claimGift, getGiftTokenFromUrl, returnExpiredGifts } from './gifting.js';
@@ -588,7 +588,7 @@ function setCell(col, row, depth, char, r, g, b, alpha) {
 // --- Character Sampling ---
 function sampleCharacterShape(char, resolution, fontOverride) {
     const off = document.createElement('canvas');
-    const octx = off.getContext('2d');
+    const octx = off.getContext('2d', { willReadFrequently: true });
     const charCount = [...char].length;
     const w = resolution * charCount;
     const h = resolution;
@@ -5360,6 +5360,68 @@ function initStartOverlay() {
             { font: '"ZCOOL XiaoWei"', char: '\u9A6C' },
             { font: '"Noto Serif TC"', char: '\u99AC' },                   // 馬 (traditional, one entry)
         ];
+
+        // Detect which character each font supports: 馬 (traditional) or 马 (simplified)
+        function getHorseFontEntries() {
+            const testSize = 64;
+            const testCanvas = document.createElement('canvas');
+            testCanvas.width = testSize;
+            testCanvas.height = testSize;
+            const tc = testCanvas.getContext('2d', { willReadFrequently: true });
+
+            function renderGlyph(fontSpec, char) {
+                tc.clearRect(0, 0, testSize, testSize);
+                tc.font = `${testSize * 0.7}px ${fontSpec}`;
+                tc.textAlign = 'center';
+                tc.textBaseline = 'middle';
+                tc.fillStyle = '#000';
+                tc.fillText(char, testSize / 2, testSize / 2);
+                return tc.getImageData(0, 0, testSize, testSize).data;
+            }
+
+            function pixelsDiffer(a, b) {
+                for (let i = 0; i < a.length; i += 4) {
+                    if (Math.abs(a[i + 3] - b[i + 3]) > 10) return true;
+                }
+                return false;
+            }
+
+            // Baselines: fallback rendering for both characters
+            const fallbackTrad = renderGlyph('"Noto Serif TC", serif', '\u99AC');
+            const fallbackSimp = renderGlyph('"Noto Serif TC", serif', '\u9A6C');
+
+            const entries = []; // { font, char }
+            const seen = new Set(); // avoid duplicate renderings
+            for (const f of HORSE_CANDIDATE_FONTS) {
+                const spec = `${f}, "Noto Serif TC", serif`;
+                // Try traditional 馬 first
+                const tradPixels = renderGlyph(spec, '\u99AC');
+                if (pixelsDiffer(tradPixels, fallbackTrad)) {
+                    // Check it's not a duplicate of an already-added font
+                    const key = Array.from(tradPixels).filter((_, i) => i % 4 === 3).join(',');
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        entries.push({ font: f, char: '\u99AC' });
+                    }
+                    continue;
+                }
+                // Fall back to simplified 马
+                const simpPixels = renderGlyph(spec, '\u9A6C');
+                if (pixelsDiffer(simpPixels, fallbackSimp)) {
+                    const key = Array.from(simpPixels).filter((_, i) => i % 4 === 3).join(',');
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        entries.push({ font: f, char: '\u9A6C' });
+                    }
+                    continue;
+                }
+            }
+            // Always include Noto Serif TC with traditional 馬
+            entries.push({ font: '"Noto Serif TC"', char: '\u99AC' });
+            return entries;
+        }
+
+        const horseFontEntries = getHorseFontEntries();
         const horseFontCount = horseFontEntries.length;
 
         // Zodiac characters for scramble phase (matching Google Fonts text subset)
@@ -5906,13 +5968,6 @@ function frame(now) {
     await returnExpiredGifts();
   } catch (e) {
     console.warn('Return expired gifts failed:', e);
-  }
-
-  try {
-    // Daily login check
-    await claimDailyLogin();
-  } catch (e) {
-    console.warn('Daily login claim failed:', e);
   }
 
   // Initialize monetization UI (auth bar, rewards panel, etc.)
