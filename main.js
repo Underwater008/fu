@@ -652,7 +652,7 @@ let multiFlipState = null; // { revealedCount, cardElements[] }
 let multiFortuneState = null; // Canvas-integrated multi fortune display
 
 // Force-load all calligraphy fonts with ALL characters used in the app
-const ALL_FONT_CHARS = ALL_LUCKY + '\u00B7\u4E00\u4EBA\u5341\u5927\u99AC\u9A6C';
+const ALL_FONT_CHARS = ALL_LUCKY + '\u00B7\u4E00\u4EBA\u5341\u5927\u99AC\u9A6C\u9F20\u725B\u864E\u5154\u9F8D\u86C7\u7F8A\u7334\u96DE\u72D7\u8C6C';
 const EXTRA_HORSE_FONTS = ['"Long Cang"', '"ZCOOL XiaoWei"'];
 Promise.all([
     ...CALLI_FONTS.map(f => document.fonts.load(`64px ${f}`, ALL_FONT_CHARS)),
@@ -5285,90 +5285,18 @@ function initStartOverlay() {
         const dpr = devicePixelRatio || 1;
         let lastCanvasW = 0, lastCanvasH = 0;
 
-        // All candidate fonts for horse morphing (CALLI_FONTS + extra calligraphy + system CJK fonts)
-        const HORSE_CANDIDATE_FONTS = [
-            ...CALLI_FONTS,
-            '"Long Cang"',
-            '"ZCOOL XiaoWei"',
-            // System CJK fonts (will be detected if available)
-            '"STKaiti"',
-            '"KaiTi"',
-            '"STFangsong"',
-            '"FangSong"',
-            '"STXihei"',
-            '"PingFang SC"',
+        // Direct font entries for horse morphing — use known web fonts, no pixel detection needed
+        const horseFontEntries = [
+            ...CALLI_FONTS.map(f => ({ font: f, char: '\u9A6C' })),       // 马 (simplified)
+            { font: '"Long Cang"', char: '\u9A6C' },
+            { font: '"ZCOOL XiaoWei"', char: '\u9A6C' },
+            { font: '"Noto Serif TC"', char: '\u99AC' },                   // 馬 (traditional, one entry)
         ];
-
-        // Detect which character each font supports: 馬 (traditional) or 马 (simplified)
-        function getHorseFontEntries() {
-            const testSize = 64;
-            const testCanvas = document.createElement('canvas');
-            testCanvas.width = testSize;
-            testCanvas.height = testSize;
-            const tc = testCanvas.getContext('2d');
-
-            function renderGlyph(fontSpec, char) {
-                tc.clearRect(0, 0, testSize, testSize);
-                tc.font = `${testSize * 0.7}px ${fontSpec}`;
-                tc.textAlign = 'center';
-                tc.textBaseline = 'middle';
-                tc.fillStyle = '#000';
-                tc.fillText(char, testSize / 2, testSize / 2);
-                return tc.getImageData(0, 0, testSize, testSize).data;
-            }
-
-            function pixelsDiffer(a, b) {
-                for (let i = 0; i < a.length; i += 4) {
-                    if (Math.abs(a[i + 3] - b[i + 3]) > 10) return true;
-                }
-                return false;
-            }
-
-            // Baselines: fallback rendering for both characters
-            const fallbackTrad = renderGlyph('"Noto Serif TC", serif', '\u99AC');
-            const fallbackSimp = renderGlyph('"Noto Serif TC", serif', '\u9A6C');
-
-            const entries = []; // { font, char }
-            const seen = new Set(); // avoid duplicate renderings
-            let hasTrad = false; // only keep one traditional 馬 entry
-            for (const f of HORSE_CANDIDATE_FONTS) {
-                const spec = `${f}, "Noto Serif TC", serif`;
-                // Try traditional 馬 first
-                const tradPixels = renderGlyph(spec, '\u99AC');
-                if (pixelsDiffer(tradPixels, fallbackTrad)) {
-                    if (!hasTrad) {
-                        const key = Array.from(tradPixels).filter((_, i) => i % 4 === 3).join(',');
-                        if (!seen.has(key)) {
-                            seen.add(key);
-                            entries.push({ font: f, char: '\u99AC' });
-                            hasTrad = true;
-                        }
-                    }
-                    continue;
-                }
-                // Fall back to simplified 马
-                const simpPixels = renderGlyph(spec, '\u9A6C');
-                if (pixelsDiffer(simpPixels, fallbackSimp)) {
-                    const key = Array.from(simpPixels).filter((_, i) => i % 4 === 3).join(',');
-                    if (!seen.has(key)) {
-                        seen.add(key);
-                        entries.push({ font: f, char: '\u9A6C' });
-                    }
-                    continue;
-                }
-            }
-            // Include Noto Serif TC traditional 馬 only if no other traditional entry exists
-            if (!hasTrad) {
-                entries.push({ font: '"Noto Serif TC"', char: '\u99AC' });
-            }
-            return entries;
-        }
-
-        const horseFontEntries = getHorseFontEntries();
         const horseFontCount = horseFontEntries.length;
 
-        // Zodiac cycle: rapid spin through 11 animals then land on 馬
-        const ZODIAC_OTHERS = ['鼠','牛','虎','兔','龙','蛇','羊','猴','鸡','狗','猪'];
+        // Zodiac cycle: rapid spin through 11 animals then land on 馬/马
+        // Use traditional forms matching the Google Fonts text subset
+        const ZODIAC_OTHERS = ['鼠','牛','虎','兔','龍','蛇','羊','猴','雞','狗','豬'];
         const spinDuration = 0.5;     // seconds for rapid zodiac spin
         const holdDuration = 2.5;     // seconds to hold 馬
         const cycleDur = spinDuration + holdDuration;
