@@ -317,7 +317,7 @@ body {
 .start-seal-row {
     position: absolute;
     left: 50%;
-    top: max(14.5vw, calc(14.5vw + env(safe-area-inset-top)));
+    bottom: max(14.5vw, calc(14.5vw + env(safe-area-inset-bottom)));
     transform: translateX(-50%);
     display: flex;
     align-items: center;
@@ -363,18 +363,9 @@ body {
 }
 
 
-.start-seal-bottom {
-    top: auto;
-    bottom: max(14.5vw, calc(14.5vw + env(safe-area-inset-bottom)));
-}
-
-/* Desktop: seal avatars at edges */
+/* Desktop: seal avatars at very bottom */
 @media (min-width: 768px) {
-    .start-seal-top {
-        top: 8px;
-    }
-    .start-seal-bottom {
-        top: auto;
+    .start-seal-row {
         bottom: 8px;
     }
 }
