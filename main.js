@@ -652,10 +652,12 @@ let multiFlipState = null; // { revealedCount, cardElements[] }
 let multiFortuneState = null; // Canvas-integrated multi fortune display
 
 // Force-load all calligraphy fonts with ALL characters used in the app
-const ALL_FONT_CHARS = ALL_LUCKY + '\u00B7\u4E00\u4EBA\u5341\u5927';
-Promise.all(
-    CALLI_FONTS.map(f => document.fonts.load(`64px ${f}`, ALL_FONT_CHARS))
-).then(() => {
+const ALL_FONT_CHARS = ALL_LUCKY + '\u00B7\u4E00\u4EBA\u5341\u5927\u99AC\u9A6C';
+const EXTRA_HORSE_FONTS = ['"Long Cang"', '"ZCOOL XiaoWei"'];
+Promise.all([
+    ...CALLI_FONTS.map(f => document.fonts.load(`64px ${f}`, ALL_FONT_CHARS)),
+    ...EXTRA_HORSE_FONTS.map(f => document.fonts.load(`64px ${f}`, '\u99AC\u9A6C').catch(() => {})),
+]).then(() => {
     fuShape = sampleCharacterShape('\u798F', 64, chosenFont);
     dajiShape = sampleCharacterShape('\u5927\u5409', 64);
     fontsReady = true;
@@ -5167,6 +5169,104 @@ const CNY_DATES = [
     { year: 2027, date: new Date('2027-02-06T00:00:00') },
 ];
 
+// ---- Flame particle effect for start overlay ----
+function initFlameEffect() {
+    const canvas = document.getElementById('flame-canvas');
+    if (!canvas) return null;
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let raf = 0;
+    let running = true;
+
+    function resize() {
+        canvas.width = canvas.offsetWidth * devicePixelRatio;
+        canvas.height = canvas.offsetHeight * devicePixelRatio;
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    const W = () => canvas.offsetWidth;
+    const H = () => canvas.offsetHeight;
+
+    const COLORS = [
+        [255, 200, 50],   // bright gold
+        [255, 140, 20],   // orange
+        [255, 80, 10],    // red-orange
+        [255, 50, 0],     // red
+        [255, 220, 100],  // pale gold
+    ];
+
+    function spawn() {
+        // Spawn from bottom area, rising up
+        const x = Math.random() * W();
+        const baseY = H() + 5;
+        const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+        const size = 2 + Math.random() * 4;
+        const life = 1.5 + Math.random() * 2.5;
+        const vx = (Math.random() - 0.5) * 30;
+        const vy = -(40 + Math.random() * 80);
+        particles.push({ x, y: baseY, vx, vy, size, life, maxLife: life, color, flicker: Math.random() * Math.PI * 2 });
+    }
+
+    function update(dt) {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.life -= dt;
+            if (p.life <= 0) { particles.splice(i, 1); continue; }
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx += (Math.random() - 0.5) * 50 * dt; // horizontal drift
+            p.vy -= 10 * dt; // slow down rise slightly
+            p.flicker += dt * 8;
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, W(), H());
+        for (const p of particles) {
+            const t = p.life / p.maxLife; // 1→0
+            const alpha = t * (0.4 + 0.3 * Math.sin(p.flicker));
+            const size = p.size * (0.5 + 0.5 * t);
+            const [r, g, b] = p.color;
+
+            // Glow
+            const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 3);
+            grad.addColorStop(0, `rgba(${r},${g},${b},${alpha})`);
+            grad.addColorStop(0.4, `rgba(${r},${g},${b},${alpha * 0.4})`);
+            grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+            ctx.fillStyle = grad;
+            ctx.fillRect(p.x - size * 3, p.y - size * 3, size * 6, size * 6);
+
+            // Core
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, size * 0.5, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${Math.min(255, r + 50)},${Math.min(255, g + 50)},${b},${alpha * 1.2})`;
+            ctx.fill();
+        }
+    }
+
+    let last = performance.now();
+    function loop(now) {
+        if (!running) return;
+        const dt = Math.min((now - last) / 1000, 0.05);
+        last = now;
+
+        // Spawn 2-4 particles per frame
+        const count = 2 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < count; i++) spawn();
+
+        update(dt);
+        draw();
+        raf = requestAnimationFrame(loop);
+    }
+    raf = requestAnimationFrame(loop);
+
+    return {
+        stop() { running = false; cancelAnimationFrame(raf); ctx.clearRect(0, 0, W(), H()); }
+    };
+}
+
 function initStartOverlay() {
     const overlay = document.getElementById('start-overlay');
     const btnEnter = document.getElementById('btn-enter');
@@ -5174,6 +5274,182 @@ function initStartOverlay() {
     const labelEl = document.getElementById('cny-label');
 
     if (!overlay || !btnEnter) return;
+
+    // Start flame effect
+    const flame = initFlameEffect();
+
+    // Horse "馬" canvas font-morphing (same technique as single draw)
+    const horseCanvas = document.getElementById('horse-canvas');
+    let horseMorphRunning = true;
+    if (horseCanvas) {
+        const hCtx = horseCanvas.getContext('2d');
+        const dpr = devicePixelRatio || 1;
+        let lastCanvasW = 0, lastCanvasH = 0;
+
+        // All candidate fonts for horse morphing (CALLI_FONTS + extra calligraphy + system CJK fonts)
+        const HORSE_CANDIDATE_FONTS = [
+            ...CALLI_FONTS,
+            '"Long Cang"',
+            '"ZCOOL XiaoWei"',
+            // System CJK fonts (will be detected if available)
+            '"STKaiti"',
+            '"KaiTi"',
+            '"STFangsong"',
+            '"FangSong"',
+            '"STXihei"',
+            '"PingFang SC"',
+        ];
+
+        // Detect which character each font supports: 馬 (traditional) or 马 (simplified)
+        function getHorseFontEntries() {
+            const testSize = 64;
+            const testCanvas = document.createElement('canvas');
+            testCanvas.width = testSize;
+            testCanvas.height = testSize;
+            const tc = testCanvas.getContext('2d');
+
+            function renderGlyph(fontSpec, char) {
+                tc.clearRect(0, 0, testSize, testSize);
+                tc.font = `${testSize * 0.7}px ${fontSpec}`;
+                tc.textAlign = 'center';
+                tc.textBaseline = 'middle';
+                tc.fillStyle = '#000';
+                tc.fillText(char, testSize / 2, testSize / 2);
+                return tc.getImageData(0, 0, testSize, testSize).data;
+            }
+
+            function pixelsDiffer(a, b) {
+                for (let i = 0; i < a.length; i += 4) {
+                    if (Math.abs(a[i + 3] - b[i + 3]) > 10) return true;
+                }
+                return false;
+            }
+
+            // Baselines: fallback rendering for both characters
+            const fallbackTrad = renderGlyph('"Noto Serif TC", serif', '\u99AC');
+            const fallbackSimp = renderGlyph('"Noto Serif TC", serif', '\u9A6C');
+
+            const entries = []; // { font, char }
+            const seen = new Set(); // avoid duplicate renderings
+            for (const f of HORSE_CANDIDATE_FONTS) {
+                const spec = `${f}, "Noto Serif TC", serif`;
+                // Try traditional 馬 first
+                const tradPixels = renderGlyph(spec, '\u99AC');
+                if (pixelsDiffer(tradPixels, fallbackTrad)) {
+                    // Check it's not a duplicate of an already-added font
+                    const key = Array.from(tradPixels).filter((_, i) => i % 4 === 3).join(',');
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        entries.push({ font: f, char: '\u99AC' });
+                    }
+                    continue;
+                }
+                // Fall back to simplified 马
+                const simpPixels = renderGlyph(spec, '\u9A6C');
+                if (pixelsDiffer(simpPixels, fallbackSimp)) {
+                    const key = Array.from(simpPixels).filter((_, i) => i % 4 === 3).join(',');
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        entries.push({ font: f, char: '\u9A6C' });
+                    }
+                    continue;
+                }
+            }
+            // Always include Noto Serif TC with traditional 馬
+            entries.push({ font: '"Noto Serif TC"', char: '\u99AC' });
+            return entries;
+        }
+
+        const horseFontEntries = getHorseFontEntries();
+        const horseFontCount = horseFontEntries.length;
+        const holdDuration = 1.6;    // seconds to hold each font
+        const transitionDur = 0.5;   // seconds for cross-fade transition
+        const cycleDur = holdDuration + transitionDur;
+        const startT = performance.now();
+        let currentFontIdx = Math.floor(Math.random() * horseFontCount);
+
+        function drawHorse(now) {
+            if (!horseMorphRunning) return;
+
+            // Resize canvas buffer every frame if CSS size changed
+            const cssW = horseCanvas.offsetWidth;
+            const cssH = horseCanvas.offsetHeight;
+            if (cssW !== lastCanvasW || cssH !== lastCanvasH) {
+                lastCanvasW = cssW;
+                lastCanvasH = cssH;
+                horseCanvas.width = cssW * dpr;
+                horseCanvas.height = cssH * dpr;
+                hCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            }
+            if (cssW === 0 || cssH === 0) { requestAnimationFrame(drawHorse); return; }
+
+            const t = (now - startT) / 1000;
+            const fontSize = cssW * 0.75;
+            const cx = cssW / 2;
+            const cy = cssH / 2 + fontSize * 0.33;
+
+            hCtx.clearRect(0, 0, cssW, cssH);
+
+            // Determine current cycle phase: hold or transition
+            const cycleT = t % cycleDur;
+            const fontCycle = Math.floor(t / cycleDur);
+            const fontIdx = (currentFontIdx + fontCycle) % horseFontCount;
+            const nextFontIdx = (fontIdx + 1) % horseFontCount;
+
+            hCtx.textAlign = 'center';
+            hCtx.textBaseline = 'alphabetic';
+            hCtx.fillStyle = '#FFD700';
+            hCtx.shadowColor = 'rgba(255, 165, 0, 0.8)';
+
+            if (cycleT < holdDuration) {
+                // Hold phase: show single font with glow
+                const entry = horseFontEntries[fontIdx];
+                hCtx.font = `${fontSize}px ${entry.font}, "Noto Serif TC", serif`;
+
+                // Outer glow
+                hCtx.globalAlpha = 0.3;
+                hCtx.shadowBlur = fontSize * 0.15;
+                hCtx.fillText(entry.char, cx, cy);
+
+                // Solid
+                hCtx.globalAlpha = 0.9;
+                hCtx.shadowBlur = fontSize * 0.05;
+                hCtx.fillText(entry.char, cx, cy);
+            } else {
+                // Transition phase: cross-fade to next font
+                const tt = (cycleT - holdDuration) / transitionDur;
+                const blend = easeInOut(tt);
+                const alphaA = 1 - blend;
+                const alphaB = blend;
+                const entryA = horseFontEntries[fontIdx];
+                const entryB = horseFontEntries[nextFontIdx];
+
+                // Font A (fading out)
+                hCtx.font = `${fontSize}px ${entryA.font}, "Noto Serif TC", serif`;
+                hCtx.globalAlpha = alphaA * 0.3;
+                hCtx.shadowBlur = fontSize * 0.15;
+                hCtx.fillText(entryA.char, cx, cy);
+                hCtx.globalAlpha = alphaA * 0.9;
+                hCtx.shadowBlur = fontSize * 0.05;
+                hCtx.fillText(entryA.char, cx, cy);
+
+                // Font B (fading in)
+                hCtx.font = `${fontSize}px ${entryB.font}, "Noto Serif TC", serif`;
+                hCtx.globalAlpha = alphaB * 0.3;
+                hCtx.shadowBlur = fontSize * 0.15;
+                hCtx.fillText(entryB.char, cx, cy);
+                hCtx.globalAlpha = alphaB * 0.9;
+                hCtx.shadowBlur = fontSize * 0.05;
+                hCtx.fillText(entryB.char, cx, cy);
+            }
+
+            hCtx.globalAlpha = 1;
+            hCtx.shadowBlur = 0;
+
+            requestAnimationFrame(drawHorse);
+        }
+        requestAnimationFrame(drawHorse);
+    }
 
     // First visit: show special button text
     const hasEntered = localStorage.getItem('fu_has_entered');
@@ -5197,11 +5473,19 @@ function initStartOverlay() {
             const zodiac = getZodiac(nextTarget.year);
             const dateStr = `${nextTarget.date.getFullYear()}.${String(nextTarget.date.getMonth() + 1).padStart(2, '0')}.${String(nextTarget.date.getDate()).padStart(2, '0')}`;
             
-            countdownEl.innerHTML = `${days}<span style="font-size:1.2rem; margin-right:6px">d</span> ${hours}<span style="font-size:1.2rem; margin-right:6px">h</span> ${mins}<span style="font-size:1.2rem; margin-right:6px">m</span> ${secs}<span style="font-size:1.2rem">s</span>`;
+            const pad = n => String(n).padStart(2, '0');
+            countdownEl.innerHTML = `
+                <div class="countdown-unit"><span class="countdown-number">${days}</span><span class="countdown-label">DAYS</span></div>
+                <span class="countdown-separator">:</span>
+                <div class="countdown-unit"><span class="countdown-number">${pad(hours)}</span><span class="countdown-label">HRS</span></div>
+                <span class="countdown-separator">:</span>
+                <div class="countdown-unit"><span class="countdown-number">${pad(mins)}</span><span class="countdown-label">MIN</span></div>
+                <span class="countdown-separator">:</span>
+                <div class="countdown-unit"><span class="countdown-number">${pad(secs)}</span><span class="countdown-label">SEC</span></div>`;
             labelEl.innerHTML = `
-                <div class="cny-label-en">UNTIL YEAR OF THE <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>
+                <div class="cny-label-en">UNTIL YEAR OF <span class="cny-label-highlight">THE ${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>
                 <div class="cny-label-cn">
-                    <span class="cny-label-char">${escapeHtml(zodiac.cn)}${escapeHtml(zodiac.ganZhi)}</span>
+                    <span class="cny-label-char">${escapeHtml(zodiac.ganZhi)}</span>
                     <span class="cny-label-date">${escapeHtml(dateStr)}</span>
                 </div>`;
         } else {
@@ -5220,11 +5504,12 @@ function initStartOverlay() {
             const zodiac = getZodiac(lastTarget.year);
             const dateStr = `${lastTarget.date.getFullYear()}.${String(lastTarget.date.getMonth() + 1).padStart(2, '0')}.${String(lastTarget.date.getDate()).padStart(2, '0')}`;
             
-            countdownEl.innerHTML = `${days}<span style="font-size:1.5rem"> DAYS AGO</span>`;
+            countdownEl.innerHTML = `
+                <div class="countdown-unit"><span class="countdown-number">${days}</span><span class="countdown-label">DAYS AGO</span></div>`;
             labelEl.innerHTML = `
-                <div class="cny-label-en">SINCE YEAR OF THE <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>
+                <div class="cny-label-en">SINCE YEAR OF <span class="cny-label-highlight">THE ${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>
                 <div class="cny-label-cn">
-                    <span class="cny-label-char">${escapeHtml(zodiac.cn)}${escapeHtml(zodiac.ganZhi)}</span>
+                    <span class="cny-label-char">${escapeHtml(zodiac.ganZhi)}</span>
                     <span class="cny-label-date">${escapeHtml(dateStr)}</span>
                 </div>`;
         }
@@ -5242,7 +5527,9 @@ function initStartOverlay() {
         // Init Audio Context (User Gesture)
         ensureAudio();
         
-        // Fade out overlay
+        // Stop effects & fade out overlay
+        horseMorphRunning = false;
+        if (flame) flame.stop();
         overlay.style.opacity = '0';
         setTimeout(() => {
             overlay.style.visibility = 'hidden';
