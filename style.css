@@ -56,7 +56,19 @@ body {
     overflow: hidden;
 }
 
-/* ... existing media query ... */
+@media (min-width: 768px) {
+    .start-content {
+        padding-top: 6vh;
+        gap: 0.5rem;
+    }
+}
+
+@media (min-width: 768px) and (orientation: landscape) {
+    .start-content {
+        padding-top: 4vh;
+        gap: 0.25rem;
+    }
+}
 
 /* Grand countdown blocks */
 .cny-countdown {
@@ -84,6 +96,15 @@ body {
     z-index: 1;
 }
 
+/* Desktop / landscape: constrain horse canvas to viewport height */
+@media (min-width: 768px) {
+    .horse-canvas {
+        width: clamp(180px, 35vh, 400px);
+        height: clamp(180px, 35vh, 400px);
+        top: 48%;
+    }
+}
+
 @keyframes horseBreath {
     0%, 100% { filter: drop-shadow(0 0 15px rgba(255, 165, 0, 0.6)) drop-shadow(0 0 35px rgba(255, 69, 0, 0.3)); }
     50% { filter: drop-shadow(0 0 25px rgba(255, 215, 0, 0.8)) drop-shadow(0 0 50px rgba(255, 69, 0, 0.5)); }
@@ -104,8 +125,7 @@ body {
     line-height: 1;
     text-shadow:
         0 0 30px rgba(255, 215, 0, 0.7),
-        0 0 60px rgba(255, 69, 0, 0.4),
-        0 2px 4px rgba(0, 0, 0, 0.5);
+        0 0 60px rgba(255, 69, 0, 0.4);
 }
 
 .countdown-label {
@@ -123,6 +143,23 @@ body {
     line-height: 1;
     align-self: flex-start;
     padding-top: clamp(4px, 1.5vw, 10px);
+}
+
+/* Desktop: smaller countdown */
+@media (min-width: 768px) {
+    .countdown-number {
+        font-size: clamp(2rem, 4vh, 3.2rem);
+    }
+    .countdown-separator {
+        font-size: clamp(1.2rem, 3vh, 2rem);
+        padding-top: clamp(2px, 0.8vh, 6px);
+    }
+    .countdown-label {
+        font-size: clamp(0.5rem, 1vh, 0.65rem);
+    }
+    .countdown-unit {
+        min-width: clamp(40px, 8vh, 70px);
+    }
 }
 
 /* Label area */
@@ -147,6 +184,18 @@ body {
     }
 }
 
+@media (min-width: 768px) {
+    #cny-label-bottom {
+        top: 70%;
+    }
+}
+
+@media (min-width: 768px) and (orientation: landscape) {
+    #cny-label-bottom {
+        top: 74%;
+    }
+}
+
 .cny-label-en {
     font-family: 'Courier New', monospace;
     font-size: clamp(0.8rem, 4vw, 1.6rem);
@@ -162,6 +211,13 @@ body {
     display: block;
     margin-top: 8px;
     text-shadow: 0 0 20px rgba(255, 100, 0, 0.8), 0 0 40px rgba(255, 69, 0, 0.5), 0 0 8px rgba(255, 215, 0, 0.9);
+}
+
+@media (min-width: 768px) {
+    .cny-label-highlight {
+        display: inline;
+        margin-top: 0;
+    }
 }
 
 .cny-label-cn {
@@ -208,6 +264,18 @@ body {
 @media (orientation: landscape) {
     .start-swipe-hint {
         top: 81%;
+    }
+}
+
+@media (min-width: 768px) {
+    .start-swipe-hint {
+        top: 80%;
+    }
+}
+
+@media (min-width: 768px) and (orientation: landscape) {
+    .start-swipe-hint {
+        top: 84%;
     }
 }
 
