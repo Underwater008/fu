@@ -11,6 +11,26 @@ import { RARITY_TIERS } from './gacha.js';
 let _currentDrawResult = null;
 let _currentDetailDraw = null;
 
+// Preload QR code image for share posters
+const qrImg = new Image();
+qrImg.src = './image/newqrcode.png';
+
+// Reference to the WebGL renderer canvas (3D scene only, no UI text)
+let _sceneCanvas = null;
+export function setSceneCanvas(canvas) { _sceneCanvas = canvas; }
+
+// Preload poster font characters for canvas rendering (cn-font-split needs explicit load)
+const POSTER_CHARS = '\u798F\u591A\u626B\u7801\u62BD\u65B0\u5E74\u7EB3';
+const POSTER_FONT = '"TsangerZhoukeZhengdabangshu"';
+document.fonts.ready.then(() => {
+  document.fonts.load(`72px ${POSTER_FONT}`, POSTER_CHARS).catch(() => {});
+});
+// Hidden DOM node to trigger unicode-range matching
+const _fontProbe = document.createElement('span');
+_fontProbe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;font-size:20px;font-family:"TsangerZhoukeZhengdabangshu",serif';
+_fontProbe.textContent = POSTER_CHARS;
+document.documentElement.appendChild(_fontProbe);
+
 export function setCurrentDrawResult(drawResult) {
   _currentDrawResult = drawResult;
 }
@@ -189,18 +209,9 @@ function wireRewardsPanel() {
       const user = getUser();
       if (!user) return;
 
-      // Use Web Share API
       try {
-        const shareUrl = `${window.location.origin}${window.location.pathname}?ref=${user.referral_code}`;
-        if (navigator.share) {
-          await navigator.share({
-            title: '福 Fortune Gacha',
-            text: 'Try your luck with the Fortune Gacha!',
-            url: shareUrl,
-          });
-        } else {
-          await navigator.clipboard.writeText(shareUrl);
-        }
+        // Generate and share a web poster image
+        await sharePoster();
         const result = await claimShareReward();
         if (result) {
           btnShare.innerHTML = `<span>+${result.draws} Draws!</span>`;
@@ -419,98 +430,323 @@ function renderPurchaseBundles() {
 
 // --- Share Card Image Generation ---
 export function generateShareCard(drawResult) {
+  const W = 1080, H = 1440;
   const canvas = document.createElement('canvas');
-  canvas.width = 600;
-  canvas.height = 800;
+  canvas.width = W;
+  canvas.height = H;
   const ctx = canvas.getContext('2d');
 
   // Red gradient background
-  const grad = ctx.createLinearGradient(0, 0, 0, 800);
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
   grad.addColorStop(0, '#8B0000');
   grad.addColorStop(0.5, '#CC0000');
   grad.addColorStop(1, '#8B0000');
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 600, 800);
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle texture pattern
+  ctx.globalAlpha = 0.03;
+  for (let i = 0; i < 60; i++) {
+    const x = Math.random() * W, y = Math.random() * H;
+    ctx.fillStyle = '#FFD700';
+    ctx.font = `${40 + Math.random() * 60}px "Ma Shan Zheng", serif`;
+    ctx.fillText('福', x, y);
+  }
+  ctx.globalAlpha = 1;
 
   // Gold border
   ctx.strokeStyle = drawResult.rarity.color;
-  ctx.lineWidth = 4;
-  ctx.strokeRect(20, 20, 560, 760);
+  ctx.lineWidth = 6;
+  ctx.strokeRect(36, 36, W - 72, H - 72);
+
+  // Inner border
+  ctx.strokeStyle = 'rgba(255, 215, 0, 0.25)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(48, 48, W - 96, H - 96);
 
   // Rarity glow border
   ctx.shadowColor = drawResult.rarity.glow;
-  ctx.shadowBlur = 30;
-  ctx.strokeRect(20, 20, 560, 760);
+  ctx.shadowBlur = 50;
+  ctx.strokeStyle = drawResult.rarity.color;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(36, 36, W - 72, H - 72);
   ctx.shadowBlur = 0;
 
   // Character (large, centered)
   ctx.textAlign = 'center';
   ctx.fillStyle = '#FFD700';
   ctx.shadowColor = drawResult.rarity.glow;
-  ctx.shadowBlur = 20;
-  ctx.font = '180px "Ma Shan Zheng", serif';
-  ctx.fillText(drawResult.char, 300, 320);
+  ctx.shadowBlur = 40;
+  ctx.font = '320px "Ma Shan Zheng", serif';
+  ctx.fillText(drawResult.char, W / 2, 520);
   ctx.shadowBlur = 0;
 
   // Stars
   const stars = drawResult.rarity.stars;
-  const starStr = '★'.repeat(stars);
+  const starStr = '\u2605'.repeat(stars);
   ctx.fillStyle = drawResult.rarity.color;
-  ctx.font = '32px sans-serif';
-  ctx.fillText(starStr, 300, 400);
+  ctx.font = '56px sans-serif';
+  ctx.fillText(starStr, W / 2, 640);
 
   // Tier label
   ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-  ctx.font = '20px sans-serif';
-  ctx.fillText(drawResult.rarity.label, 300, 440);
+  ctx.font = '36px sans-serif';
+  ctx.fillText(drawResult.rarity.label, W / 2, 710);
+
+  // Tier label English
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.font = '24px sans-serif';
+  ctx.fillText(drawResult.rarity.labelEn || '', W / 2, 750);
 
   // Category
   ctx.fillStyle = drawResult.category.color;
-  ctx.font = '18px sans-serif';
-  ctx.fillText(drawResult.category.name + ' · ' + drawResult.category.nameEn, 300, 480);
+  ctx.font = '32px sans-serif';
+  ctx.fillText(drawResult.category.name + ' \u00B7 ' + drawResult.category.nameEn, W / 2, 820);
 
   // Divider
   ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(100, 520);
-  ctx.lineTo(500, 520);
+  ctx.moveTo(180, 880);
+  ctx.lineTo(W - 180, 880);
   ctx.stroke();
 
   // Blessing phrase
   ctx.fillStyle = '#FFD700';
-  ctx.font = '36px "Ma Shan Zheng", serif';
-  ctx.fillText(drawResult.blessing.phrase, 300, 580);
+  ctx.font = '64px "Ma Shan Zheng", serif';
+  ctx.fillText(drawResult.blessing.phrase, W / 2, 980);
 
   // English
   ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-  ctx.font = 'italic 18px sans-serif';
-  ctx.fillText(drawResult.blessing.english, 300, 620);
+  ctx.font = 'italic 30px sans-serif';
+  ctx.fillText(drawResult.blessing.english, W / 2, 1050);
 
-  // Branding
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-  ctx.font = '14px sans-serif';
-  ctx.fillText('福 Fortune Gacha', 300, 740);
-  ctx.fillText(window.location.origin, 300, 760);
+  // Branding text (left-aligned, larger)
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.font = '48px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.fillText('\u626B\u7801\u62BD\u798F', 72, H - 130);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.font = '32px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.fillText('Scan to try your fortune', 72, H - 85);
+  ctx.fillStyle = 'rgba(255, 215, 0, 0.45)';
+  ctx.font = '28px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.fillText(window.location.origin, 72, H - 48);
+
+  // QR code (bottom-right, no background frame)
+  if (qrImg.complete && qrImg.naturalWidth > 0) {
+    const qrSize = 180;
+    const qrX = W - 60 - qrSize;
+    const qrY = H - 60 - qrSize;
+    ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+  }
 
   return canvas.toDataURL('image/png');
 }
 
 export async function shareResult(drawResult) {
   const imageDataUrl = generateShareCard(drawResult);
-  const blob = await (await fetch(imageDataUrl)).blob();
-  const file = new File([blob], 'fortune.png', { type: 'image/png' });
+  const title = `I drew ${drawResult.char} — ${drawResult.blessing.english}`;
+  await showSharePreview(imageDataUrl, 'fortune.png', title);
+}
 
-  if (navigator.canShare?.({ files: [file] })) {
-    await navigator.share({
-      title: `I drew ${drawResult.char} — ${drawResult.blessing.english}`,
-      files: [file],
-    });
-  } else {
-    // Fallback: download image
-    const a = document.createElement('a');
-    a.href = imageDataUrl;
-    a.download = 'fortune.png';
-    a.click();
+// --- Web Poster Generation (main page share) ---
+export function generateWebPoster() {
+  const W = 1080, H = 1920;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // 1. Dark red gradient base
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+  bgGrad.addColorStop(0, '#3A0000');
+  bgGrad.addColorStop(0.35, '#8B0000');
+  bgGrad.addColorStop(0.65, '#CC0000');
+  bgGrad.addColorStop(1, '#3A0000');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // 2. Subtle radial glow behind the character
+  const radGrad = ctx.createRadialGradient(W / 2, H * 0.48, 0, W / 2, H * 0.48, 500);
+  radGrad.addColorStop(0, 'rgba(255, 180, 0, 0.15)');
+  radGrad.addColorStop(0.5, 'rgba(200, 50, 0, 0.08)');
+  radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = radGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // 3. Faint decorative 福 texture scattered in background
+  ctx.save();
+  ctx.globalAlpha = 0.025;
+  ctx.fillStyle = '#FFD700';
+  for (let i = 0; i < 40; i++) {
+    const x = Math.random() * W, y = Math.random() * H;
+    ctx.font = `${30 + Math.random() * 50}px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif`;
+    ctx.fillText('\u798F', x, y);
   }
+  ctx.restore();
+
+  // 4. Gold border frame
+  ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(40, 40, W - 80, H - 80);
+  ctx.strokeStyle = 'rgba(255, 215, 0, 0.2)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(52, 52, W - 104, H - 104);
+
+  // 5. Large centered 福 character with glow
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const fuY = H * 0.46;
+
+  // Multi-layer glow effect
+  ctx.shadowColor = 'rgba(255, 200, 50, 0.6)';
+  ctx.shadowBlur = 80;
+  ctx.fillStyle = 'rgba(255, 215, 0, 0.08)';
+  ctx.font = '520px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.fillText('\u798F', W / 2, fuY);
+
+  ctx.shadowBlur = 50;
+  ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
+  ctx.fillText('\u798F', W / 2, fuY);
+
+  ctx.shadowColor = 'rgba(255, 180, 0, 0.8)';
+  ctx.shadowBlur = 30;
+  ctx.fillStyle = '#FFD700';
+  ctx.font = '480px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.fillText('\u798F', W / 2, fuY);
+  ctx.shadowBlur = 0;
+
+  // "新年纳福" below the big 福
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#FFD700';
+  ctx.shadowColor = 'rgba(255, 200, 50, 0.4)';
+  ctx.shadowBlur = 15;
+  ctx.font = '72px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.fillText('\u65B0\u5E74\u7EB3\u798F', W / 2, fuY + 380);
+  ctx.shadowBlur = 0;
+
+  // English below
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.font = 'italic 44px "Roboto Slab", serif';
+  ctx.fillText('Embrace Fortune in the New Year', W / 2, fuY + 450);
+
+  // 6. Top: "福多多" + "FUDUODUO"
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#FFD700';
+  ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
+  ctx.shadowBlur = 20;
+  ctx.font = '120px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.fillText('\u798F\u591A\u591A', W / 2, 180);
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = 'rgba(255, 215, 0, 0.6)';
+  ctx.font = '600 32px "Roboto Slab", serif';
+  ctx.fillText('FUDUODUO', W / 2, 235);
+
+  // Bottom gradient for QR readability
+  const botGrad = ctx.createLinearGradient(0, H - 380, 0, H);
+  botGrad.addColorStop(0, 'rgba(40, 0, 0, 0)');
+  botGrad.addColorStop(0.5, 'rgba(40, 0, 0, 0.45)');
+  botGrad.addColorStop(1, 'rgba(40, 0, 0, 0.85)');
+  ctx.fillStyle = botGrad;
+  ctx.fillRect(0, H - 380, W, 380);
+
+  // 7. Bottom section — text + QR code
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.font = '72px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.fillText('\u626B\u7801\u62BD\u798F', 80, H - 260);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.font = '44px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.fillText('Scan to try your fortune', 80, H - 190);
+
+  ctx.fillStyle = 'rgba(255, 215, 0, 0.5)';
+  ctx.font = '40px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.fillText(window.location.origin, 80, H - 120);
+
+  // QR code (bottom-right, no background frame)
+  if (qrImg.complete && qrImg.naturalWidth > 0) {
+    const qrSize = 220;
+    const qrX = W - 60 - qrSize;
+    const qrY = H - 60 - qrSize;
+    ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+  }
+
+  return canvas.toDataURL('image/png');
+}
+
+// Share web poster (for main page share button)
+export async function sharePoster() {
+  const imageDataUrl = generateWebPoster();
+  await showSharePreview(imageDataUrl, 'fuduoduo-poster.png', '\u798F\u591A\u591A Fortune Gacha');
+}
+
+// --- Share Preview Modal ---
+function showSharePreview(imageDataUrl, filename, title) {
+  return new Promise((resolve) => {
+    const backdrop = document.getElementById('share-preview-backdrop');
+    const modal = document.getElementById('share-preview-modal');
+    const img = document.getElementById('share-preview-img');
+    const btnConfirm = document.getElementById('btn-share-confirm');
+    const btnDownload = document.getElementById('btn-share-download');
+    const btnClose = document.getElementById('btn-share-close');
+
+    if (!modal || !img) { resolve(); return; }
+
+    img.src = imageDataUrl;
+    backdrop.style.display = '';
+    modal.style.display = '';
+
+    // Check if Web Share API supports file sharing
+    const canShareFiles = (() => {
+      try {
+        const testBlob = new Blob([''], { type: 'image/png' });
+        const testFile = new File([testBlob], 'test.png', { type: 'image/png' });
+        return navigator.canShare?.({ files: [testFile] });
+      } catch { return false; }
+    })();
+    btnConfirm.style.display = canShareFiles ? '' : 'none';
+
+    const cleanup = () => {
+      backdrop.style.display = 'none';
+      modal.style.display = 'none';
+      btnConfirm.removeEventListener('click', onShare);
+      btnDownload.removeEventListener('click', onDownload);
+      btnClose.removeEventListener('click', onClose);
+      backdrop.removeEventListener('click', onClose);
+    };
+
+    const onShare = async () => {
+      try {
+        const blob = await (await fetch(imageDataUrl)).blob();
+        const file = new File([blob], filename, { type: 'image/png' });
+        await navigator.share({ title, files: [file] });
+      } catch (e) {
+        if (e.name !== 'AbortError') console.warn('Share failed:', e);
+      }
+      cleanup();
+      resolve();
+    };
+
+    const onDownload = () => {
+      const a = document.createElement('a');
+      a.href = imageDataUrl;
+      a.download = filename;
+      a.click();
+      cleanup();
+      resolve();
+    };
+
+    const onClose = () => {
+      cleanup();
+      resolve();
+    };
+
+    btnConfirm.addEventListener('click', onShare);
+    btnDownload.addEventListener('click', onDownload);
+    btnClose.addEventListener('click', onClose);
+    backdrop.addEventListener('click', onClose);
+  });
 }
