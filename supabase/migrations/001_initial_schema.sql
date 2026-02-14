@@ -5,7 +5,7 @@ create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text,
   display_name text,
-  draws_remaining int default 10,
+  draws_remaining int default 15,
   total_draws int default 0,
   pity_counter int default 0,
   login_streak int default 0,

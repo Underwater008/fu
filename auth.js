@@ -116,8 +116,8 @@ async function devRestore() {
       return profile;
     }
   }
-  // No session — create anonymous user
-  return devCreateAnonymous();
+  // No session — return null (anonymous user created lazily on first draw)
+  return null;
 }
 
 // --- Prod mode (Supabase) ---
@@ -193,8 +193,8 @@ async function prodRestore() {
     notifyListeners();
     return profile;
   }
-  // No session — create anonymous session
-  return prodCreateAnonymous();
+  // No session — return null (anonymous user created lazily on first draw)
+  return null;
 }
 
 async function prodLogout() {
@@ -223,6 +223,12 @@ export async function linkAnonymousToEmail(email) {
 export async function logout() {
   if (!CONFIG.isProd) return devLogout();
   return prodLogout();
+}
+
+export async function ensureUser() {
+  if (currentUser) return currentUser;
+  if (!CONFIG.isProd) return devCreateAnonymous();
+  return prodCreateAnonymous();
 }
 
 export async function restoreSession() {

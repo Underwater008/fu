@@ -1,9 +1,9 @@
--- 002_anonymous_users.sql — Add anonymous user support
+-- 005_fix_anon_draws.sql — Give anonymous users 15 welcome draws (was defaulting to 10)
 
--- Add is_anonymous flag to profiles
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_anonymous boolean DEFAULT false;
+-- Update column default
+ALTER TABLE profiles ALTER COLUMN draws_remaining SET DEFAULT 15;
 
--- Update trigger to handle anonymous signups (null email)
+-- Update trigger to explicitly set 15 draws for all new users
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS trigger AS $$
 BEGIN

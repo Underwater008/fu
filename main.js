@@ -20,7 +20,7 @@ import {
     initAudio, resumeAudio, startBGM, toggleMute, isBGMMuted,
     playSfxDraw, playSfxReveal, switchToVocal, switchToInst, initMusicSystem
 } from './audio.js';
-import { getUser, onAuthChange, restoreSession, spendDraws } from './auth.js';
+import { getUser, onAuthChange, restoreSession, ensureUser, spendDraws } from './auth.js';
 import { claimDailyLogin, getPityCounter, incrementPity, resetPity, setPityCounter } from './rewards.js';
 import { initAds } from './ads.js';
 import { getPaymentResult } from './payments.js';
@@ -4413,7 +4413,7 @@ async function startMultiPull() {
 
 async function attemptPaidPull(mode = selectedMode) {
     const drawsNeeded = mode === 'multi' ? 10 : 1;
-    const user = getUser();
+    const user = getUser() || await ensureUser();
 
     if (!user || user.draws_remaining < drawsNeeded) {
         showRewardsPanel();
