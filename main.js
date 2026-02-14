@@ -4629,7 +4629,7 @@ function showMultiDetail(draw) {
 
     detailStars.textContent = '\u2605'.repeat(draw.rarity.stars) + '\u2606'.repeat(Math.max(0, 7 - draw.rarity.stars));
     detailStars.style.color = draw.rarity.color;
-    detailCategory.textContent = '[ ' + draw.rarity.label + ' \u00B7 ' + draw.rarity.labelEn + ' ]';
+    detailCategory.innerHTML = escapeHtml(draw.rarity.label) + '<br><span class="detail-category-en">' + escapeHtml(draw.rarity.labelEn) + '</span>';
     detailCategory.style.color = draw.rarity.color;
     detailCharacter.textContent = draw.char;
 
@@ -4765,9 +4765,9 @@ function showCollectionPanel() {
     const progress = getCollectionProgress();
     const categories = getCollectionByCategory();
 
-    // Update progress — centered hero ring + stats
+    // Update progress — right half of status row
     if (collectionProgress) {
-        collectionProgress.className = 'collection-progress-hero';
+        collectionProgress.className = 'collection-progress-half';
         const r = 38, circ = 2 * Math.PI * r;
         const offset = circ - (circ * progress.percentage / 100);
         collectionProgress.innerHTML =
@@ -4807,15 +4807,6 @@ function showCollectionPanel() {
             if (fillCircle) fillCircle.style.strokeDashoffset = offset;
             if (glowCircle) glowCircle.style.strokeDashoffset = offset;
         });
-        // Thin accent bar below the entire header
-        let bar = collectionProgress.parentElement.querySelector('.collection-progress-bar');
-        if (!bar) {
-            bar = document.createElement('div');
-            bar.className = 'collection-progress-bar';
-            bar.innerHTML = '<div class="collection-progress-fill"></div>';
-            collectionProgress.parentElement.appendChild(bar);
-        }
-        bar.querySelector('.collection-progress-fill').style.width = `${progress.percentage}%`;
     }
 
     // Build grid

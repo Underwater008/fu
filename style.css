@@ -1168,7 +1168,7 @@ canvas {
     --orn-pulse: 0;
 
     width: 100%;
-    padding: 60px 48px 52px;
+    padding: 60px 52px 52px;
     background: linear-gradient(155deg,
         rgba(70, 6, 6, 0.82) 0%,
         rgba(38, 5, 5, 0.85) 50%,
@@ -1200,7 +1200,7 @@ canvas {
 .detail-card::before {
     content: '';
     position: absolute;
-    inset: 9px;
+    inset: 7px;
     border: 1.2px solid rgba(255, 215, 0, 0.25);
     border-radius: 12px;
     pointer-events: none;
@@ -1210,7 +1210,7 @@ canvas {
 .detail-card::after {
     content: '';
     position: absolute;
-    inset: 16px;
+    inset: 14px;
     border: 1px solid rgba(145, 22, 22, 0.35);
     border-radius: 9px;
     pointer-events: none;
@@ -1257,7 +1257,7 @@ canvas {
 .detail-card.stars-4 {
     --orn-intensity: 0.72; --orn-side: 0.85; --orn-cloud: 0; --orn-pulse: 0;
     --orn-color: rgba(77, 166, 255, 0.88);
-    --orn-corner-size: 50px;
+    --orn-corner-size: 44px;
     --orn-corner-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M0 100V0h100' fill='none' stroke='white' stroke-width='5'/%3E%3Cpath d='M26 0v26H0' fill='none' stroke='white' stroke-width='4'/%3E%3Cpath d='M0 50h50V0' fill='none' stroke='white' stroke-width='3' opacity='.65'/%3E%3Cpath d='M10 88V10h78' fill='none' stroke='white' stroke-width='2' opacity='.25'/%3E%3C/svg%3E");
     border-color: rgba(77, 166, 255, 0.38);
     box-shadow:
@@ -1271,7 +1271,7 @@ canvas {
 .detail-card.stars-5 {
     --orn-intensity: 0.88; --orn-side: 0.92; --orn-cloud: 0.88; --orn-pulse: 0.15;
     --orn-color: rgba(176, 112, 255, 0.92);
-    --orn-corner-size: 56px;
+    --orn-corner-size: 48px;
     --orn-corner-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M0 100V0h100' fill='none' stroke='white' stroke-width='5'/%3E%3Cpath d='M24 0v24H0' fill='none' stroke='white' stroke-width='4'/%3E%3Cpath d='M0 44h44V0' fill='none' stroke='white' stroke-width='3.5' opacity='.7'/%3E%3Cpath d='M62 0v62H0' fill='none' stroke='white' stroke-width='3' opacity='.45'/%3E%3Cpath d='M10 86V10h76' fill='none' stroke='white' stroke-width='2' opacity='.28'/%3E%3Crect x='5' y='5' width='7' height='7' rx='1.5' fill='white' opacity='.5'/%3E%3C/svg%3E");
     border-color: rgba(176, 112, 255, 0.42);
     box-shadow:
@@ -1285,7 +1285,7 @@ canvas {
 .detail-card.stars-6 {
     --orn-intensity: 1; --orn-side: 1; --orn-cloud: 1; --orn-pulse: 1;
     --orn-color: rgba(255, 215, 0, 0.95);
-    --orn-corner-size: 62px;
+    --orn-corner-size: 52px;
     --orn-corner-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M0 100V0h100' fill='none' stroke='white' stroke-width='6'/%3E%3Cpath d='M22 0v22H0' fill='none' stroke='white' stroke-width='4.5'/%3E%3Cpath d='M0 42h42V0' fill='none' stroke='white' stroke-width='3.5' opacity='.8'/%3E%3Cpath d='M60 0v60H0' fill='none' stroke='white' stroke-width='3' opacity='.55'/%3E%3Cpath d='M76 0v76H0' fill='none' stroke='white' stroke-width='2.5' opacity='.35'/%3E%3Cpath d='M10 86V10h76' fill='none' stroke='white' stroke-width='2' opacity='.3'/%3E%3Crect x='5' y='5' width='8' height='8' rx='2' fill='white' opacity='.6'/%3E%3Ccircle cx='50' cy='3' r='2' fill='white' opacity='.5'/%3E%3Ccircle cx='3' cy='50' r='2' fill='white' opacity='.5'/%3E%3C/svg%3E");
     border-color: rgba(255, 215, 0, 0.6);
     box-shadow:
@@ -1315,7 +1315,7 @@ canvas {
 .detail-card.stars-7 {
     --orn-intensity: 1; --orn-side: 1; --orn-cloud: 1; --orn-pulse: 1;
     --orn-color: rgba(255, 0, 0, 1);
-    --orn-corner-size: 68px;
+    --orn-corner-size: 56px;
     --orn-corner-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M0 100V0h100' fill='none' stroke='white' stroke-width='7'/%3E%3Cpath d='M20 0v20H0' fill='none' stroke='white' stroke-width='5'/%3E%3Cpath d='M0 38h38V0' fill='none' stroke='white' stroke-width='4' opacity='.9'/%3E%3Cpath d='M55 0v55H0' fill='none' stroke='white' stroke-width='3.5' opacity='.7'/%3E%3Cpath d='M70 0v70H0' fill='none' stroke='white' stroke-width='3' opacity='.5'/%3E%3Cpath d='M85 0v85H0' fill='none' stroke='white' stroke-width='2.5' opacity='.35'/%3E%3Cpath d='M10 90V10h80' fill='none' stroke='white' stroke-width='2' opacity='.4'/%3E%3Crect x='4' y='4' width='10' height='10' rx='2' fill='white' opacity='.7'/%3E%3Ccircle cx='50' cy='3' r='3' fill='white' opacity='.6'/%3E%3Ccircle cx='3' cy='50' r='3' fill='white' opacity='.6'/%3E%3Ccircle cx='75' cy='3' r='2' fill='white' opacity='.4'/%3E%3Ccircle cx='3' cy='75' r='2' fill='white' opacity='.4'/%3E%3C/svg%3E");
     border-color: rgba(255, 0, 0, 0.8);
     box-shadow:
@@ -1441,10 +1441,10 @@ canvas {
     filter: drop-shadow(0 0 6px var(--orn-color, rgba(255, 215, 0, 0.3)));
 }
 .orn-corner::before, .orn-corner::after { content: none; }
-.orn-tl { top: 8px; left: 8px; }
-.orn-tr { top: 8px; right: 8px; transform: scaleX(-1); }
-.orn-bl { bottom: 8px; left: 8px; transform: scaleY(-1); }
-.orn-br { bottom: 8px; right: 8px; transform: scale(-1, -1); }
+.orn-tl { top: 6px; left: 6px; }
+.orn-tr { top: 6px; right: 6px; transform: scaleX(-1); }
+.orn-bl { bottom: 6px; left: 6px; transform: scaleY(-1); }
+.orn-br { bottom: 6px; right: 6px; transform: scale(-1, -1); }
 
 /* ===== Top/bottom center bar ===== */
 .orn-center {
@@ -1482,8 +1482,8 @@ canvas {
         transparent 6% 94%,
         var(--orn-color, rgba(255, 215, 0, 0.9)) 94% 100%);
 }
-.orn-top { top: 16px; }
-.orn-bottom { bottom: 16px; transform: translateX(-50%) scaleY(-1); }
+.orn-top { top: 14px; }
+.orn-bottom { bottom: 14px; transform: translateX(-50%) scaleY(-1); }
 
 /* ===== Side ornaments ===== */
 .orn-side {
@@ -1519,9 +1519,9 @@ canvas {
     transform: translateY(-50%);
     background: var(--orn-color, rgba(255, 215, 0, 0.88));
 }
-.orn-left { left: 18px; }
+.orn-left { left: 14px; }
 .orn-left::after { left: 1px; }
-.orn-right { right: 18px; }
+.orn-right { right: 14px; }
 .orn-right::after { right: 1px; }
 
 /* ===== Cloud flourish (祥云) ===== */
@@ -1550,8 +1550,8 @@ canvas {
     right: 22%;
     top: 1px;
 }
-.orn-cloud-top { top: 34px; }
-.orn-cloud-bottom { bottom: 34px; transform: translateX(-50%) scaleY(-1); }
+.orn-cloud-top { top: 30px; }
+.orn-cloud-bottom { bottom: 30px; transform: translateX(-50%) scaleY(-1); }
 
 /* ===== Corner dot accents ===== */
 .orn-seal-dots {
@@ -1571,19 +1571,25 @@ canvas {
     50% { opacity: calc(var(--orn-pulse) * 0.95); }
 }
 
+.detail-category {
+    font-size: 0.95rem;
+    color: var(--card-color, #FFD700);
+    margin-bottom: 6px;
+    letter-spacing: 5px;
+    line-height: 1.6;
+    text-shadow: 0 0 8px var(--card-glow, rgba(255,215,0,0.3));
+}
+.detail-category-en {
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    opacity: 0.7;
+}
 .detail-stars {
     font-size: 1.4rem;
     letter-spacing: 4px;
     margin-bottom: 12px;
     color: var(--card-color, #FFD700);
     text-shadow: 0 0 10px var(--card-glow, rgba(255,215,0,0.5));
-}
-.detail-category {
-    font-size: 0.85rem;
-    color: var(--card-color, #FFD700);
-    margin-bottom: 20px;
-    letter-spacing: 5px;
-    text-shadow: 0 0 8px var(--card-glow, rgba(255,215,0,0.3));
 }
 .detail-character {
     font-size: 7.5rem;
@@ -1747,7 +1753,7 @@ canvas {
         padding: 8px 0;
     }
     .detail-card {
-        padding: 52px 36px 40px;
+        padding: 56px 40px 44px;
     }
     .detail-character {
         font-size: 5.5rem;
@@ -1778,7 +1784,7 @@ canvas {
         margin: 8px 0 8px;
     }
     .detail-card {
-        padding: 44px 32px 36px;
+        padding: 48px 36px 40px;
     }
     .detail-stars {
         font-size: 1.1rem;
@@ -1789,18 +1795,26 @@ canvas {
     }
 }
 @media (max-width: 380px) {
-    .collection-progress-area {
-        gap: 18px;
+    .collection-status-row {
+        gap: 10px;
+    }
+    .collection-progress-half {
+        gap: 10px;
     }
     .progress-ring-wrap {
-        width: 76px;
-        height: 76px;
+        width: 56px;
+        height: 56px;
     }
     .progress-pct {
-        font-size: 1.3rem;
+        font-size: 1.1rem;
     }
     .stat-row-value {
-        font-size: 1.3rem;
+        font-size: 1.1rem;
+    }
+    .btn-signin-gold {
+        padding: 0 22px;
+        font-size: 12px;
+        min-height: 42px;
     }
     .collection-title-en span:first-child {
         font-size: 1.1rem;
@@ -1917,16 +1931,7 @@ canvas {
     text-align: right;
 }
 
-/* --- Collection Progress: Centered Hero --- */
-.collection-progress-hero {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
-    width: 100%;
-    max-width: 560px;
-    margin-top: 20px;
-}
+/* --- Collection Progress (right half of status row) --- */
 
 /* SVG Ring Container */
 .progress-ring-wrap {
@@ -2030,39 +2035,6 @@ canvas {
 }
 
 /* Bottom progress bar (thin elegant accent under header) */
-.collection-progress-bar {
-    width: 100%;
-    max-width: 400px;
-    height: 2px;
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 2px;
-    margin-top: 20px;
-    overflow: hidden;
-    position: relative;
-}
-.collection-progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg,
-        rgba(255, 180, 0, 0.5),
-        rgba(255, 215, 0, 0.9),
-        rgba(255, 240, 160, 1));
-    border-radius: 2px;
-    transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
-    position: relative;
-}
-.collection-progress-fill::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: -2px;
-    width: 4px;
-    height: 6px;
-    background: #FFD700;
-    border-radius: 3px;
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
-}
-
 /* Legacy stat classes (fallback) */
 .collection-stats {
     display: flex;
@@ -2456,31 +2428,32 @@ canvas {
    MONETIZATION UI — Auth bar, Login modal, Rewards panel
    ============================================================ */
 
-<<<<<<< HEAD
-/* --- Auth Strip (contextual sign-in below progress) --- */
-.collection-auth-strip {
+/* --- Status Row: auth (left half) + progress (right half) --- */
+.collection-status-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: 560px;
+    margin-top: 20px;
+    gap: 16px;
+}
+.collection-account-half {
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 100%;
-    max-width: 560px;
-    margin-top: 14px;
     position: relative;
+}
+.collection-progress-half {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
 }
 .auth-logged-out-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px 6px 6px 14px;
-    background: rgba(255, 215, 0, 0.04);
-    border: 1px solid rgba(255, 215, 0, 0.08);
-    border-radius: 20px;
-}
-.auth-save-hint {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.35);
-    letter-spacing: 0.3px;
-    white-space: nowrap;
 }
 .auth-logged-in-row {
     display: flex;
@@ -2507,61 +2480,53 @@ canvas {
     min-width: 160px;
 }
 
-/* Compact sign-in button inside auth strip */
-.btn-signin-compact {
-    min-height: 28px;
-    padding: 0 14px;
-    border-radius: 14px;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 1.2px;
+/* Gold-bordered sign-in button */
+.btn-auth.btn-signin-gold {
+    min-height: 48px;
+    padding: 0 32px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
     text-transform: uppercase;
-    color: rgba(255, 215, 0, 0.9);
-    text-shadow: none;
+    color: #FFD700;
+    text-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
     background: linear-gradient(135deg,
         rgba(255, 215, 0, 0.12) 0%,
-        rgba(255, 215, 0, 0.05) 100%);
-    border: 1px solid rgba(255, 215, 0, 0.3);
-    box-shadow: none;
-    transition: all 0.25s ease;
+        rgba(180, 120, 0, 0.10) 50%,
+        rgba(255, 215, 0, 0.08) 100%);
+    border: 2px solid rgba(255, 215, 0, 0.5);
+    box-shadow:
+        0 0 16px rgba(255, 215, 0, 0.10),
+        0 2px 8px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: all 0.3s ease;
     cursor: pointer;
 }
-
-.btn-signin-compact:hover {
+.btn-auth.btn-signin-gold:hover {
     background: linear-gradient(135deg,
-        rgba(255, 215, 0, 0.2) 0%,
-        rgba(255, 215, 0, 0.1) 100%);
-    border-color: rgba(255, 215, 0, 0.5);
-    color: #FFD700;
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.1);
+        rgba(255, 215, 0, 0.22) 0%,
+        rgba(200, 140, 0, 0.15) 50%,
+        rgba(255, 215, 0, 0.12) 100%);
+    border-color: rgba(255, 215, 0, 0.75);
+    color: #FFE44D;
+    box-shadow:
+        0 0 24px rgba(255, 215, 0, 0.18),
+        0 4px 12px rgba(0, 0, 0, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    transform: translateY(-1px);
 }
-
-.btn-signin-compact:active {
+.btn-auth.btn-signin-gold:active {
     transform: scale(0.97);
     transition-duration: 0.1s;
 }
 
-/* User badge button when logged in */
+/* User badge: inherits gold border, shows truncated name */
 .btn-user-badge {
-    padding: 5px 14px;
-    border-radius: 14px;
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.3px;
-    color: rgba(255, 255, 255, 0.7);
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    cursor: pointer;
-    transition: all 0.25s ease;
-    max-width: 180px;
+    max-width: 160px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-.btn-user-badge:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 215, 0, 0.25);
-    color: rgba(255, 215, 0, 0.8);
 }
 
 /* --- Draw Counter (inline in bottom controls, left of toggle) --- */

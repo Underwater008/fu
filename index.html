@@ -132,8 +132,8 @@
                     <span class="orn-cloud orn-cloud-bottom"></span>
                     <span class="orn-seal-dots"></span>
                 </div>
-                <div class="detail-stars" id="detail-stars"></div>
                 <div class="detail-category" id="detail-category"></div>
+                <div class="detail-stars" id="detail-stars"></div>
                 <div class="detail-character" id="detail-character"></div>
                 <div class="detail-char-en" id="detail-char-en"></div>
                 <div class="detail-divider"></div>
@@ -158,20 +158,21 @@
                 </h1>
                 <h2>福多多宝典</h2>
             </div>
-            <div id="collection-account" class="collection-auth-strip">
-                <div id="auth-logged-out" class="auth-logged-out-row">
-                    <span class="auth-save-hint">Sign in to save progress</span>
-                    <button id="btn-login" class="btn-auth btn-signin-compact">Sign In</button>
-                </div>
-                <div id="auth-logged-in" class="auth-logged-in-row" style="display:none">
-                    <button id="btn-auth-user" class="btn-auth btn-user-badge"></button>
-                    <div id="auth-dropdown" class="auth-dropdown" style="display:none">
-                        <span id="auth-email" class="auth-email"></span>
-                        <button id="btn-logout" class="btn-auth btn-small">Logout</button>
+            <div class="collection-status-row">
+                <div id="collection-account" class="collection-account-half">
+                    <div id="auth-logged-out" class="auth-logged-out-row">
+                        <button id="btn-login" class="btn-auth btn-signin-gold">Sign In</button>
+                    </div>
+                    <div id="auth-logged-in" class="auth-logged-in-row" style="display:none">
+                        <button id="btn-auth-user" class="btn-auth btn-signin-gold btn-user-badge"></button>
+                        <div id="auth-dropdown" class="auth-dropdown" style="display:none">
+                            <span id="auth-email" class="auth-email"></span>
+                            <button id="btn-logout" class="btn-auth btn-small">Logout</button>
+                        </div>
                     </div>
                 </div>
+                <div id="collection-progress" class="collection-progress-half"></div>
             </div>
-            <div id="collection-progress" class="collection-progress-hero"></div>
         </div>
         <div id="collection-grid" class="collection-grid"></div>
         <div class="collection-actions">
