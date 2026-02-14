@@ -139,7 +139,7 @@ async function prodCreateAnonymous() {
     await storage.addTransaction(userId, { type: 'welcome', draws_granted: CONFIG.rewards.anonymousWelcomeDraws });
   }
   currentUser = profile;
-  localStorage.setItem(LS_ANON_BOOTSTRAPPED, '1');
+  try { localStorage.setItem(LS_ANON_BOOTSTRAPPED, '1'); } catch {}
   notifyListeners();
   return profile;
 }
@@ -168,15 +168,25 @@ async function prodRestore() {
   // getSession() only returns the in-memory session and may be null if the
   // client hasn't finished its async initialisation yet. Listening for the
   // INITIAL_SESSION event is the reliable way to detect an existing session.
+  // Timeout after 5s so we don't hang forever (iOS Safari may never fire this).
   const session = await new Promise((resolve) => {
+    let settled = false;
     const { data: { subscription } } = sb.auth.onAuthStateChange(
       (event, sess) => {
-        if (event === 'INITIAL_SESSION') {
+        if (event === 'INITIAL_SESSION' && !settled) {
+          settled = true;
           subscription.unsubscribe();
           resolve(sess);
         }
       },
     );
+    setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        subscription.unsubscribe();
+        resolve(null);
+      }
+    }, 5000);
   });
 
   if (session?.user) {
@@ -192,7 +202,7 @@ async function prodRestore() {
     }
     currentUser = profile;
     if (profile.is_anonymous) {
-      localStorage.setItem(LS_ANON_BOOTSTRAPPED, '1');
+      try { localStorage.setItem(LS_ANON_BOOTSTRAPPED, '1'); } catch {}
     }
     notifyListeners();
     return profile;
