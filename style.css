@@ -146,7 +146,7 @@ body {
 
 .cny-label-en {
     font-family: 'Courier New', monospace;
-    font-size: clamp(0.85rem, 3vw, 1.35rem);
+    font-size: clamp(1.6rem, 7vw, 3rem);
     letter-spacing: 3px;
     text-transform: uppercase;
     margin-bottom: 10px;
@@ -211,16 +211,16 @@ body {
 .start-seal-row {
     position: absolute;
     left: 50%;
-    bottom: max(56px, calc(48px + env(safe-area-inset-bottom)));
+    bottom: max(14.5vw, calc(14.5vw + env(safe-area-inset-bottom)));
     transform: translateX(-50%);
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     z-index: 2;
 }
 
 .start-seal-link {
-    width: clamp(42px, 8vw, 56px);
+    width: clamp(28px, 5vw, 40px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -254,6 +254,13 @@ body {
 .start-ornament-top,
 .start-ornament-bottom {
     display: none;
+}
+
+/* Desktop: seal avatars at very bottom */
+@media (min-width: 768px) {
+    .start-seal-row {
+        bottom: 8px;
+    }
 }
 
 .mute-btn {

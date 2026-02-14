@@ -5419,28 +5419,43 @@ function initStartOverlay() {
                 // Transition phase: cross-fade to next font
                 const tt = (cycleT - holdDuration) / transitionDur;
                 const blend = easeInOut(tt);
-                const alphaA = 1 - blend;
-                const alphaB = blend;
                 const entryA = horseFontEntries[fontIdx];
                 const entryB = horseFontEntries[nextFontIdx];
 
-                // Font A (fading out)
-                hCtx.font = `${fontSize}px ${entryA.font}, "Noto Serif TC", serif`;
-                hCtx.globalAlpha = alphaA * 0.3;
-                hCtx.shadowBlur = fontSize * 0.15;
-                hCtx.fillText(entryA.char, cx, cy);
-                hCtx.globalAlpha = alphaA * 0.9;
-                hCtx.shadowBlur = fontSize * 0.05;
-                hCtx.fillText(entryA.char, cx, cy);
+                let alphaA, alphaB;
+                if (IS_COARSE_POINTER) {
+                    // Mobile: sequential fade — A fades out fully, then B fades in
+                    if (blend < 0.5) {
+                        alphaA = lerp(1, 0, blend / 0.5);
+                        alphaB = 0;
+                    } else {
+                        alphaA = 0;
+                        alphaB = lerp(0, 1, (blend - 0.5) / 0.5);
+                    }
+                } else {
+                    alphaA = 1 - blend;
+                    alphaB = blend;
+                }
 
-                // Font B (fading in)
-                hCtx.font = `${fontSize}px ${entryB.font}, "Noto Serif TC", serif`;
-                hCtx.globalAlpha = alphaB * 0.3;
-                hCtx.shadowBlur = fontSize * 0.15;
-                hCtx.fillText(entryB.char, cx, cy);
-                hCtx.globalAlpha = alphaB * 0.9;
-                hCtx.shadowBlur = fontSize * 0.05;
-                hCtx.fillText(entryB.char, cx, cy);
+                if (alphaA > 0.01) {
+                    hCtx.font = `${fontSize}px ${entryA.font}, "Noto Serif TC", serif`;
+                    hCtx.globalAlpha = alphaA * 0.3;
+                    hCtx.shadowBlur = fontSize * 0.15;
+                    hCtx.fillText(entryA.char, cx, cy);
+                    hCtx.globalAlpha = alphaA * 0.9;
+                    hCtx.shadowBlur = fontSize * 0.05;
+                    hCtx.fillText(entryA.char, cx, cy);
+                }
+
+                if (alphaB > 0.01) {
+                    hCtx.font = `${fontSize}px ${entryB.font}, "Noto Serif TC", serif`;
+                    hCtx.globalAlpha = alphaB * 0.3;
+                    hCtx.shadowBlur = fontSize * 0.15;
+                    hCtx.fillText(entryB.char, cx, cy);
+                    hCtx.globalAlpha = alphaB * 0.9;
+                    hCtx.shadowBlur = fontSize * 0.05;
+                    hCtx.fillText(entryB.char, cx, cy);
+                }
             }
 
             hCtx.globalAlpha = 1;
@@ -5451,11 +5466,8 @@ function initStartOverlay() {
         requestAnimationFrame(drawHorse);
     }
 
-    // First visit: show special button text
-    const hasEntered = localStorage.getItem('fu_has_entered');
-    if (!hasEntered) {
-        btnEnter.textContent = 'ENTER FOR 10× FORTUNE';
-    }
+    // Always show fortune button text
+    btnEnter.textContent = 'ENTER FOR 10× FORTUNE';
 
     const updateTime = () => {
         if (overlay.style.opacity === '0' || overlay.style.display === 'none') return;
