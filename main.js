@@ -27,7 +27,6 @@ import { getPaymentResult } from './payments.js';
 import { claimGift, getGiftTokenFromUrl, returnExpiredGifts } from './gifting.js';
 import { initMonetizationUI, setCurrentDrawResult, showSingleFortuneActions, hideSingleFortuneActions, showMultiShareButton, hideMultiShareButton, setDetailDraw } from './monetization-ui.js';
 import { loadCollection } from './gacha.js';
-
 // --- HTML escape helper (prevent XSS in innerHTML) ---
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -4965,6 +4964,7 @@ function updateUIVisibility() {
     } else {
         hideMultiShareButton();
     }
+
 }
 
 // ============================================================

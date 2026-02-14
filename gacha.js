@@ -316,15 +316,20 @@ export function getCollectionProgress() {
 
 export function getCollectionByCategory() {
     const coll = loadCollection();
-    return BLESSING_CATEGORIES.map(cat => ({
-        ...cat,
-        items: [...cat.chars].map(ch => ({
+    return BLESSING_CATEGORIES.map(cat => {
+        const items = [...cat.chars].map(ch => ({
             char: ch,
             collected: !!coll[ch],
             count: coll[ch]?.count || 0,
             maxStars: coll[ch]?.maxStars || 0,
             blessing: FULL_CHAR_BLESSINGS[ch],
-        })),
-        collectedCount: [...cat.chars].filter(ch => !!coll[ch]).length,
-    }));
+        }));
+        // Sort by baseStars descending within each category
+        items.sort((a, b) => (b.blessing?.baseStars || 0) - (a.blessing?.baseStars || 0));
+        return {
+            ...cat,
+            items,
+            collectedCount: items.filter(it => it.collected).length,
+        };
+    });
 }
