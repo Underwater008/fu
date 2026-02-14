@@ -1,7 +1,13 @@
 // api/create-checkout-session.js — Creates a Stripe PaymentIntent for embedded payment
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+function getStripeClient() {
+  const secretKey = (process.env.STRIPE_SECRET_KEY || '').trim();
+  if (!secretKey) {
+    throw new Error('STRIPE_SECRET_KEY not configured');
+  }
+  return new Stripe(secretKey);
+}
 
 // Map bundle IDs to amounts (cents) and draw counts
 const BUNDLES = {
@@ -28,6 +34,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    const stripe = getStripeClient();
     const paymentIntent = await stripe.paymentIntents.create({
       amount: bundle.amount,
       currency: 'usd',

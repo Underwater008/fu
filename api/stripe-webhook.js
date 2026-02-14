@@ -3,12 +3,22 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+function getStripeClient() {
+  const secretKey = (process.env.STRIPE_SECRET_KEY || '').trim();
+  if (!secretKey) {
+    throw new Error('STRIPE_SECRET_KEY not configured');
+  }
+  return new Stripe(secretKey);
+}
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+function getSupabaseClient() {
+  const url = (process.env.SUPABASE_URL || '').trim();
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  if (!url || !serviceRoleKey) {
+    throw new Error('Supabase service role not configured');
+  }
+  return createClient(url, serviceRoleKey);
+}
 
 function getRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -25,16 +35,30 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  let stripe;
+  let supabase;
+  try {
+    stripe = getStripeClient();
+    supabase = getSupabaseClient();
+  } catch (err) {
+    console.error('Webhook config error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+
   // Read raw body for signature verification
   const rawBody = await getRawBody(req);
   const sig = req.headers['stripe-signature'];
+  const webhookSecret = (process.env.STRIPE_WEBHOOK_SECRET || '').trim();
+  if (!webhookSecret) {
+    return res.status(500).json({ error: 'STRIPE_WEBHOOK_SECRET not configured' });
+  }
 
   let event;
   try {
     event = stripe.webhooks.constructEvent(
       rawBody,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET
+      webhookSecret
     );
   } catch (err) {
     console.error('Webhook signature verification failed:', err.message);
