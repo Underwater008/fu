@@ -498,7 +498,7 @@ export function generateShareCard(drawResult) {
   for (let i = 0; i < 60; i++) {
     const x = Math.random() * W, y = Math.random() * H;
     ctx.fillStyle = '#FFD700';
-    ctx.font = `${40 + Math.random() * 60}px "Ma Shan Zheng", serif`;
+    ctx.font = `${40 + Math.random() * 60}px "TsangerZhoukeZhengdabangshu", serif`;
     ctx.fillText('福', x, y);
   }
   ctx.globalAlpha = 1;
@@ -521,12 +521,14 @@ export function generateShareCard(drawResult) {
   ctx.strokeRect(36, 36, W - 72, H - 72);
   ctx.shadowBlur = 0;
 
+  const F = '"TsangerZhoukeZhengdabangshu", serif';
+
   // Character (large, centered)
   ctx.textAlign = 'center';
   ctx.fillStyle = '#FFD700';
   ctx.shadowColor = drawResult.rarity.glow;
   ctx.shadowBlur = 40;
-  ctx.font = '320px "Ma Shan Zheng", serif';
+  ctx.font = `320px ${F}`;
   ctx.fillText(drawResult.char, W / 2, 520);
   ctx.shadowBlur = 0;
 
@@ -534,52 +536,55 @@ export function generateShareCard(drawResult) {
   const stars = drawResult.rarity.stars;
   const starStr = '\u2605'.repeat(stars);
   ctx.fillStyle = drawResult.rarity.color;
-  ctx.font = '56px sans-serif';
+  ctx.font = `56px ${F}`;
   ctx.fillText(starStr, W / 2, 640);
 
   // Tier label
   ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-  ctx.font = '36px sans-serif';
+  ctx.font = `36px ${F}`;
   ctx.fillText(drawResult.rarity.label, W / 2, 710);
 
   // Tier label English
   ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-  ctx.font = '24px sans-serif';
+  ctx.font = `24px ${F}`;
   ctx.fillText(drawResult.rarity.labelEn || '', W / 2, 750);
 
   // Category
   ctx.fillStyle = drawResult.category.color;
-  ctx.font = '32px sans-serif';
-  ctx.fillText(drawResult.category.name + ' \u00B7 ' + drawResult.category.nameEn, W / 2, 820);
+  ctx.font = `32px ${F}`;
+  ctx.fillText(drawResult.category.name, W / 2, 810);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.font = `22px ${F}`;
+  ctx.fillText(drawResult.category.nameEn, W / 2, 848);
 
   // Divider
   ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(180, 880);
-  ctx.lineTo(W - 180, 880);
+  ctx.moveTo(180, 900);
+  ctx.lineTo(W - 180, 900);
   ctx.stroke();
 
   // Blessing phrase
   ctx.fillStyle = '#FFD700';
-  ctx.font = '64px "Ma Shan Zheng", serif';
-  ctx.fillText(drawResult.blessing.phrase, W / 2, 980);
+  ctx.font = `64px ${F}`;
+  ctx.fillText(drawResult.blessing.phrase, W / 2, 1000);
 
   // English
   ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-  ctx.font = 'italic 30px sans-serif';
-  ctx.fillText(drawResult.blessing.english, W / 2, 1050);
+  ctx.font = `italic 28px ${F}`;
+  ctx.fillText(drawResult.blessing.english, W / 2, 1060);
 
   // Branding text (left-aligned, larger)
   ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-  ctx.font = '48px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.font = `48px ${F}`;
   ctx.fillText('\u626B\u7801\u62BD\u798F', 72, H - 170);
   ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-  ctx.font = '32px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.font = `28px ${F}`;
   ctx.fillText('Scan to try your fortune', 72, H - 122);
   ctx.fillStyle = 'rgba(255, 215, 0, 0.45)';
-  ctx.font = '28px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.font = `24px ${F}`;
   ctx.fillText(window.location.origin, 72, H - 82);
 
   // QR code (bottom-right, no background frame)
