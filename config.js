@@ -21,7 +21,7 @@ export const CONFIG = {
     maxPerDay: 10,
   },
   rewards: {
-    welcomeDraws: 10,
+    welcomeDraws: 99,
     anonymousWelcomeDraws: 99,
     shareDraws: 10,
     shareCooldownMs: 15 * 60 * 1000, // 15 minutes
