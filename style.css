@@ -320,7 +320,7 @@ body {
 .start-seal-row {
     position: absolute;
     left: 50%;
-    bottom: max(14.5vw, calc(14.5vw + env(safe-area-inset-bottom)));
+    bottom: max(8vw, calc(8vw + env(safe-area-inset-bottom)));
     transform: translateX(-50%);
     display: flex;
     align-items: center;
@@ -329,7 +329,7 @@ body {
 }
 
 .start-seal-link {
-    width: clamp(20px, 3.5vw, 28px);
+    width: clamp(28px, 5vw, 40px);
     display: flex;
     align-items: center;
     justify-content: center;
