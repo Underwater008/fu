@@ -5353,14 +5353,6 @@ function initStartOverlay() {
         const dpr = devicePixelRatio || 1;
         let lastCanvasW = 0, lastCanvasH = 0;
 
-        // Direct font entries for horse morphing — use known web fonts, no pixel detection needed
-        const horseFontEntries = [
-            ...CALLI_FONTS.map(f => ({ font: f, char: '\u9A6C' })),       // 马 (simplified)
-            { font: '"Long Cang"', char: '\u9A6C' },
-            { font: '"ZCOOL XiaoWei"', char: '\u9A6C' },
-            { font: '"Noto Serif TC"', char: '\u99AC' },                   // 馬 (traditional, one entry)
-        ];
-
         // Detect which character each font supports: 馬 (traditional) or 马 (simplified)
         function getHorseFontEntries() {
             const testSize = 64;
