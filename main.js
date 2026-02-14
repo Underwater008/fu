@@ -2001,9 +2001,8 @@ function initDrawAnimation() {
     resetCam();
     if (!fontsReady) return;
 
-    // Multi-pull: spawn meteors as rarity tell + set god ray color
+    // Multi-pull: set god ray color (meteors disabled)
     if (isMultiMode && bestStarsInBatch >= 4) {
-        spawnMeteors();
         const mc = getMeteorColor(bestStarsInBatch);
         godRayColor = mc.trail;
     }
@@ -4617,8 +4616,8 @@ function showMultiDetail(draw) {
 
     detailStars.textContent = '\u2605'.repeat(draw.rarity.stars) + '\u2606'.repeat(6 - draw.rarity.stars);
     detailStars.style.color = draw.rarity.color;
-    detailCategory.textContent = '[ ' + draw.category.name + ' \u00B7 ' + draw.category.nameEn + ' ]';
-    detailCategory.style.color = draw.category.color;
+    detailCategory.textContent = '[ ' + draw.rarity.label + ' \u00B7 ' + draw.rarity.labelEn + ' ]';
+    detailCategory.style.color = draw.rarity.color;
     detailCharacter.textContent = draw.char;
 
     // English name of the character
@@ -5168,6 +5167,12 @@ function initStartOverlay() {
 
     if (!overlay || !btnEnter) return;
 
+    // First visit: show special button text
+    const hasEntered = localStorage.getItem('fu_has_entered');
+    if (!hasEntered) {
+        btnEnter.textContent = 'ENTER FOR 10× LUCK';
+    }
+
     const updateTime = () => {
         if (overlay.style.opacity === '0' || overlay.style.display === 'none') return;
 
@@ -5186,10 +5191,10 @@ function initStartOverlay() {
             
             countdownEl.innerHTML = `${days}<span style="font-size:1.2rem; margin-right:6px">d</span> ${hours}<span style="font-size:1.2rem; margin-right:6px">h</span> ${mins}<span style="font-size:1.2rem; margin-right:6px">m</span> ${secs}<span style="font-size:1.2rem">s</span>`;
             labelEl.innerHTML = `
-                <div style="margin-bottom: 12px">UNTIL YEAR OF THE ${escapeHtml(zodiac.en)}</div>
-                <div style="display: flex; align-items: center; justify-content: center; gap: 16px;">
-                    <span style="font-family:'Ma Shan Zheng', 'Noto Serif TC', serif; font-size:1.6em; font-weight:normal">${escapeHtml(zodiac.cn)} ${escapeHtml(zodiac.ganZhi)}</span>
-                    <span style="opacity:0.8; font-family:'Courier New', monospace; font-size: 0.9em">${escapeHtml(dateStr)}</span>
+                <div class="cny-label-en">UNTIL YEAR OF THE <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>
+                <div class="cny-label-cn">
+                    <span class="cny-label-char">${escapeHtml(zodiac.cn)}${escapeHtml(zodiac.ganZhi)}</span>
+                    <span class="cny-label-date">${escapeHtml(dateStr)}</span>
                 </div>`;
         } else {
             // If no future date in our list, find the most recent past date
@@ -5208,7 +5213,12 @@ function initStartOverlay() {
             const dateStr = `${lastTarget.date.getFullYear()}.${String(lastTarget.date.getMonth() + 1).padStart(2, '0')}.${String(lastTarget.date.getDate()).padStart(2, '0')}`;
             
             countdownEl.innerHTML = `${days}<span style="font-size:1.5rem"> DAYS AGO</span>`;
-            labelEl.innerHTML = `SINCE YEAR OF THE ${escapeHtml(zodiac.en)} <span style="font-family:'Ma Shan Zheng', 'Noto Serif TC', serif; margin-left:24px; font-size:1.5em; font-weight:normal">${escapeHtml(zodiac.cn)} ${escapeHtml(zodiac.ganZhi)}</span> <span style="margin-left:8px; opacity:0.8; font-family:'Courier New', monospace">${escapeHtml(dateStr)}</span>`;
+            labelEl.innerHTML = `
+                <div class="cny-label-en">SINCE YEAR OF THE <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>
+                <div class="cny-label-cn">
+                    <span class="cny-label-char">${escapeHtml(zodiac.cn)}${escapeHtml(zodiac.ganZhi)}</span>
+                    <span class="cny-label-date">${escapeHtml(dateStr)}</span>
+                </div>`;
         }
 
         requestAnimationFrame(updateTime);
@@ -5218,6 +5228,9 @@ function initStartOverlay() {
 
     // 2. Interaction
     btnEnter.onclick = () => {
+        // Mark as entered
+        localStorage.setItem('fu_has_entered', 'true');
+
         // Init Audio Context (User Gesture)
         ensureAudio();
         
@@ -5233,10 +5246,13 @@ function initStartOverlay() {
 function getZodiac(year) {
     const stems = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
     const branches = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
-    
-    const stem = stems[(year - 4) % 10];
+    const elements = ['WOOD', 'WOOD', 'FIRE', 'FIRE', 'EARTH', 'EARTH', 'METAL', 'METAL', 'WATER', 'WATER'];
+
+    const stemIdx = (year - 4) % 10;
+    const stem = stems[stemIdx];
     const branch = branches[(year - 4) % 12];
     const ganZhi = `${stem}${branch}年`;
+    const element = elements[stemIdx];
 
     const animals = [
         { en: 'RAT', cn: '鼠' },
@@ -5252,9 +5268,9 @@ function getZodiac(year) {
         { en: 'DOG', cn: '狗' },
         { en: 'PIG', cn: '豬' }
     ];
-    
+
     const animal = animals[(year - 4) % 12];
-    return { ...animal, ganZhi };
+    return { ...animal, ganZhi, element };
 }
 
 // Rewards panel opener (implemented in monetization-ui.js)
