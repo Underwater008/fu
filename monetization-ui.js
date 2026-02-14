@@ -12,8 +12,10 @@ let _currentDrawResult = null;
 let _currentDetailDraw = null;
 
 // Preload QR code image for share posters
+import qrUrl from './image/newqrcode.png';
 const qrImg = new Image();
-qrImg.src = './image/newqrcode.png';
+qrImg.crossOrigin = 'anonymous';
+qrImg.src = qrUrl;
 
 // Reference to the WebGL renderer canvas (3D scene only, no UI text)
 let _sceneCanvas = null;
@@ -525,13 +527,13 @@ export function generateShareCard(drawResult) {
   ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
   ctx.font = '48px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
-  ctx.fillText('\u626B\u7801\u62BD\u798F', 72, H - 130);
+  ctx.fillText('\u626B\u7801\u62BD\u798F', 72, H - 170);
   ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
   ctx.font = '32px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
-  ctx.fillText('Scan to try your fortune', 72, H - 85);
+  ctx.fillText('Scan to try your fortune', 72, H - 122);
   ctx.fillStyle = 'rgba(255, 215, 0, 0.45)';
   ctx.font = '28px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
-  ctx.fillText(window.location.origin, 72, H - 48);
+  ctx.fillText(window.location.origin, 72, H - 82);
 
   // QR code (bottom-right, no background frame)
   if (qrImg.complete && qrImg.naturalWidth > 0) {
@@ -631,18 +633,19 @@ export function generateWebPoster() {
   ctx.font = 'italic 44px "Roboto Slab", serif';
   ctx.fillText('Embrace Fortune in the New Year', W / 2, fuY + 450);
 
-  // 6. Top: "福多多" + "FUDUODUO"
+  // 6. Top: "FUDUODUO" (main) + "福多多" (subtitle)
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#FFD700';
   ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
-  ctx.shadowBlur = 20;
-  ctx.font = '120px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
-  ctx.fillText('\u798F\u591A\u591A', W / 2, 180);
+  ctx.shadowBlur = 15;
+  ctx.font = '600 52px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.letterSpacing = '8px';
+  ctx.fillText('FUDUODUO', W / 2, 150);
   ctx.shadowBlur = 0;
 
-  ctx.fillStyle = 'rgba(255, 215, 0, 0.6)';
-  ctx.font = '600 32px "Roboto Slab", serif';
-  ctx.fillText('FUDUODUO', W / 2, 235);
+  ctx.fillStyle = 'rgba(255, 215, 0, 0.4)';
+  ctx.font = '56px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.fillText('\u798F\u591A\u591A', W / 2, 220);
 
   // Bottom gradient for QR readability
   const botGrad = ctx.createLinearGradient(0, H - 380, 0, H);
@@ -656,15 +659,15 @@ export function generateWebPoster() {
   ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
   ctx.font = '72px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
-  ctx.fillText('\u626B\u7801\u62BD\u798F', 80, H - 260);
+  ctx.fillText('\u626B\u7801\u62BD\u798F', 80, H - 290);
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
   ctx.font = '44px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
-  ctx.fillText('Scan to try your fortune', 80, H - 190);
+  ctx.fillText('Scan to try your fortune', 80, H - 220);
 
   ctx.fillStyle = 'rgba(255, 215, 0, 0.5)';
   ctx.font = '40px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
-  ctx.fillText(window.location.origin, 80, H - 120);
+  ctx.fillText(window.location.origin, 80, H - 155);
 
   // QR code (bottom-right, no background frame)
   if (qrImg.complete && qrImg.naturalWidth > 0) {
@@ -718,10 +721,14 @@ function showSharePreview(imageDataUrl, filename, title) {
       backdrop.removeEventListener('click', onClose);
     };
 
+    const toFile = async () => {
+      const blob = await (await fetch(imageDataUrl)).blob();
+      return new File([blob], filename, { type: 'image/png' });
+    };
+
     const onShare = async () => {
       try {
-        const blob = await (await fetch(imageDataUrl)).blob();
-        const file = new File([blob], filename, { type: 'image/png' });
+        const file = await toFile();
         await navigator.share({ title, files: [file] });
       } catch (e) {
         if (e.name !== 'AbortError') console.warn('Share failed:', e);
@@ -730,11 +737,22 @@ function showSharePreview(imageDataUrl, filename, title) {
       resolve();
     };
 
-    const onDownload = () => {
-      const a = document.createElement('a');
-      a.href = imageDataUrl;
-      a.download = filename;
-      a.click();
+    const onDownload = async () => {
+      // Mobile: use native share sheet (has "Save Image" option)
+      if (canShareFiles && 'ontouchstart' in window) {
+        try {
+          const file = await toFile();
+          await navigator.share({ files: [file] });
+        } catch (e) {
+          if (e.name !== 'AbortError') console.warn('Save failed:', e);
+        }
+      } else {
+        // Desktop: normal download
+        const a = document.createElement('a');
+        a.href = imageDataUrl;
+        a.download = filename;
+        a.click();
+      }
       cleanup();
       resolve();
     };
