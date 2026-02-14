@@ -120,14 +120,23 @@ function wireAuthButtons() {
 }
 
 // --- Draw Counter (opens rewards panel on click) ---
+function openRewardsPanel() {
+  const panel = document.getElementById('rewards-panel');
+  const backdrop = document.getElementById('rewards-panel-backdrop');
+  if (panel) panel.style.display = 'flex';
+  if (backdrop) backdrop.style.display = 'block';
+}
+function closeRewardsPanel() {
+  const panel = document.getElementById('rewards-panel');
+  const backdrop = document.getElementById('rewards-panel-backdrop');
+  if (panel) panel.style.display = 'none';
+  if (backdrop) backdrop.style.display = 'none';
+}
 function wireDrawCounter() {
   const drawCounterFloat = document.getElementById('draw-counter-float');
   if (drawCounterFloat) {
     drawCounterFloat.style.cursor = 'pointer';
-    drawCounterFloat.addEventListener('click', () => {
-      const panel = document.getElementById('rewards-panel');
-      if (panel) panel.style.display = 'flex';
-    });
+    drawCounterFloat.addEventListener('click', openRewardsPanel);
   }
 }
 
@@ -138,11 +147,13 @@ function wireRewardsPanel() {
   const btnAd = document.getElementById('btn-watch-ad');
   const btnReferral = document.getElementById('btn-copy-referral');
 
+  const backdrop = document.getElementById('rewards-panel-backdrop');
+
   if (btnClose) {
-    btnClose.addEventListener('click', () => {
-      const panel = document.getElementById('rewards-panel');
-      if (panel) panel.style.display = 'none';
-    });
+    btnClose.addEventListener('click', closeRewardsPanel);
+  }
+  if (backdrop) {
+    backdrop.addEventListener('click', closeRewardsPanel);
   }
 
   if (btnShare) {
@@ -164,8 +175,8 @@ function wireRewardsPanel() {
         }
         const result = await claimShareReward();
         if (result) {
-          btnShare.textContent = `+${result.draws} Draws!`;
-          setTimeout(() => { btnShare.textContent = 'Share → 10 Draws'; }, 2000);
+          btnShare.innerHTML = `<span>+${result.draws} Draws!</span>`;
+          setTimeout(() => { btnShare.innerHTML = '<span>Share</span><span class="rewards-btn-badge">+10</span>'; }, 2000);
           updateAuthUI(getUser());
         }
       } catch (e) {
@@ -177,19 +188,19 @@ function wireRewardsPanel() {
   if (btnAd) {
     btnAd.addEventListener('click', async () => {
       btnAd.disabled = true;
-      btnAd.textContent = 'Watching...';
+      btnAd.innerHTML = '<span>Watching...</span>';
       const result = await showRewardedAd();
       if (result.success) {
-        btnAd.textContent = '+1 Draw!';
+        btnAd.innerHTML = '<span>+6 Draws!</span>';
         const adCount = document.getElementById('ad-count');
         if (adCount) adCount.textContent = `${result.adsWatchedToday}/${CONFIG.ads.maxPerDay} today`;
         updateAuthUI(getUser());
       } else {
-        btnAd.textContent = 'Daily limit reached';
+        btnAd.innerHTML = '<span>Daily limit reached</span>';
       }
       setTimeout(() => {
         btnAd.disabled = false;
-        btnAd.textContent = 'Watch Ad → 1 Draw';
+        btnAd.innerHTML = '<span>Ad</span><span class="rewards-btn-badge">+6</span>';
       }, 2000);
     });
   }
