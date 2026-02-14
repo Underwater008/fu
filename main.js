@@ -433,7 +433,7 @@ function getSwipeHintHopOffset() {
 // --- Three.js Setup (Hybrid Rendering) ---
 const ATLAS_COLS = 20;
 const ATLAS_ROWS = 20;
-const CELL_PX = 64;
+const CELL_PX = 96;
 
 function initThreeJS() {
     // 1. Renderer
@@ -467,12 +467,12 @@ function initThreeJS() {
         '\u00B7', '\u2605',
     ]);
 
-    actx.font = `bold ${Math.floor(CELL_PX * 0.7)}px "Courier New", "SF Mono", monospace`;
+    actx.font = `${Math.floor(CELL_PX * 0.88)}px "Courier New", "SF Mono", monospace`;
     actx.textAlign = 'center';
     actx.textBaseline = 'middle';
     actx.fillStyle = '#FFFFFF';
     actx.shadowColor = 'white';
-    actx.shadowBlur = CELL_PX * 0.12;
+    actx.shadowBlur = CELL_PX * 0.04;
 
     let idx = 0;
     uniqueChars.forEach(char => {
@@ -494,7 +494,7 @@ function initThreeJS() {
     // Bake calligraphy font variants for cluster characters
     const clusterChars = LUCKY_CHARS_BY_DENSITY.filter(c => c !== ' ');
     for (let fi = 0; fi < CALLI_FONTS.length; fi++) {
-        actx.font = `bold ${Math.floor(CELL_PX * 0.7)}px ${CALLI_FONTS[fi]}, "Courier New", monospace`;
+        actx.font = `${Math.floor(CELL_PX * 0.88)}px ${CALLI_FONTS[fi]}, "Courier New", monospace`;
         for (const char of clusterChars) {
             if (idx >= ATLAS_COLS * ATLAS_ROWS) break;
             const col = idx % ATLAS_COLS;
@@ -1700,10 +1700,10 @@ const ARRIVAL_FLAMES = {
     yStartJitter: 46,       // px additional random depth below bottom edge
     zSpread: 140,           // px depth variation
     // Motion (px/sec)
-    riseMin: 180,
-    riseMax: 380,
-    buoyancy: 45,           // px/sec^2 upward accel (stronger "licking" lift)
-    riseClamp: 600,         // max |vy| to avoid absurd speeds on long frames
+    riseMin: 80,
+    riseMax: 180,
+    buoyancy: 18,           // px/sec^2 upward accel (gentle lift)
+    riseClamp: 300,         // max |vy| to avoid absurd speeds on long frames
     // Lateral drift is driven by a shared wind field for coherence.
     windAmpMin: 24,
     windAmpMax: 110,
@@ -1712,8 +1712,8 @@ const ARRIVAL_FLAMES = {
     velDragMin: 2.8,        // 1/sec (higher = follows wind quicker)
     velDragMax: 5.0,
     // Lifetime (sec) — shorter for faster fade
-    lifeMin: 1.2,
-    lifeMax: 2.2,
+    lifeMin: 0.7,
+    lifeMax: 1.4,
     // Visuals
     alphaMul: 0.62,         // overall opacity (additive blending gets bright fast)
     flickerFreq: 5.0,
@@ -1763,10 +1763,10 @@ function updateArrivalFlames() {
             // Two populations: flame glyphs + tiny hot sparks. Both are still characters.
             const spark = Math.random() < ARRIVAL_FLAMES.sparkFrac;
 
-            // Size: larger particles for bolder fire look.
+            // Size: large particles so characters are easily readable.
             const size = spark
-                ? cellSize * (0.7 + Math.random() * 1.0)
-                : cellSize * (1.3 + Math.random() * Math.random() * 2.8);
+                ? cellSize * (1.0 + Math.random() * 1.2)
+                : cellSize * (2.2 + Math.random() * Math.random() * 3.5);
 
             // Shorter life for sparks; base flames live longer.
             const lifeScale = spark ? (0.42 + Math.random() * 0.35) : (1.0 + Math.random() * 0.15);
@@ -1872,7 +1872,7 @@ function appendArrivalFlamesToGPU(startIdx) {
         const heat = heatRaw;
 
         const fadeIn = smoothstep(0.00, 0.08, age);
-        const fadeOut = smoothstep(0.00, 0.45, p.life);
+        const fadeOut = smoothstep(0.00, 0.30, p.life);
         const topFade = 1 - smoothstep(ARRIVAL_FLAMES.topFadeStart, ARRIVAL_FLAMES.topFadeEnd, h01);
 
         let flicker =
