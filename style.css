@@ -2747,6 +2747,36 @@ canvas#c {
     margin: 8px 0 0;
 }
 
+/* --- Payment Modal --- */
+.payment-modal-card {
+    width: min(420px, 92vw);
+}
+
+#payment-element {
+    margin-bottom: 16px;
+    min-height: 100px;
+}
+
+.payment-status {
+    color: rgba(255, 215, 0, 0.8);
+    font-size: 13px;
+    min-height: 18px;
+    margin: 0 0 12px;
+}
+
+.payment-status.error {
+    color: #f87171;
+}
+
+.payment-status.success {
+    color: #4ADE80;
+}
+
+#btn-pay:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 /* --- Rewards Panel Backdrop --- */
 .rewards-backdrop {
     position: fixed;
