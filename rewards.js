@@ -7,7 +7,19 @@ import { getSupabaseClient } from './supabase-client.js';
 async function callRpc(name, args = {}) {
   const sb = await getSupabaseClient();
   const { data, error } = await sb.rpc(name, args);
-  if (error) throw error;
+  if (error) {
+    // If the session expired, refresh and retry once
+    if (error.message === 'NOT_AUTHENTICATED') {
+      const { error: refreshErr } = await sb.auth.refreshSession();
+      if (!refreshErr) {
+        const retry = await sb.rpc(name, args);
+        if (retry.error) throw retry.error;
+        if (Array.isArray(retry.data)) return retry.data[0] || null;
+        return retry.data || null;
+      }
+    }
+    throw error;
+  }
   if (Array.isArray(data)) return data[0] || null;
   return data || null;
 }
@@ -204,8 +216,10 @@ export async function setPityCounter(value) {
   const nextValue = Math.max(0, Number(value) || 0);
 
   if (CONFIG.isProd) {
-    // set_pity_counter is disabled in production for security
-    throw new Error('setPityCounter is not available in production');
+    const result = await callRpc('set_pity_counter', { p_value: nextValue });
+    const pity = result?.pity_counter ?? nextValue;
+    applyProfilePatch({ pity_counter: pity });
+    return pity;
   }
 
   user.pity_counter = nextValue;
