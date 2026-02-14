@@ -159,7 +159,22 @@ async function prodLinkAnonymous(email) {
 
 async function prodRestore() {
   const sb = await getSupabaseClient();
-  const { data: { session } } = await sb.auth.getSession();
+
+  // Wait for Supabase to finish restoring the session from localStorage.
+  // getSession() only returns the in-memory session and may be null if the
+  // client hasn't finished its async initialisation yet. Listening for the
+  // INITIAL_SESSION event is the reliable way to detect an existing session.
+  const session = await new Promise((resolve) => {
+    const { data: { subscription } } = sb.auth.onAuthStateChange(
+      (event, sess) => {
+        if (event === 'INITIAL_SESSION') {
+          subscription.unsubscribe();
+          resolve(sess);
+        }
+      },
+    );
+  });
+
   if (session?.user) {
     let profile = await storage.getProfile(session.user.id);
     if (!profile) {
