@@ -638,14 +638,14 @@ export function generateWebPoster() {
   ctx.fillStyle = '#FFD700';
   ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
   ctx.shadowBlur = 15;
-  ctx.font = '600 52px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  ctx.letterSpacing = '8px';
-  ctx.fillText('FUDUODUO', W / 2, 150);
+  ctx.font = '600 104px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.letterSpacing = '12px';
+  ctx.fillText('FUDUODUO', W / 2, 190);
   ctx.shadowBlur = 0;
 
   ctx.fillStyle = 'rgba(255, 215, 0, 0.4)';
-  ctx.font = '56px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
-  ctx.fillText('\u798F\u591A\u591A', W / 2, 220);
+  ctx.font = '112px "TsangerZhoukeZhengdabangshu", "Ma Shan Zheng", serif';
+  ctx.fillText('\u798F\u591A\u591A', W / 2, 310);
 
   // Bottom gradient for QR readability
   const botGrad = ctx.createLinearGradient(0, H - 380, 0, H);
