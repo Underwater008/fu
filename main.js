@@ -5189,50 +5189,75 @@ function initFlameEffect() {
     const W = () => canvas.offsetWidth;
     const H = () => canvas.offsetHeight;
 
-    // --- Drifting lucky characters (same as main bg) ---
+    // --- Grid-snapped drifting characters (matches main app bg exactly) ---
+    // Compute grid dimensions matching main app logic
+    const vmin = Math.min(W() || window.innerWidth, H() || window.innerHeight);
+    const gridCellSize = Math.max(10, Math.floor(vmin * 0.028));
+    let gridCols = Math.max(1, Math.floor((W() || window.innerWidth) / gridCellSize));
+    let gridRows = Math.max(1, Math.floor((H() || window.innerHeight) / gridCellSize));
+
+    const BG_COUNT = 40;
     const bgChars = [];
-    const BG_COUNT = 35;
     for (let i = 0; i < BG_COUNT; i++) {
         bgChars.push({
-            x: Math.random(), y: Math.random(), // 0-1 normalized
-            vx: (Math.random() - 0.5) * 0.008,
-            vy: (Math.random() - 0.5) * 0.008,
+            col: Math.random() * gridCols,
+            row: Math.random() * gridRows,
+            vx: (Math.random() - 0.5) * 0.02,
+            vy: (Math.random() - 0.5) * 0.02,
             char: ALL_LUCKY[Math.floor(Math.random() * ALL_LUCKY.length)],
-            alpha: 0.03 + Math.random() * 0.07,
+            alpha: 0.03 + Math.random() * 0.08,
             phase: Math.random() * Math.PI * 2,
             changeTimer: Math.random() * 200,
-            fontSize: 14 + Math.random() * 10,
         });
     }
 
-    function updateBgChars(time) {
-        for (const c of bgChars) {
-            c.x += c.vx * 0.016; // ~60fps normalized
-            c.y += c.vy * 0.016;
-            if (c.x < 0) c.x += 1; if (c.x > 1) c.x -= 1;
-            if (c.y < 0) c.y += 1; if (c.y > 1) c.y -= 1;
-            c.changeTimer--;
-            if (c.changeTimer <= 0) {
-                c.char = ALL_LUCKY[Math.floor(Math.random() * ALL_LUCKY.length)];
-                c.changeTimer = 100 + Math.random() * 200;
+    function updateBgChars() {
+        // Recompute grid on resize
+        const w = W(), h = H();
+        if (w > 0 && h > 0) {
+            gridCols = Math.max(1, Math.floor(w / gridCellSize));
+            gridRows = Math.max(1, Math.floor(h / gridCellSize));
+        }
+        for (const p of bgChars) {
+            p.col += p.vx;
+            p.row += p.vy;
+            p.changeTimer--;
+            if (p.col < 0) p.col += gridCols;
+            if (p.col >= gridCols) p.col -= gridCols;
+            if (p.row < 0) p.row += gridRows;
+            if (p.row >= gridRows) p.row -= gridRows;
+            if (p.changeTimer <= 0) {
+                p.char = ALL_LUCKY[Math.floor(Math.random() * ALL_LUCKY.length)];
+                p.changeTimer = 100 + Math.random() * 200;
             }
         }
     }
 
     function drawBgChars(time) {
         const w = W(), h = H();
+        if (w === 0 || h === 0) return;
+        const offX = (w - gridCols * gridCellSize) / 2;
+        const offY = (h - gridRows * gridCellSize) / 2;
+        const fontSize = gridCellSize;
+        ctx.font = `${fontSize}px ${chosenFont}, "Courier New", "SF Mono", monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        for (const c of bgChars) {
-            const flicker = c.alpha + Math.sin(c.phase + time * 1.5) * 0.02;
+        for (const p of bgChars) {
+            const col = Math.floor(p.col);
+            const row = Math.floor(p.row);
+            const x = offX + col * gridCellSize + gridCellSize / 2;
+            const y = offY + row * gridCellSize + gridCellSize / 2;
+            const flicker = p.alpha + Math.sin(p.phase + time * 1.5) * 0.02;
             const a = Math.max(0.01, flicker);
-            ctx.font = `${c.fontSize}px ${chosenFont}, "Courier New", monospace`;
-            ctx.fillStyle = `rgba(255, 215, 0, ${a})`;
-            if (a > 0.05) {
+            if (a > 0.03) {
                 ctx.shadowColor = `rgba(255, 215, 0, ${a * 0.6})`;
-                ctx.shadowBlur = c.fontSize * a * 1.2;
+                ctx.shadowBlur = gridCellSize * a * 1.2;
+            } else {
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
             }
-            ctx.fillText(c.char, c.x * w, c.y * h);
+            ctx.fillStyle = `rgba(255, 215, 0, ${a})`;
+            ctx.fillText(p.char, x, y);
         }
         ctx.shadowBlur = 0;
         ctx.shadowColor = 'transparent';
