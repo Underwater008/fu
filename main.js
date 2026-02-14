@@ -363,13 +363,13 @@ function getLayout() {
     if (isLandscape()) {
         const maxCharSize = Math.min(cellSize * 5, window.innerHeight * 0.11);
         return {
-            starsY: 0.24,
+            starsY: 0.22,
             charY: 0.13,
-            tierY: 0.56,
-            tierEnY: 0.59,
-            cardTop: 0.20,
-            cardBottom: 0.65,
-            clusterYOffset: 0.07,
+            tierY: 0.61,
+            tierEnY: 0.65,
+            cardTop: 0.19,
+            cardBottom: 0.71,
+            clusterYOffset: 0.09,
             cardWidth: 0.42,
             categoryY: 0.70,
             phraseY: 0.77,
