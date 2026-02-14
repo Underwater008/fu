@@ -1584,6 +1584,7 @@ function updateProjectedGlyphsToGPU(glyphs) {
 // STATE MACHINE
 // ============================================================
 let state = 'arrival';
+let isOverlayActive = true;
 let stateTime = 0;
 let globalTime = 0;
 let stateStartGlobal = 0;
@@ -1684,15 +1685,290 @@ function changeState(newState) {
 // ============================================================
 // ARRIVAL
 // ============================================================
+let arrivalParticles = [];
+let arrivalSpawnCarry = 0;
+let arrivalLastT = 0;
+
+// Calm, cohesive "ember" glyphs behind the start overlay (welcome screen).
+const ARRIVAL_FLAMES = {
+    // Target particles per second (time-based), clamped by maxParticles.
+    // Higher rate + shorter life => denser, flame-like plume from the bottom.
+    spawnRate: IS_COARSE_POINTER ? 40 : 50,
+    maxParticles: IS_COARSE_POINTER ? 500 : 650,
+    // Spawn region (world coords where origin is screen center)
+    xSpreadFrac: 0.95,      // fraction of screen width (spread across entire bottom)
+    yStartPad: 22,          // px below bottom edge
+    yStartJitter: 46,       // px additional random depth below bottom edge
+    zSpread: 140,           // px depth variation
+    // Motion (px/sec)
+    riseMin: 180,
+    riseMax: 380,
+    buoyancy: 45,           // px/sec^2 upward accel (stronger "licking" lift)
+    riseClamp: 600,         // max |vy| to avoid absurd speeds on long frames
+    // Lateral drift is driven by a shared wind field for coherence.
+    windAmpMin: 24,
+    windAmpMax: 110,
+    windFreq: 0.95,         // radians/sec multiplier (more turbulent)
+    centerPull: 0.08,       // 1/sec, pulls vx back toward x=0 so plume stays coherent
+    velDragMin: 2.8,        // 1/sec (higher = follows wind quicker)
+    velDragMax: 5.0,
+    // Lifetime (sec) — shorter for faster fade
+    lifeMin: 1.2,
+    lifeMax: 2.2,
+    // Visuals
+    alphaMul: 0.62,         // overall opacity (additive blending gets bright fast)
+    flickerFreq: 5.0,
+    flickerAmp: 0.10,
+    sparkFrac: 0.12,        // fraction of particles that are tiny hot sparks ('·')
+    // Keep the effect in the lower/middle of the screen; no need to reach the top.
+    topFadeStart: 0.38,     // h01 where fade begins (0 bottom, 1 top) — fades sooner
+    topFadeEnd: 0.65,       // h01 where fade ends — fades out quicker
+};
+
+const ARRIVAL_FLAME_CHARS = ['福', '吉', '安', '喜', '财', '禄', '寿'];
+
+function smoothstep(edge0, edge1, x) {
+    const t = Math.max(0, Math.min(1, (x - edge0) / Math.max(1e-6, edge1 - edge0)));
+    return t * t * (3 - 2 * t);
+}
+
+function updateArrivalFlames() {
+    // Time-based update for consistent motion across refresh rates.
+    const dt = Math.min(
+        0.05,
+        Math.max(0.001, (globalTime - (arrivalLastT || globalTime - 1 / 60)))
+    );
+    arrivalLastT = globalTime;
+
+    // Spawn new particles (only if overlay is active)
+    if (isOverlayActive) {
+        // Small emitter breathing; keep subtle so motion reads as "fire" not bursts.
+        const rateFlicker = 0.92 + 0.12 * (0.5 + 0.5 * Math.sin(globalTime * 2.0));
+        arrivalSpawnCarry += (ARRIVAL_FLAMES.spawnRate * rateFlicker) * dt;
+        let spawnCount = Math.floor(arrivalSpawnCarry);
+        arrivalSpawnCarry -= spawnCount;
+
+        // Safety: don't let long stalls dump a huge burst.
+        spawnCount = Math.min(spawnCount, 8);
+
+        const bottomY = window.innerHeight / 2;
+
+        for (let i = 0; i < spawnCount; i++) {
+            if (arrivalParticles.length >= ARRIVAL_FLAMES.maxParticles) break;
+
+            // Spread uniformly across the bottom of the screen.
+            const xAmp = window.innerWidth * ARRIVAL_FLAMES.xSpreadFrac * 0.5;
+            const x = (Math.random() * 2 - 1) * xAmp;
+            const y = bottomY + ARRIVAL_FLAMES.yStartPad + Math.random() * ARRIVAL_FLAMES.yStartJitter; // Start below screen
+
+            // Two populations: flame glyphs + tiny hot sparks. Both are still characters.
+            const spark = Math.random() < ARRIVAL_FLAMES.sparkFrac;
+
+            // Size: larger particles for bolder fire look.
+            const size = spark
+                ? cellSize * (0.7 + Math.random() * 1.0)
+                : cellSize * (1.3 + Math.random() * Math.random() * 2.8);
+
+            // Shorter life for sparks; base flames live longer.
+            const lifeScale = spark ? (0.42 + Math.random() * 0.35) : (1.0 + Math.random() * 0.15);
+            const lifeSec = (ARRIVAL_FLAMES.lifeMin + Math.random() * (ARRIVAL_FLAMES.lifeMax - ARRIVAL_FLAMES.lifeMin)) * lifeScale;
+
+            // Faster rise + slight upward accel in update gives "licking" flames.
+            const riseBase = ARRIVAL_FLAMES.riseMin + Math.random() * (ARRIVAL_FLAMES.riseMax - ARRIVAL_FLAMES.riseMin);
+            const riseMul = spark ? (1.25 + Math.random() * 0.95) : (0.85 + Math.random() * 0.35);
+            const vy = -Math.min(ARRIVAL_FLAMES.riseClamp, riseBase * riseMul);
+
+            // Sparks follow wind less; flames sway more.
+            const windAmp = spark
+                ? ARRIVAL_FLAMES.windAmpMin * (0.20 + Math.random() * 0.55)
+                : ARRIVAL_FLAMES.windAmpMin + Math.random() * (ARRIVAL_FLAMES.windAmpMax - ARRIVAL_FLAMES.windAmpMin);
+
+            const drag = spark
+                ? ARRIVAL_FLAMES.velDragMax * (1.1 + Math.random() * 1.1)
+                : ARRIVAL_FLAMES.velDragMin + Math.random() * (ARRIVAL_FLAMES.velDragMax - ARRIVAL_FLAMES.velDragMin);
+
+            // Keep base hue fairly consistent; avoid visible "color banding" at the bottom.
+            const heat0 = spark ? (1.00 + Math.random() * 0.12) : (0.88 + Math.random() * 0.12);
+            
+            arrivalParticles.push({
+                x: x,
+                y: y,
+                z: (Math.random() - 0.5) * ARRIVAL_FLAMES.zSpread,
+                vx: 0,
+                vy,
+                life: 1.0,
+                decay: 1 / Math.max(0.001, lifeSec), // per-second decay (life: 1 → 0)
+                size: size,
+                char: spark ? '\u00B7' : ARRIVAL_FLAME_CHARS[Math.floor(Math.random() * ARRIVAL_FLAME_CHARS.length)],
+                fontIdx: Math.floor(Math.random() * CALLI_FONTS.length),
+                heat0,
+                phase: Math.random() * Math.PI * 2,
+                windAmp,
+                drag,
+                spark: spark ? 1 : 0,
+            });
+        }
+    }
+
+    // Update physics
+    let alive = 0;
+    for (let i = 0; i < arrivalParticles.length; i++) {
+        const p = arrivalParticles[i];
+        p.life -= p.decay * dt;
+        if (p.life <= 0) continue;
+
+        const heat = Math.max(0, Math.min(1, p.life * (p.heat0 || 1)));
+
+        // Coherent wind field: smooth, shared motion (less chaotic than per-particle jitter).
+        const heatWind = p.windAmp * (0.55 + 0.45 * heat);
+        const windBase =
+            Math.sin(globalTime * ARRIVAL_FLAMES.windFreq + p.phase + p.y * 0.003) * heatWind +
+            Math.sin(globalTime * (ARRIVAL_FLAMES.windFreq * 0.63) + p.phase * 1.7) * (heatWind * 0.35);
+        const windCrackle =
+            Math.sin(globalTime * (ARRIVAL_FLAMES.windFreq * 2.4) + p.phase * 2.1 + p.y * 0.007) * (heatWind * 0.12) * (0.4 + 0.6 * heat);
+
+        // Keep the plume coherent by gently pulling velocity back to center.
+        const windTarget = (windBase + windCrackle) - p.x * ARRIVAL_FLAMES.centerPull;
+
+        // Exponential approach to the wind target velocity (damped).
+        const follow = 1 - Math.exp(-p.drag * dt);
+        p.vx += (windTarget - p.vx) * follow;
+
+        // Slight upward acceleration to feel more like flame lift (buoyancy).
+        if (ARRIVAL_FLAMES.buoyancy > 0) {
+            p.vy -= ARRIVAL_FLAMES.buoyancy * dt * (0.35 + 0.65 * heat);
+            p.vy = Math.max(p.vy, -ARRIVAL_FLAMES.riseClamp);
+        }
+
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        
+        arrivalParticles[alive++] = p;
+    }
+    arrivalParticles.length = alive;
+}
+
+function appendArrivalFlamesToGPU(startIdx) {
+    if (!particlesMesh) return startIdx;
+    
+    const instColor = particlesMesh.geometry.attributes.instanceColor;
+    const instAlpha = particlesMesh.geometry.attributes.instanceAlpha;
+    const instUV = particlesMesh.geometry.attributes.instanceUV;
+    const instScale = particlesMesh.geometry.attributes.instanceScale;
+    const maxCount = instColor.count;
+    
+    let idx = startIdx;
+    
+    for (const p of arrivalParticles) {
+        if (idx >= maxCount) break;
+        
+        // Flicker effect
+        const age = 1 - p.life;
+        const heatRaw = Math.max(0, Math.min(1, p.life * (p.heat0 || 1)));
+
+        // Height within the screen (0 = bottom edge, 1 = top edge)
+        const bottomY = window.innerHeight / 2;
+        const h01 = Math.max(0, Math.min(1.2, (bottomY - p.y) / Math.max(1, window.innerHeight)));
+        const core = 1 - smoothstep(0.00, 0.22, h01); // brightness boost near the base
+        const heat = heatRaw;
+
+        const fadeIn = smoothstep(0.00, 0.08, age);
+        const fadeOut = smoothstep(0.00, 0.45, p.life);
+        const topFade = 1 - smoothstep(ARRIVAL_FLAMES.topFadeStart, ARRIVAL_FLAMES.topFadeEnd, h01);
+
+        let flicker =
+            0.84 +
+            Math.sin(globalTime * ARRIVAL_FLAMES.flickerFreq + p.phase) * ARRIVAL_FLAMES.flickerAmp +
+            Math.sin(globalTime * (ARRIVAL_FLAMES.flickerFreq * 1.7) + p.phase * 2.3) * (ARRIVAL_FLAMES.flickerAmp * 0.35);
+        flicker = Math.max(0.35, Math.min(1.25, flicker));
+
+        // Hotter and brighter at the base, cooling as it rises.
+        const alpha = fadeIn * fadeOut * topFade * flicker * ARRIVAL_FLAMES.alphaMul * (0.75 + core * 0.55) * (0.72 + heat * 0.55);
+        
+        // Scale: keep particles large and stable so glyphs stay readable.
+        const swell = 0.85 + Math.sin(Math.min(1, age) * Math.PI) * 0.20;
+        const scale = p.size * swell * (0.90 + heat * 0.15);
+
+        _dummy.position.set(p.x, -p.y, -p.z);
+        _dummy.updateMatrix();
+        
+        particlesMesh.setMatrixAt(idx, _dummy.matrix);
+
+        // Heat-based flame tint (no extra height-based color shifting at the bottom).
+        const cool = 1 - heat;
+        let rr, gg, bb;
+        if (cool < 0.40) {
+            const t = cool / 0.40;
+            // hot gold -> orange
+            rr = 255;
+            gg = lerp(205, 150, t);
+            bb = lerp(80, 35, t);
+        } else if (cool < 0.82) {
+            const t = (cool - 0.40) / 0.42;
+            // orange -> red-orange
+            rr = 255;
+            gg = lerp(150, 75, t);
+            bb = lerp(35, 10, t);
+        } else {
+            const t = (cool - 0.82) / 0.18;
+            // red-orange -> ember
+            rr = lerp(255, 140, t);
+            gg = lerp(75, 22, t);
+            bb = lerp(10, 8, t);
+        }
+
+        // Tiny sparks run hotter (slightly whiter).
+        if (p.spark) {
+            rr = lerp(rr, 255, 0.20);
+            gg = lerp(gg, 250, 0.20);
+            bb = lerp(bb, 230, 0.15);
+        }
+
+        instColor.setXYZ(idx, rr / 255, gg / 255, bb / 255);
+        instAlpha.setX(idx, alpha);
+        instScale.setX(idx, scale);
+        
+        const uv = (p.fontIdx != null && charToUV[p.char + '|' + p.fontIdx]) || charToUV[p.char];
+        if (uv) instUV.setXY(idx, uv.u, uv.v);
+        
+        idx++;
+    }
+    
+    // We don't commit here; we return index so fireworks can append after us
+    return idx;
+}
+
 function updateArrival() {
     updateBgParticles(globalTime);
+    updateArrivalFlames();
     // Update tap-triggered firework particles
     if (hasTapFireworks()) updateFireworkPhysics();
 }
 
 function renderArrivalOverlay() {
-    // Render tap-triggered fireworks in arrival state
-    if (hasTapFireworks()) appendFireworksToGPU(0);
+    // 1. Render WebGL Particles (Flames + Fireworks)
+    let gpuIdx = 0;
+    
+    // Append Flames
+    gpuIdx = appendArrivalFlamesToGPU(gpuIdx);
+    
+    // Append Fireworks (if any) and Render
+    if (hasTapFireworks()) {
+        appendFireworksToGPU(gpuIdx); // This calls renderAndCompositeGL
+    } else {
+        // Manually update and render if no fireworks
+        if (particlesMesh) {
+            particlesMesh.count = gpuIdx;
+            particlesMesh.instanceMatrix.needsUpdate = true;
+            particlesMesh.geometry.attributes.instanceColor.needsUpdate = true;
+            particlesMesh.geometry.attributes.instanceAlpha.needsUpdate = true;
+            particlesMesh.geometry.attributes.instanceUV.needsUpdate = true;
+            particlesMesh.geometry.attributes.instanceScale.needsUpdate = true;
+        }
+        renderAndCompositeGL();
+    }
+
+    if (isOverlayActive) return;
 
     const fadeIn = Math.min(1, stateTime / 1.0);
     const L = getLayout();
@@ -2814,11 +3090,11 @@ function renderMultiCardText() {
 
             // Main character — large, centered
             const charSize = Math.max(18, cw * 0.62);
-            ctx.font = `bold ${charSize}px ${MULTI_CARD_FONT}, serif`;
+            ctx.font = `${charSize}px ${MULTI_CARD_FONT}, serif`;
             ctx.globalAlpha = alpha * 0.92;
             ctx.fillStyle = CONFIG.glowGold;
             ctx.shadowColor = CONFIG.glowGold;
-            ctx.shadowBlur = charSize * 0.12;
+            ctx.shadowBlur = charSize * 0.06;
             ctx.fillText(dr.char, cx, cy - ch * 0.18);
 
             // English name — small, below character
@@ -2877,11 +3153,11 @@ function renderMultiCardText() {
 
             // Main character
             const charSize = Math.max(14, unit * 0.45);
-            ctx.font = `bold ${charSize}px ${MULTI_CARD_FONT}, serif`;
+            ctx.font = `${charSize}px ${MULTI_CARD_FONT}, serif`;
             ctx.globalAlpha = alpha * 0.9;
             ctx.fillStyle = CONFIG.glowGold;
             ctx.shadowColor = CONFIG.glowGold;
-            ctx.shadowBlur = charSize * 0.15;
+            ctx.shadowBlur = charSize * 0.08;
             ctx.fillText(dr.char, cx, cy - ch * 0.02);
 
             // Blessing phrase (vertical stack)
@@ -4930,7 +5206,7 @@ function updateUIVisibility() {
     const collVisible = collectionPanel && collectionPanel.classList.contains('visible');
     // Mode Switch: visible in arrival, single fortune, and multi fortune after all revealed
     if (modeSwitch) {
-        if (!collVisible && (state === 'arrival' || (state === 'fortune' && (!isMultiMode || allMultiRevealed))) && fontsReady) {
+        if (!isOverlayActive && !collVisible && (state === 'arrival' || (state === 'fortune' && (!isMultiMode || allMultiRevealed))) && fontsReady) {
             modeSwitch.classList.add('visible');
         } else {
             modeSwitch.classList.remove('visible');
@@ -4939,7 +5215,7 @@ function updateUIVisibility() {
 
     // Collection FAB: visible in arrival, single fortune, and multi fortune after all revealed
     if (btnCollection) {
-        if (!collVisible && (state === 'arrival' || (state === 'fortune' && (!isMultiMode || allMultiRevealed)))) {
+        if (!isOverlayActive && !collVisible && (state === 'arrival' || (state === 'fortune' && (!isMultiMode || allMultiRevealed)))) {
             btnCollection.classList.add('visible');
         } else {
             btnCollection.classList.remove('visible');
@@ -4949,10 +5225,20 @@ function updateUIVisibility() {
     // Draw counter: visible together with collection and toggle
     const drawCounterFloat = document.getElementById('draw-counter-float');
     if (drawCounterFloat) {
-        if (!collVisible && (state === 'arrival' || (state === 'fortune' && (!isMultiMode || allMultiRevealed)))) {
+        if (!isOverlayActive && !collVisible && (state === 'arrival' || (state === 'fortune' && (!isMultiMode || allMultiRevealed)))) {
             drawCounterFloat.classList.add('visible');
         } else {
             drawCounterFloat.classList.remove('visible');
+        }
+    }
+
+    // Mute button: visible when overlay is gone
+    const btnMute = document.getElementById('btn-mute');
+    if (btnMute) {
+        if (!isOverlayActive) {
+            btnMute.classList.add('visible');
+        } else {
+            btnMute.classList.remove('visible');
         }
     }
 
@@ -5170,197 +5456,6 @@ const CNY_DATES = [
     { year: 2027, date: new Date('2027-02-06T00:00:00') },
 ];
 
-// ---- Flame particle effect for start overlay ----
-function initFlameEffect() {
-    const canvas = document.getElementById('flame-canvas');
-    if (!canvas) return null;
-    const ctx = canvas.getContext('2d');
-    let particles = [];
-    let raf = 0;
-    let running = true;
-
-    function resize() {
-        canvas.width = canvas.offsetWidth * devicePixelRatio;
-        canvas.height = canvas.offsetHeight * devicePixelRatio;
-        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-    }
-    resize();
-    window.addEventListener('resize', resize);
-
-    const W = () => canvas.offsetWidth;
-    const H = () => canvas.offsetHeight;
-
-    // --- Grid-snapped drifting characters (matches main app bg exactly) ---
-    // Compute grid dimensions matching main app logic
-    const vmin = Math.min(W() || window.innerWidth, H() || window.innerHeight);
-    const gridCellSize = Math.max(10, Math.floor(vmin * 0.028));
-    let gridCols = Math.max(1, Math.floor((W() || window.innerWidth) / gridCellSize));
-    let gridRows = Math.max(1, Math.floor((H() || window.innerHeight) / gridCellSize));
-
-    const BG_COUNT = 40;
-    const bgChars = [];
-    for (let i = 0; i < BG_COUNT; i++) {
-        bgChars.push({
-            col: Math.random() * gridCols,
-            row: Math.random() * gridRows,
-            vx: (Math.random() - 0.5) * 0.02,
-            vy: (Math.random() - 0.5) * 0.02,
-            char: ALL_LUCKY[Math.floor(Math.random() * ALL_LUCKY.length)],
-            alpha: 0.03 + Math.random() * 0.08,
-            phase: Math.random() * Math.PI * 2,
-            changeTimer: Math.random() * 200,
-        });
-    }
-
-    function updateBgChars() {
-        // Recompute grid on resize
-        const w = W(), h = H();
-        if (w > 0 && h > 0) {
-            gridCols = Math.max(1, Math.floor(w / gridCellSize));
-            gridRows = Math.max(1, Math.floor(h / gridCellSize));
-        }
-        for (const p of bgChars) {
-            p.col += p.vx;
-            p.row += p.vy;
-            p.changeTimer--;
-            if (p.col < 0) p.col += gridCols;
-            if (p.col >= gridCols) p.col -= gridCols;
-            if (p.row < 0) p.row += gridRows;
-            if (p.row >= gridRows) p.row -= gridRows;
-            if (p.changeTimer <= 0) {
-                p.char = ALL_LUCKY[Math.floor(Math.random() * ALL_LUCKY.length)];
-                p.changeTimer = 100 + Math.random() * 200;
-            }
-        }
-    }
-
-    function drawBgChars(time) {
-        const w = W(), h = H();
-        if (w === 0 || h === 0) return;
-        const offX = (w - gridCols * gridCellSize) / 2;
-        const offY = (h - gridRows * gridCellSize) / 2;
-        const fontSize = gridCellSize;
-        ctx.font = `${fontSize}px ${chosenFont}, "Courier New", "SF Mono", monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        for (const p of bgChars) {
-            const col = Math.floor(p.col);
-            const row = Math.floor(p.row);
-            const x = offX + col * gridCellSize + gridCellSize / 2;
-            const y = offY + row * gridCellSize + gridCellSize / 2;
-            const flicker = p.alpha + Math.sin(p.phase + time * 1.5) * 0.02;
-            const a = Math.max(0.01, flicker);
-            if (a > 0.03) {
-                ctx.shadowColor = `rgba(255, 215, 0, ${a * 0.6})`;
-                ctx.shadowBlur = gridCellSize * a * 1.2;
-            } else {
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
-            }
-            ctx.fillStyle = `rgba(255, 215, 0, ${a})`;
-            ctx.fillText(p.char, x, y);
-        }
-        ctx.shadowBlur = 0;
-        ctx.shadowColor = 'transparent';
-    }
-
-    function drawScanlines() {
-        ctx.save();
-        ctx.globalAlpha = 0.03;
-        ctx.fillStyle = '#fff';
-        const w = W(), h = H();
-        for (let y = 0; y < h; y += 4) {
-            ctx.fillRect(0, y, w, 1);
-        }
-        ctx.restore();
-    }
-
-    // --- Flame particles ---
-    const COLORS = [
-        [255, 200, 50],   // bright gold
-        [255, 140, 20],   // orange
-        [255, 80, 10],    // red-orange
-        [255, 50, 0],     // red
-        [255, 220, 100],  // pale gold
-    ];
-
-    function spawn() {
-        const x = Math.random() * W();
-        const baseY = H() + 5;
-        const color = COLORS[Math.floor(Math.random() * COLORS.length)];
-        const size = 2 + Math.random() * 4;
-        const life = 1.5 + Math.random() * 2.5;
-        const vx = (Math.random() - 0.5) * 30;
-        const vy = -(40 + Math.random() * 80);
-        particles.push({ x, y: baseY, vx, vy, size, life, maxLife: life, color, flicker: Math.random() * Math.PI * 2 });
-    }
-
-    function update(dt) {
-        for (let i = particles.length - 1; i >= 0; i--) {
-            const p = particles[i];
-            p.life -= dt;
-            if (p.life <= 0) { particles.splice(i, 1); continue; }
-            p.x += p.vx * dt;
-            p.y += p.vy * dt;
-            p.vx += (Math.random() - 0.5) * 50 * dt;
-            p.vy -= 10 * dt;
-            p.flicker += dt * 8;
-        }
-    }
-
-    function drawFlames() {
-        for (const p of particles) {
-            const t = p.life / p.maxLife;
-            const alpha = t * (0.4 + 0.3 * Math.sin(p.flicker));
-            const size = p.size * (0.5 + 0.5 * t);
-            const [r, g, b] = p.color;
-
-            const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 3);
-            grad.addColorStop(0, `rgba(${r},${g},${b},${alpha})`);
-            grad.addColorStop(0.4, `rgba(${r},${g},${b},${alpha * 0.4})`);
-            grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
-            ctx.fillStyle = grad;
-            ctx.fillRect(p.x - size * 3, p.y - size * 3, size * 6, size * 6);
-
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, size * 0.5, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(${Math.min(255, r + 50)},${Math.min(255, g + 50)},${b},${alpha * 1.2})`;
-            ctx.fill();
-        }
-    }
-
-    let last = performance.now();
-    let elapsed = 0;
-    function loop(now) {
-        if (!running) return;
-        const dt = Math.min((now - last) / 1000, 0.05);
-        last = now;
-        elapsed += dt;
-
-        // Spawn 2-4 flame particles per frame
-        const count = 2 + Math.floor(Math.random() * 3);
-        for (let i = 0; i < count; i++) spawn();
-
-        update(dt);
-        updateBgChars(elapsed);
-
-        // Draw layers: bg fill → drifting chars → scanlines → flames
-        ctx.clearRect(0, 0, W(), H());
-        ctx.fillStyle = '#990000';
-        ctx.fillRect(0, 0, W(), H());
-        drawBgChars(elapsed);
-        drawScanlines();
-        drawFlames();
-
-        raf = requestAnimationFrame(loop);
-    }
-    raf = requestAnimationFrame(loop);
-
-    return {
-        stop() { running = false; cancelAnimationFrame(raf); ctx.clearRect(0, 0, W(), H()); }
-    };
-}
-
 function initStartOverlay() {
     const overlay = document.getElementById('start-overlay');
     const countdownEl = document.getElementById('cny-countdown');
@@ -5368,9 +5463,6 @@ function initStartOverlay() {
     const labelBottomEl = document.getElementById('cny-label-bottom');
 
     if (!overlay) return;
-
-    // Start flame effect
-    const flame = initFlameEffect();
 
     // Horse "馬" canvas font-morphing (same technique as single draw)
     const horseCanvas = document.getElementById('horse-canvas');
@@ -5443,7 +5535,7 @@ function initStartOverlay() {
             if (cssW === 0 || cssH === 0) { requestAnimationFrame(drawHorse); return; }
 
             const elapsed = (now - startT) / 1000;
-            const fontSize = cssW * 0.75;
+            const fontSize = cssW * 0.6;
             const cx = cssW / 2;
             const cy = cssH / 2;
 
@@ -5513,10 +5605,12 @@ function initStartOverlay() {
                 const blurSize = lerp(fontSize * 0.3, fontSize * (0.08 + breath * 0.15), settle);
 
                 // Fading sparkles carried over from morph phase
+                /*
                 if (holdT < 0.8) {
                     const sparkFade = 1 - easeInOut(holdT / 0.8);
                     horseSparkles(cx, cy, fontSize, 1.0 + holdT, 0.9 * sparkFade);
                 }
+                */
 
                 hCtx.save();
                 hCtx.translate(cx, cy);
@@ -5546,8 +5640,10 @@ function initStartOverlay() {
                 const FORM_START = 0.45;
 
                 // Sparkles — keep alive until end so hold phase can continue them
+                /*
                 const sparkleEnv = t < 0.15 ? t / 0.15 : 1;
                 horseSparkles(cx, cy, fontSize, t, baseAlpha * sparkleEnv);
+                */
 
                 // Dissolve old char
                 if (t < DISSOLVE_END) {
@@ -5727,14 +5823,16 @@ function initStartOverlay() {
     // 2. Interaction — swipe up to enter (+ tap fallback)
     function enterApp() {
         localStorage.setItem('fu_has_entered', 'true');
+        isOverlayActive = false;
         ensureAudio();
         horseMorphRunning = false;
-        if (flame) flame.stop();
+        updateUIVisibility();
+        
         overlay.style.opacity = '0';
         setTimeout(() => {
             overlay.style.visibility = 'hidden';
             overlay.style.display = 'none';
-        }, 800);
+        }, 500);
     }
 
     let startTouchY = 0, startTouchTime = 0;
