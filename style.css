@@ -68,6 +68,14 @@ body {
     border-image-outset: 0;
 }
 
+/* Desktop: hide Chinese frame */
+@media (min-width: 768px) {
+    .start-content {
+        border: none;
+        border-image: none;
+    }
+}
+
 /* Grand countdown blocks */
 .cny-countdown {
     display: flex;
