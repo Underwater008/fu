@@ -5389,10 +5389,11 @@ function frame(now) {
     console.warn('Session restore failed:', e);
   }
 
-  // Save referral code from ?ref= parameter (credited after first draw)
+  // Handle referral from ?ref= parameter — create account immediately so user sees draws
   const referralCode = getReferralFromUrl();
   if (referralCode) {
     localStorage.setItem('fu_pending_referral', referralCode);
+    await ensureUser();
   }
 
   // Handle gift claim from URL
