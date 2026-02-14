@@ -2496,27 +2496,24 @@ function updateDraw() {
 
         for (let i = 0; i < count; i++) {
             let cx, cy;
-            // Calculate current position of the "Fu"
+            // Calculate current position of the "Fu" — match renderDrawOverlay positions
             if (count > 1) {
                 const c = i % grid.multiCols;
                 const r = Math.floor(i / grid.multiCols);
+                const _isStick = grid.cardH > grid.cardW * 2.5;
+                const _charOff = _isStick ? grid.cardH * 0.18 : grid.cardH * 0.02;
                 const targetX = grid.startX + c * grid.stepX;
-                const targetY = grid.startY + r * grid.stepY;
-                const originX = window.innerWidth * 0.2 + (i / (count - 1)) * window.innerWidth * 0.6;
-                const originY = window.innerHeight * 0.9;
-                
-                // We need 3D world coords for the trail spawn
-                // Canvas is 2D, but trails are 3D.
-                // We project 2D canvas pos back to 3D plane Z=0 roughly
+                const targetY = (grid.startY + r * grid.stepY) - _charOff;
+                // Match the 福 character origin (all from center bottom)
+                const originX = window.innerWidth / 2;
+                const originY = window.innerHeight * 0.85;
+
                 const curX2D = lerp(originX, targetX, launchT);
                 const curY2D = lerp(originY, targetY, launchT);
-                
-                // Approximate World Coords from Screen Coords
-                // ScreenX = WorldX * scale + W/2
-                // WorldX = (ScreenX - W/2) / scale
-                // At Z=0, scale = 1 (fov/(fov+0)) = 1
+
+                // Screen coords to world coords (at Z=0, scale = 1)
                 cx = curX2D - window.innerWidth / 2;
-                cy = curY2D - window.innerHeight / 2; // +y is down on screen, +y is down in world logic here
+                cy = curY2D - window.innerHeight / 2;
 
             } else {
                 const fuRow = lerp(rows * 0.5, rows * 0.20, launchT);
