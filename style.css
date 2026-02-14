@@ -75,8 +75,8 @@ body {
     top: 45%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: clamp(100px, 28vw, 200px);
-    height: clamp(100px, 28vw, 200px);
+    width: clamp(180px, 55vw, 500px);
+    height: clamp(180px, 55vw, 500px);
     filter: drop-shadow(0 0 15px rgba(255, 165, 0, 0.6))
             drop-shadow(0 0 35px rgba(255, 69, 0, 0.3));
     animation: horseBreath 3s ease-in-out infinite;

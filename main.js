@@ -5442,7 +5442,7 @@ function initStartOverlay() {
             if (cssW === 0 || cssH === 0) { requestAnimationFrame(drawHorse); return; }
 
             const elapsed = (now - startT) / 1000;
-            const fontSize = cssW * 0.75;
+            const fontSize = cssW * 0.6;
             const cx = cssW / 2;
             const cy = cssH / 2;
 
@@ -5512,10 +5512,12 @@ function initStartOverlay() {
                 const blurSize = lerp(fontSize * 0.3, fontSize * (0.08 + breath * 0.15), settle);
 
                 // Fading sparkles carried over from morph phase
+                /*
                 if (holdT < 0.8) {
                     const sparkFade = 1 - easeInOut(holdT / 0.8);
                     horseSparkles(cx, cy, fontSize, 1.0 + holdT, 0.9 * sparkFade);
                 }
+                */
 
                 hCtx.save();
                 hCtx.translate(cx, cy);
@@ -5545,8 +5547,10 @@ function initStartOverlay() {
                 const FORM_START = 0.45;
 
                 // Sparkles — keep alive until end so hold phase can continue them
+                /*
                 const sparkleEnv = t < 0.15 ? t / 0.15 : 1;
                 horseSparkles(cx, cy, fontSize, t, baseAlpha * sparkleEnv);
+                */
 
                 // Dissolve old char
                 if (t < DISSOLVE_END) {
