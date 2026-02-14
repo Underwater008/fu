@@ -20,7 +20,7 @@ import {
     initAudio, resumeAudio, startBGM, toggleMute, isBGMMuted,
     playSfxDraw, playSfxReveal, switchToVocal, switchToInst, initMusicSystem
 } from './audio.js';
-import { getUser, onAuthChange, restoreSession, ensureUser, spendDraws, getReferralFromUrl, applyReferral } from './auth.js';
+import { getUser, onAuthChange, restoreSession, ensureUser, spendDraws, getReferralFromUrl } from './auth.js';
 import { claimDailyLogin, getPityCounter, incrementPity, resetPity, setPityCounter } from './rewards.js';
 import { initAds } from './ads.js';
 import { getPaymentResult } from './payments.js';
@@ -5389,14 +5389,10 @@ function frame(now) {
     console.warn('Session restore failed:', e);
   }
 
-  // Handle referral from ?ref= parameter
+  // Save referral code from ?ref= parameter (credited after first draw)
   const referralCode = getReferralFromUrl();
   if (referralCode) {
-    try {
-      await applyReferral(referralCode);
-    } catch (e) {
-      console.warn('Referral application failed:', e);
-    }
+    localStorage.setItem('fu_pending_referral', referralCode);
   }
 
   // Handle gift claim from URL

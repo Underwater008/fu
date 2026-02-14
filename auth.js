@@ -227,8 +227,22 @@ export async function logout() {
 
 export async function ensureUser() {
   if (currentUser) return currentUser;
-  if (!CONFIG.isProd) return devCreateAnonymous();
-  return prodCreateAnonymous();
+  if (!CONFIG.isProd) {
+    await devCreateAnonymous();
+  } else {
+    await prodCreateAnonymous();
+  }
+  // Apply pending referral on first user creation (triggered by first draw)
+  const pendingRef = localStorage.getItem('fu_pending_referral');
+  if (pendingRef) {
+    try {
+      await applyReferral(pendingRef);
+    } catch (e) {
+      console.warn('Referral application failed:', e);
+    }
+    localStorage.removeItem('fu_pending_referral');
+  }
+  return currentUser;
 }
 
 export async function restoreSession() {
