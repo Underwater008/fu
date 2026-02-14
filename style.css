@@ -838,30 +838,30 @@ canvas {
 @keyframes rarityPulse5 {
     0%, 100% {
         box-shadow:
-            0 0 30px rgba(168, 85, 247, 0.4),
-            0 0 60px rgba(168, 85, 247, 0.15),
+            0 0 32px rgba(168, 85, 247, 0.42),
+            0 0 65px rgba(168, 85, 247, 0.17),
             inset 0 0 20px rgba(0, 0, 0, 0.3);
     }
     50% {
         box-shadow:
-            0 0 40px rgba(168, 85, 247, 0.6),
-            0 0 80px rgba(168, 85, 247, 0.25),
+            0 0 38px rgba(168, 85, 247, 0.52),
+            0 0 75px rgba(168, 85, 247, 0.22),
             inset 0 0 20px rgba(0, 0, 0, 0.3);
     }
 }
 @keyframes rarityPulse6 {
     0%, 100% {
         box-shadow:
-            0 0 30px rgba(255, 69, 0, 0.5),
-            0 0 60px rgba(255, 69, 0, 0.2),
-            0 0 100px rgba(255, 150, 0, 0.08),
+            0 0 34px rgba(255, 69, 0, 0.52),
+            0 0 70px rgba(255, 69, 0, 0.22),
+            0 0 108px rgba(255, 150, 0, 0.08),
             inset 0 0 20px rgba(0, 0, 0, 0.3);
     }
     50% {
         box-shadow:
-            0 0 45px rgba(255, 69, 0, 0.7),
-            0 0 90px rgba(255, 69, 0, 0.3),
-            0 0 130px rgba(255, 150, 0, 0.12),
+            0 0 42px rgba(255, 69, 0, 0.62),
+            0 0 85px rgba(255, 69, 0, 0.28),
+            0 0 125px rgba(255, 150, 0, 0.11),
             inset 0 0 20px rgba(0, 0, 0, 0.3);
     }
 }
@@ -940,10 +940,10 @@ canvas {
     }
     50% {
         text-shadow:
-            0 0 6px var(--mc-glow, rgba(255,215,0,0.95)),
-            0 0 20px var(--mc-glow, rgba(255,215,0,0.7)),
-            0 0 40px var(--mc-glow, rgba(255,215,0,0.4));
-        transform: scale(1.05);
+            0 0 5px var(--mc-glow, rgba(255,215,0,0.88)),
+            0 0 17px var(--mc-glow, rgba(255,215,0,0.6)),
+            0 0 34px var(--mc-glow, rgba(255,215,0,0.35));
+        transform: scale(1.02);
     }
 }
 .mc-phrase {
@@ -1302,12 +1302,12 @@ canvas {
 
 @keyframes detailImperialRing {
     0%, 100% {
-        box-shadow: 0 0 0 rgba(255, 220, 145, 0), inset 0 0 0 rgba(255, 220, 145, 0);
-        border-color: rgba(255, 215, 0, 0.4);
+        box-shadow: 0 0 8px rgba(255, 220, 145, 0.08), inset 0 0 4px rgba(255, 220, 145, 0.05);
+        border-color: rgba(255, 215, 0, 0.45);
     }
     50% {
         box-shadow: 0 0 20px rgba(255, 220, 145, 0.22), inset 0 0 8px rgba(255, 220, 145, 0.14);
-        border-color: rgba(255, 235, 175, 0.7);
+        border-color: rgba(255, 235, 175, 0.65);
     }
 }
 
@@ -1323,50 +1323,40 @@ canvas {
         0 0 100px rgba(255, 215, 0, 0.25),
         0 0 150px rgba(255, 0, 0, 0.15),
         inset 0 0 30px rgba(0, 0, 0, 0.3);
-    animation: cardAppear 0.5s cubic-bezier(0.2, 0.9, 0.3, 1), stars7BackgroundPulse 5s ease-in-out infinite;
+    animation: cardAppear 0.5s cubic-bezier(0.2, 0.9, 0.3, 1), stars7InnerGlow 5s ease-in-out infinite;
 }
-@keyframes stars7BackgroundPulse {
+@keyframes stars7InnerGlow {
     0%, 100% {
-        background: linear-gradient(155deg,
-            rgba(100, 0, 0, 0.92) 0%,
-            rgba(60, 0, 0, 0.95) 50%,
-            rgba(90, 0, 0, 0.92) 100%);
+        box-shadow:
+            0 0 50px rgba(255, 0, 0, 0.4),
+            0 0 100px rgba(255, 215, 0, 0.25),
+            0 0 150px rgba(255, 0, 0, 0.15),
+            inset 0 0 30px rgba(0, 0, 0, 0.3);
     }
     50% {
-        background: linear-gradient(155deg,
-            rgba(115, 8, 0, 0.92) 0%,
-            rgba(75, 4, 0, 0.95) 50%,
-            rgba(105, 8, 0, 0.92) 100%);
+        box-shadow:
+            0 0 50px rgba(255, 0, 0, 0.4),
+            0 0 100px rgba(255, 215, 0, 0.25),
+            0 0 150px rgba(255, 0, 0, 0.15),
+            inset 0 0 50px rgba(100, 10, 0, 0.18);
     }
 }
 .detail-card.stars-7::before {
-    border-color: rgba(255, 30, 0, 0.55);
-    animation: stars7RingA 4s ease-in-out infinite;
-    will-change: box-shadow, border-color;
+    border-color: rgba(255, 0, 0, 0.6);
+    animation: stars7Ring 3.5s ease-in-out infinite;
 }
 .detail-card.stars-7::after {
-    border-color: rgba(255, 180, 0, 0.3);
-    animation: stars7RingB 4s ease-in-out infinite;
-    will-change: box-shadow, border-color;
+    border-color: rgba(255, 215, 0, 0.35);
+    animation: stars7Ring 3.5s ease-in-out 1.75s infinite;
 }
-@keyframes stars7RingA {
+@keyframes stars7Ring {
     0%, 100% {
-        box-shadow: 0 0 8px rgba(255, 0, 0, 0.1), inset 0 0 4px rgba(255, 0, 0, 0.05);
-        border-color: rgba(255, 30, 0, 0.45);
+        box-shadow: 0 0 12px rgba(255, 20, 0, 0.12), inset 0 0 4px rgba(255, 60, 0, 0.05);
+        border-color: rgba(255, 20, 0, 0.45);
     }
     50% {
-        box-shadow: 0 0 22px rgba(255, 0, 0, 0.3), inset 0 0 10px rgba(255, 215, 0, 0.15);
-        border-color: rgba(255, 120, 0, 0.7);
-    }
-}
-@keyframes stars7RingB {
-    0%, 100% {
-        box-shadow: 0 0 12px rgba(255, 215, 0, 0.08), inset 0 0 6px rgba(255, 215, 0, 0.05);
-        border-color: rgba(255, 180, 0, 0.25);
-    }
-    50% {
-        box-shadow: 0 0 20px rgba(255, 215, 0, 0.2), inset 0 0 8px rgba(255, 100, 0, 0.12);
-        border-color: rgba(255, 215, 0, 0.55);
+        box-shadow: 0 0 16px rgba(255, 30, 0, 0.18), inset 0 0 6px rgba(255, 80, 0, 0.08);
+        border-color: rgba(255, 40, 0, 0.55);
     }
 }
 /* Radiating glow overlay for 7-star */
@@ -1375,14 +1365,13 @@ canvas {
     position: absolute;
     inset: -20px;
     border-radius: 24px;
-    background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0.10) 0%, transparent 70%);
-    animation: stars7Radiate 5s ease-in-out infinite;
+    background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0.12) 0%, transparent 70%);
+    animation: stars7Radiate 4s ease-in-out infinite;
     pointer-events: none;
-    will-change: opacity, transform;
 }
 @keyframes stars7Radiate {
-    0%, 100% { opacity: 0.5; transform: scale(1); }
-    50% { opacity: 0.85; transform: scale(1.05); }
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.01); }
 }
 /* Golden sparkle particles for 7-star */
 .detail-card.stars-7 .detail-card-ornaments::after {
@@ -1401,12 +1390,12 @@ canvas {
         radial-gradient(2px 2px at 40% 10%, rgba(255, 255, 200, 0.8) 50%, transparent 100%);
     animation: stars7Sparkle 6s ease-in-out infinite;
     pointer-events: none;
-    will-change: opacity;
 }
 @keyframes stars7Sparkle {
-    0%, 100% { opacity: 0.45; }
-    33% { opacity: 0.75; }
-    66% { opacity: 0.55; }
+    0%, 100% { opacity: 0.6; }
+    25% { opacity: 0.68; }
+    50% { opacity: 0.62; }
+    75% { opacity: 0.72; }
 }
 /* 7-star text glow override */
 .detail-card.stars-7 .detail-character {
@@ -1429,6 +1418,15 @@ canvas {
     inset: 0;
     pointer-events: none;
     z-index: 2;
+    border-radius: 16px;
+}
+
+.detail-card.stars-7 .detail-card-ornaments {
+    animation: stars7SurfaceGlow 5s ease-in-out infinite;
+}
+@keyframes stars7SurfaceGlow {
+    0%, 100% { background-color: rgba(140, 10, 0, 0.03); }
+    50% { background-color: rgba(140, 10, 0, 0.35); }
 }
 
 /* ===== Corner ornaments (SVG mask + background-color) ===== */
@@ -1569,12 +1567,12 @@ canvas {
         radial-gradient(circle at 76% 10%, var(--orn-color, rgba(255, 228, 150, 0.96)) 0 2.2px, transparent 3px),
         radial-gradient(circle at 24% 90%, var(--orn-color, rgba(255, 228, 150, 0.96)) 0 2.2px, transparent 3px),
         radial-gradient(circle at 76% 90%, var(--orn-color, rgba(255, 228, 150, 0.96)) 0 2.2px, transparent 3px);
-    animation: detailSealPulse 2.2s ease-in-out infinite;
+    animation: detailSealPulse 4s ease-in-out infinite;
 }
 
 @keyframes detailSealPulse {
-    0%, 100% { opacity: calc(var(--orn-pulse) * 0.75); }
-    50% { opacity: calc(var(--orn-pulse) * 1); }
+    0%, 100% { opacity: calc(var(--orn-pulse) * 0.85); }
+    50% { opacity: calc(var(--orn-pulse) * 0.95); }
 }
 
 .detail-stars {
@@ -1622,11 +1620,11 @@ canvas {
     }
     50% {
         text-shadow:
-            0 0 8px var(--card-glow, rgba(255,235,130,0.95)),
-            0 0 22px var(--card-glow, rgba(255,215,0,0.7)),
-            0 0 44px var(--card-glow, rgba(255,200,50,0.4)),
-            0 0 80px var(--card-glow, rgba(255,180,0,0.2));
-        transform: scale(1.025);
+            0 0 6px var(--card-glow, rgba(255,230,115,0.92)),
+            0 0 19px var(--card-glow, rgba(255,215,0,0.65)),
+            0 0 40px var(--card-glow, rgba(255,200,50,0.35)),
+            0 0 72px var(--card-glow, rgba(255,180,0,0.18));
+        transform: scale(1.012);
     }
 }
 .detail-divider {
@@ -1796,17 +1794,17 @@ canvas {
 }
 @media (max-width: 380px) {
     .collection-progress-area {
-        gap: 10px;
+        gap: 18px;
     }
     .progress-ring-wrap {
-        width: 52px;
-        height: 52px;
+        width: 76px;
+        height: 76px;
     }
     .progress-pct {
-        font-size: 1rem;
+        font-size: 1.3rem;
     }
     .stat-row-value {
-        font-size: 1rem;
+        font-size: 1.3rem;
     }
     .collection-title-en span:first-child {
         font-size: 1.1rem;
@@ -1927,18 +1925,18 @@ canvas {
 .collection-progress-area {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 16px;
-    width: auto;
-    flex-shrink: 1;
-    min-width: 0;
+    justify-content: center;
+    gap: 28px;
+    margin-top: 20px;
+    width: 100%;
+    max-width: 400px;
 }
 
 /* SVG Ring Container */
 .progress-ring-wrap {
     position: relative;
-    width: 64px;
-    height: 64px;
+    width: 90px;
+    height: 90px;
     flex-shrink: 0;
 }
 .progress-ring-wrap svg {
@@ -1977,19 +1975,19 @@ canvas {
 }
 .progress-pct {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 1.2rem;
+    font-size: 1.55rem;
     font-weight: 700;
     color: #FFD700;
     line-height: 1;
     text-shadow: 0 0 14px rgba(255, 215, 0, 0.35);
 }
 .progress-pct-sign {
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     font-weight: 500;
     opacity: 0.6;
 }
 .progress-label {
-    font-size: 0.45rem;
+    font-size: 0.5rem;
     color: rgba(255, 255, 255, 0.3);
     text-transform: uppercase;
     letter-spacing: 1.8px;
@@ -2000,35 +1998,35 @@ canvas {
 .progress-stats {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 14px;
 }
 .stat-row {
     display: flex;
     align-items: baseline;
-    gap: 6px;
+    gap: 8px;
 }
 .stat-row-value {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 1.15rem;
+    font-size: 1.5rem;
     font-weight: 700;
     color: #FFD700;
     line-height: 1;
     text-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
-    min-width: 28px;
+    min-width: 36px;
 }
 .stat-row-divider {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     color: rgba(255, 215, 0, 0.25);
     font-weight: 300;
 }
 .stat-row-total {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     color: rgba(255, 215, 0, 0.4);
     font-weight: 500;
 }
 .stat-row-label {
-    font-size: 0.52rem;
+    font-size: 0.58rem;
     color: rgba(255, 255, 255, 0.25);
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -2038,11 +2036,11 @@ canvas {
 /* Bottom progress bar (thin elegant accent under header) */
 .collection-progress-bar {
     width: 100%;
-    max-width: 560px;
+    max-width: 400px;
     height: 2px;
     background: rgba(255, 255, 255, 0.04);
     border-radius: 2px;
-    margin-top: 16px;
+    margin-top: 20px;
     overflow: hidden;
     position: relative;
 }
@@ -2325,11 +2323,11 @@ canvas {
 .collection-card.r7 {
     border-color: rgba(255, 0, 0, 0.6);
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 24px rgba(255, 0, 0, 0.15), 0 0 48px rgba(255, 215, 0, 0.08), inset 0 0 20px rgba(255, 0, 0, 0.1);
-    animation: collectionR7Pulse 4s ease-in-out infinite;
+    animation: collectionR7Pulse 2.5s ease-in-out infinite;
 }
 @keyframes collectionR7Pulse {
-    0%, 100% { box-shadow: 0 2px 12px rgba(0,0,0,0.3), 0 0 24px rgba(255,0,0,0.12), 0 0 40px rgba(255,215,0,0.05), inset 0 0 18px rgba(255,0,0,0.08); }
-    50% { box-shadow: 0 2px 12px rgba(0,0,0,0.3), 0 0 30px rgba(255,0,0,0.22), 0 0 55px rgba(255,215,0,0.1), inset 0 0 22px rgba(255,0,0,0.13); }
+    0%, 100% { box-shadow: 0 2px 12px rgba(0,0,0,0.3), 0 0 26px rgba(255,0,0,0.17), 0 0 48px rgba(255,215,0,0.06), inset 0 0 20px rgba(255,0,0,0.1); }
+    50% { box-shadow: 0 2px 12px rgba(0,0,0,0.3), 0 0 32px rgba(255,0,0,0.22), 0 0 60px rgba(255,215,0,0.1), inset 0 0 22px rgba(255,0,0,0.13); }
 }
 .collection-card.r7 .card-char {
     color: #FF0000;
@@ -2339,17 +2337,16 @@ canvas {
         0 0 36px rgba(255, 215, 0, 0.4),
         0 0 60px rgba(255, 0, 0, 0.25);
     animation: cardCharAppear 0.6s ease-out both,
-               charBreatheR7 4s ease-in-out 0.6s infinite;
-    will-change: text-shadow, transform;
+               charBreatheR7 2.5s ease-in-out 0.6s infinite;
 }
 @keyframes charBreatheR7 {
     0%, 100% {
-        text-shadow: 0 0 6px rgba(255,0,0,0.9), 0 0 18px rgba(255,0,0,0.65), 0 0 36px rgba(255,215,0,0.35), 0 0 55px rgba(255,0,0,0.2);
+        text-shadow: 0 0 6px rgba(255,0,0,0.95), 0 0 18px rgba(255,0,0,0.7), 0 0 36px rgba(255,215,0,0.4), 0 0 60px rgba(255,0,0,0.25);
         transform: scale(1);
     }
     50% {
-        text-shadow: 0 0 8px rgba(255,30,0,0.95), 0 0 22px rgba(255,0,0,0.75), 0 0 42px rgba(255,215,0,0.45), 0 0 70px rgba(255,0,0,0.28);
-        transform: scale(1.04);
+        text-shadow: 0 0 8px rgba(255,30,0,1), 0 0 22px rgba(255,0,0,0.8), 0 0 42px rgba(255,215,0,0.45), 0 0 68px rgba(255,0,0,0.28);
+        transform: scale(1.02);
     }
 }
 
@@ -2372,8 +2369,8 @@ canvas {
         transform: scale(1);
     }
     50% {
-        text-shadow: 0 0 6px rgba(255,140,70,1), 0 0 20px rgba(255,69,0,0.85), 0 0 40px rgba(255,69,0,0.5), 0 0 70px rgba(255,40,0,0.25);
-        transform: scale(1.06);
+        text-shadow: 0 0 5px rgba(255,130,60,1), 0 0 18px rgba(255,69,0,0.78), 0 0 35px rgba(255,69,0,0.45), 0 0 62px rgba(255,40,0,0.22);
+        transform: scale(1.02);
     }
 }
 
@@ -2396,8 +2393,8 @@ canvas {
         transform: scale(1);
     }
     50% {
-        text-shadow: 0 0 6px rgba(220,170,255,1), 0 0 20px rgba(168,85,247,0.85), 0 0 40px rgba(168,85,247,0.5), 0 0 70px rgba(140,50,230,0.25);
-        transform: scale(1.06);
+        text-shadow: 0 0 5px rgba(210,155,255,1), 0 0 18px rgba(168,85,247,0.78), 0 0 35px rgba(168,85,247,0.45), 0 0 62px rgba(140,50,230,0.22);
+        transform: scale(1.02);
     }
 }
 
@@ -2464,53 +2461,23 @@ canvas {
    ============================================================ */
 
 /* --- Account Section (collection header) --- */
-/* Top bar: auth (left) + progress (right) */
-.collection-top-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    max-width: 560px;
-    margin-top: 16px;
-    gap: 12px;
-}
 .collection-account {
     display: flex;
     align-items: center;
-    flex-shrink: 0;
-    position: relative;
+    justify-content: flex-end;
+    width: 100%;
+    max-width: 560px;
+    margin-bottom: 16px;
 }
 .auth-logged-out-row {
     display: flex;
+    justify-content: center;
 }
 .auth-logged-in-row {
     display: flex;
     align-items: center;
-    position: relative;
-}
-.btn-user-id {
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.auth-dropdown {
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 0;
-    background: rgba(30, 5, 5, 0.95);
-    border: 1px solid rgba(255, 215, 0, 0.2);
-    border-radius: 12px;
-    padding: 12px 16px;
-    display: flex;
-    flex-direction: column;
     gap: 10px;
-    align-items: flex-start;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    z-index: 10;
-    min-width: 160px;
+    justify-content: center;
 }
 
 #collection-panel .collection-header #btn-login {
