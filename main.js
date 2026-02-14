@@ -5269,11 +5269,10 @@ function initFlameEffect() {
 
 function initStartOverlay() {
     const overlay = document.getElementById('start-overlay');
-    const btnEnter = document.getElementById('btn-enter');
     const countdownEl = document.getElementById('cny-countdown');
     const labelEl = document.getElementById('cny-label');
 
-    if (!overlay || !btnEnter) return;
+    if (!overlay) return;
 
     // Start flame effect
     const flame = initFlameEffect();
@@ -5331,16 +5330,19 @@ function initStartOverlay() {
 
             const entries = []; // { font, char }
             const seen = new Set(); // avoid duplicate renderings
+            let hasTrad = false; // only keep one traditional 馬 entry
             for (const f of HORSE_CANDIDATE_FONTS) {
                 const spec = `${f}, "Noto Serif TC", serif`;
                 // Try traditional 馬 first
                 const tradPixels = renderGlyph(spec, '\u99AC');
                 if (pixelsDiffer(tradPixels, fallbackTrad)) {
-                    // Check it's not a duplicate of an already-added font
-                    const key = Array.from(tradPixels).filter((_, i) => i % 4 === 3).join(',');
-                    if (!seen.has(key)) {
-                        seen.add(key);
-                        entries.push({ font: f, char: '\u99AC' });
+                    if (!hasTrad) {
+                        const key = Array.from(tradPixels).filter((_, i) => i % 4 === 3).join(',');
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            entries.push({ font: f, char: '\u99AC' });
+                            hasTrad = true;
+                        }
                     }
                     continue;
                 }
@@ -5355,16 +5357,21 @@ function initStartOverlay() {
                     continue;
                 }
             }
-            // Always include Noto Serif TC with traditional 馬
-            entries.push({ font: '"Noto Serif TC"', char: '\u99AC' });
+            // Include Noto Serif TC traditional 馬 only if no other traditional entry exists
+            if (!hasTrad) {
+                entries.push({ font: '"Noto Serif TC"', char: '\u99AC' });
+            }
             return entries;
         }
 
         const horseFontEntries = getHorseFontEntries();
         const horseFontCount = horseFontEntries.length;
-        const holdDuration = 1.6;    // seconds to hold each font
-        const transitionDur = 0.5;   // seconds for cross-fade transition
-        const cycleDur = holdDuration + transitionDur;
+
+        // Zodiac cycle: rapid spin through 11 animals then land on 馬
+        const ZODIAC_OTHERS = ['鼠','牛','虎','兔','龙','蛇','羊','猴','鸡','狗','猪'];
+        const spinDuration = 0.5;     // seconds for rapid zodiac spin
+        const holdDuration = 2.5;     // seconds to hold 馬
+        const cycleDur = spinDuration + holdDuration;
         const startT = performance.now();
         let currentFontIdx = Math.floor(Math.random() * horseFontCount);
 
@@ -5390,20 +5397,34 @@ function initStartOverlay() {
 
             hCtx.clearRect(0, 0, cssW, cssH);
 
-            // Determine current cycle phase: hold or transition
             const cycleT = t % cycleDur;
             const fontCycle = Math.floor(t / cycleDur);
             const fontIdx = (currentFontIdx + fontCycle) % horseFontCount;
-            const nextFontIdx = (fontIdx + 1) % horseFontCount;
+            const entry = horseFontEntries[fontIdx];
 
             hCtx.textAlign = 'center';
             hCtx.textBaseline = 'alphabetic';
             hCtx.fillStyle = '#FFD700';
             hCtx.shadowColor = 'rgba(255, 165, 0, 0.8)';
 
-            if (cycleT < holdDuration) {
-                // Hold phase: show single font with glow
-                const entry = horseFontEntries[fontIdx];
+            if (cycleT < spinDuration) {
+                // Rapid zodiac spin phase: cycle through 11 animals
+                const progress = cycleT / spinDuration; // 0→1
+                const zodiacIdx = Math.min(Math.floor(progress * ZODIAC_OTHERS.length), ZODIAC_OTHERS.length - 1);
+                const char = ZODIAC_OTHERS[zodiacIdx];
+
+                // Slight alpha ramp-up as we approach 馬
+                const alpha = 0.4 + 0.6 * progress;
+
+                hCtx.font = `${fontSize}px ${entry.font}, "Noto Serif TC", serif`;
+                hCtx.globalAlpha = alpha * 0.3;
+                hCtx.shadowBlur = fontSize * 0.15;
+                hCtx.fillText(char, cx, cy);
+                hCtx.globalAlpha = alpha * 0.9;
+                hCtx.shadowBlur = fontSize * 0.05;
+                hCtx.fillText(char, cx, cy);
+            } else {
+                // Hold phase: show 馬 with glow
                 hCtx.font = `${fontSize}px ${entry.font}, "Noto Serif TC", serif`;
 
                 // Outer glow
@@ -5415,47 +5436,6 @@ function initStartOverlay() {
                 hCtx.globalAlpha = 0.9;
                 hCtx.shadowBlur = fontSize * 0.05;
                 hCtx.fillText(entry.char, cx, cy);
-            } else {
-                // Transition phase: cross-fade to next font
-                const tt = (cycleT - holdDuration) / transitionDur;
-                const blend = easeInOut(tt);
-                const entryA = horseFontEntries[fontIdx];
-                const entryB = horseFontEntries[nextFontIdx];
-
-                let alphaA, alphaB;
-                if (IS_COARSE_POINTER) {
-                    // Mobile: sequential fade — A fades out fully, then B fades in
-                    if (blend < 0.5) {
-                        alphaA = lerp(1, 0, blend / 0.5);
-                        alphaB = 0;
-                    } else {
-                        alphaA = 0;
-                        alphaB = lerp(0, 1, (blend - 0.5) / 0.5);
-                    }
-                } else {
-                    alphaA = 1 - blend;
-                    alphaB = blend;
-                }
-
-                if (alphaA > 0.01) {
-                    hCtx.font = `${fontSize}px ${entryA.font}, "Noto Serif TC", serif`;
-                    hCtx.globalAlpha = alphaA * 0.3;
-                    hCtx.shadowBlur = fontSize * 0.15;
-                    hCtx.fillText(entryA.char, cx, cy);
-                    hCtx.globalAlpha = alphaA * 0.9;
-                    hCtx.shadowBlur = fontSize * 0.05;
-                    hCtx.fillText(entryA.char, cx, cy);
-                }
-
-                if (alphaB > 0.01) {
-                    hCtx.font = `${fontSize}px ${entryB.font}, "Noto Serif TC", serif`;
-                    hCtx.globalAlpha = alphaB * 0.3;
-                    hCtx.shadowBlur = fontSize * 0.15;
-                    hCtx.fillText(entryB.char, cx, cy);
-                    hCtx.globalAlpha = alphaB * 0.9;
-                    hCtx.shadowBlur = fontSize * 0.05;
-                    hCtx.fillText(entryB.char, cx, cy);
-                }
             }
 
             hCtx.globalAlpha = 1;
@@ -5466,8 +5446,7 @@ function initStartOverlay() {
         requestAnimationFrame(drawHorse);
     }
 
-    // Always show fortune button text
-    btnEnter.textContent = 'ENTER FOR 10× FORTUNE';
+
 
     const updateTime = () => {
         if (overlay.style.opacity === '0' || overlay.style.display === 'none') return;
@@ -5531,23 +5510,44 @@ function initStartOverlay() {
     
     requestAnimationFrame(updateTime);
 
-    // 2. Interaction
-    btnEnter.onclick = () => {
-        // Mark as entered
+    // 2. Interaction — swipe up to enter (+ tap fallback)
+    function enterApp() {
         localStorage.setItem('fu_has_entered', 'true');
-
-        // Init Audio Context (User Gesture)
         ensureAudio();
-        
-        // Stop effects & fade out overlay
         horseMorphRunning = false;
         if (flame) flame.stop();
         overlay.style.opacity = '0';
         setTimeout(() => {
             overlay.style.visibility = 'hidden';
-            overlay.style.display = 'none'; // remove from flow
+            overlay.style.display = 'none';
         }, 800);
-    };
+    }
+
+    let startTouchY = 0, startTouchTime = 0;
+    overlay.addEventListener('touchstart', (e) => {
+        startTouchY = e.touches[0].clientY;
+        startTouchTime = performance.now();
+    }, { passive: true });
+
+    overlay.addEventListener('touchend', (e) => {
+        const dy = startTouchY - e.changedTouches[0].clientY;
+        const dt = performance.now() - startTouchTime;
+        if (dy > 50 && dt < 500) enterApp(); // swipe up
+    }, { passive: true });
+
+    // Desktop: click anywhere or press Enter/Space
+    overlay.addEventListener('click', (e) => {
+        // Don't trigger on seal link clicks
+        if (e.target.closest('.start-seal-link')) return;
+        enterApp();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && overlay.style.display !== 'none') {
+            e.preventDefault();
+            enterApp();
+        }
+    });
 }
 
 function getZodiac(year) {
