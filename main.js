@@ -4765,9 +4765,9 @@ function showCollectionPanel() {
     const progress = getCollectionProgress();
     const categories = getCollectionByCategory();
 
-    // Update progress with ring + stats
+    // Update progress — centered hero ring + stats
     if (collectionProgress) {
-        collectionProgress.className = 'collection-progress-area';
+        collectionProgress.className = 'collection-progress-hero';
         const r = 38, circ = 2 * Math.PI * r;
         const offset = circ - (circ * progress.percentage / 100);
         collectionProgress.innerHTML =
@@ -4807,7 +4807,7 @@ function showCollectionPanel() {
             if (fillCircle) fillCircle.style.strokeDashoffset = offset;
             if (glowCircle) glowCircle.style.strokeDashoffset = offset;
         });
-        // Thin accent bar
+        // Thin accent bar below the entire header
         let bar = collectionProgress.parentElement.querySelector('.collection-progress-bar');
         if (!bar) {
             bar = document.createElement('div');

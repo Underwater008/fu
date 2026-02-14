@@ -1923,22 +1923,22 @@ canvas {
     text-align: right;
 }
 
-/* --- Collection Progress: Ring + Stats --- */
-.collection-progress-area {
+/* --- Collection Progress: Centered Hero --- */
+.collection-progress-hero {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 16px;
-    width: auto;
-    flex-shrink: 1;
-    min-width: 0;
+    justify-content: center;
+    gap: 20px;
+    width: 100%;
+    max-width: 560px;
+    margin-top: 20px;
 }
 
 /* SVG Ring Container */
 .progress-ring-wrap {
     position: relative;
-    width: 64px;
-    height: 64px;
+    width: 72px;
+    height: 72px;
     flex-shrink: 0;
 }
 .progress-ring-wrap svg {
@@ -1977,7 +1977,7 @@ canvas {
 }
 .progress-pct {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 1.2rem;
+    font-size: 1.35rem;
     font-weight: 700;
     color: #FFD700;
     line-height: 1;
@@ -2463,41 +2463,41 @@ canvas {
    MONETIZATION UI — Auth bar, Login modal, Rewards panel
    ============================================================ */
 
-/* --- Account Section (collection header) --- */
-/* Top bar: auth (left) + progress (right) */
-.collection-top-bar {
+/* --- Auth Strip (contextual sign-in below progress) --- */
+.collection-auth-strip {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     width: 100%;
     max-width: 560px;
-    margin-top: 16px;
-    gap: 12px;
-}
-.collection-account {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
+    margin-top: 14px;
     position: relative;
 }
 .auth-logged-out-row {
     display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 6px 6px 14px;
+    background: rgba(255, 215, 0, 0.04);
+    border: 1px solid rgba(255, 215, 0, 0.08);
+    border-radius: 20px;
+}
+.auth-save-hint {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.35);
+    letter-spacing: 0.3px;
+    white-space: nowrap;
 }
 .auth-logged-in-row {
     display: flex;
     align-items: center;
     position: relative;
 }
-.btn-user-id {
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
 .auth-dropdown {
     position: absolute;
     top: calc(100% + 8px);
-    left: 0;
+    left: 50%;
+    transform: translateX(-50%);
     background: rgba(30, 5, 5, 0.95);
     border: 1px solid rgba(255, 215, 0, 0.2);
     border-radius: 12px;
@@ -2505,7 +2505,7 @@ canvas {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    align-items: flex-start;
+    align-items: center;
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -2513,40 +2513,61 @@ canvas {
     min-width: 160px;
 }
 
-#collection-panel .collection-header #btn-login {
-    min-height: 36px;
-    padding: 0 18px;
-    border-radius: 18px;
-    font-size: 11px;
+/* Compact sign-in button inside auth strip */
+.btn-signin-compact {
+    min-height: 28px;
+    padding: 0 14px;
+    border-radius: 14px;
+    font-size: 10px;
     font-weight: 600;
-    letter-spacing: 1.5px;
+    letter-spacing: 1.2px;
     text-transform: uppercase;
-    color: rgba(255, 215, 0, 0.8);
+    color: rgba(255, 215, 0, 0.9);
     text-shadow: none;
     background: linear-gradient(135deg,
-        rgba(255, 215, 0, 0.08) 0%,
-        rgba(255, 215, 0, 0.03) 100%);
-    border: 1px solid rgba(255, 215, 0, 0.25);
-    box-shadow:
-        0 2px 10px rgba(0, 0, 0, 0.15),
-        inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    transition: all 0.3s ease;
+        rgba(255, 215, 0, 0.12) 0%,
+        rgba(255, 215, 0, 0.05) 100%);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    box-shadow: none;
+    transition: all 0.25s ease;
+    cursor: pointer;
 }
 
-#collection-panel .collection-header #btn-login:hover {
+.btn-signin-compact:hover {
     background: linear-gradient(135deg,
-        rgba(255, 215, 0, 0.15) 0%,
-        rgba(255, 215, 0, 0.06) 100%);
-    border-color: rgba(255, 215, 0, 0.45);
+        rgba(255, 215, 0, 0.2) 0%,
+        rgba(255, 215, 0, 0.1) 100%);
+    border-color: rgba(255, 215, 0, 0.5);
     color: #FFD700;
-    box-shadow:
-        0 4px 16px rgba(0, 0, 0, 0.2),
-        0 0 12px rgba(255, 215, 0, 0.08);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.1);
 }
 
-#collection-panel .collection-header #btn-login:active {
-    transform: translateY(0) scale(0.97);
+.btn-signin-compact:active {
+    transform: scale(0.97);
     transition-duration: 0.1s;
+}
+
+/* User badge button when logged in */
+.btn-user-badge {
+    padding: 5px 14px;
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.25s ease;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.btn-user-badge:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 215, 0, 0.25);
+    color: rgba(255, 215, 0, 0.8);
 }
 
 /* --- Draw Counter (inline in bottom controls, left of toggle) --- */
