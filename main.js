@@ -21,7 +21,7 @@ import {
     playSfxDraw, playSfxReveal, switchToVocal, switchToInst, initMusicSystem
 } from './audio.js';
 import { getUser, onAuthChange, restoreSession, ensureUser, spendDraws, getReferralFromUrl, applyReferral } from './auth.js';
-import { claimDailyLogin, getPityCounter, incrementPity, resetPity, setPityCounter } from './rewards.js';
+import { getPityCounter, incrementPity, resetPity, setPityCounter } from './rewards.js';
 import { initAds } from './ads.js';
 import { getPaymentResult } from './payments.js';
 import { claimGift, getGiftTokenFromUrl, returnExpiredGifts } from './gifting.js';
@@ -5718,13 +5718,6 @@ function frame(now) {
     await returnExpiredGifts();
   } catch (e) {
     console.warn('Return expired gifts failed:', e);
-  }
-
-  try {
-    // Daily login check
-    await claimDailyLogin();
-  } catch (e) {
-    console.warn('Daily login claim failed:', e);
   }
 
   // Initialize monetization UI (auth bar, rewards panel, etc.)
