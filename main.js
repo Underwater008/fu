@@ -20,7 +20,7 @@ import {
     initAudio, resumeAudio, startBGM, toggleMute, isBGMMuted,
     playSfxDraw, playSfxReveal, switchToVocal, switchToInst, initMusicSystem
 } from './audio.js';
-import { getUser, onAuthChange, restoreSession, ensureUser, spendDraws } from './auth.js';
+import { getUser, onAuthChange, restoreSession, ensureUser, spendDraws, getReferralFromUrl, applyReferral } from './auth.js';
 import { claimDailyLogin, getPityCounter, incrementPity, resetPity, setPityCounter } from './rewards.js';
 import { initAds } from './ads.js';
 import { getPaymentResult } from './payments.js';
@@ -5387,6 +5387,16 @@ function frame(now) {
     await restoreSession();
   } catch (e) {
     console.warn('Session restore failed:', e);
+  }
+
+  // Handle referral from ?ref= parameter
+  const referralCode = getReferralFromUrl();
+  if (referralCode) {
+    try {
+      await applyReferral(referralCode);
+    } catch (e) {
+      console.warn('Referral application failed:', e);
+    }
   }
 
   // Handle gift claim from URL

@@ -243,13 +243,26 @@ export function getReferralFromUrl() {
 }
 
 export async function applyReferral(referralCode) {
-  if (!currentUser || currentUser.referred_by) return;
-  // Referral tracking is prod-only (Supabase) — in dev, just log it.
-  if (!CONFIG.isProd) {
-    // dev mode: referral code noted locally
-    return;
+  if (!currentUser || currentUser.referred_by) return null;
+  if (!referralCode) return null;
+
+  if (CONFIG.isProd) {
+    const sb = await getSupabaseClient();
+    const { data, error } = await sb.rpc('apply_referral', { p_referral_code: referralCode });
+    if (error) { console.warn('Referral RPC error:', error); return null; }
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row?.referred_by_id) {
+      applyProfilePatch({ referred_by: row.referred_by_id });
+      return row;
+    }
+    return null;
   }
-  // Prod: Supabase edge function or direct query handles referral credit
+
+  // Dev mode: record referral locally
+  currentUser.referred_by = referralCode;
+  await storage.upsertProfile(currentUser);
+  notifyListeners();
+  return { referred_by_id: referralCode };
 }
 
 // Refresh profile from storage
