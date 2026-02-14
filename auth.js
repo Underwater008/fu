@@ -236,16 +236,6 @@ export async function ensureUser() {
   } else {
     await prodCreateAnonymous();
   }
-  // Apply pending referral on first user creation (triggered by first draw)
-  const pendingRef = localStorage.getItem('fu_pending_referral');
-  if (pendingRef) {
-    try {
-      await applyReferral(pendingRef);
-    } catch (e) {
-      console.warn('Referral application failed:', e);
-    }
-    localStorage.removeItem('fu_pending_referral');
-  }
   return currentUser;
 }
 
