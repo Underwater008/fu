@@ -116,8 +116,8 @@ async function devRestore() {
       return profile;
     }
   }
-  // No session — create anonymous user
-  return devCreateAnonymous();
+  // No session — return null (anonymous user created lazily on first draw)
+  return null;
 }
 
 // --- Prod mode (Supabase) ---
@@ -159,7 +159,22 @@ async function prodLinkAnonymous(email) {
 
 async function prodRestore() {
   const sb = await getSupabaseClient();
-  const { data: { session } } = await sb.auth.getSession();
+
+  // Wait for Supabase to finish restoring the session from localStorage.
+  // getSession() only returns the in-memory session and may be null if the
+  // client hasn't finished its async initialisation yet. Listening for the
+  // INITIAL_SESSION event is the reliable way to detect an existing session.
+  const session = await new Promise((resolve) => {
+    const { data: { subscription } } = sb.auth.onAuthStateChange(
+      (event, sess) => {
+        if (event === 'INITIAL_SESSION') {
+          subscription.unsubscribe();
+          resolve(sess);
+        }
+      },
+    );
+  });
+
   if (session?.user) {
     let profile = await storage.getProfile(session.user.id);
     if (!profile) {
@@ -178,13 +193,8 @@ async function prodRestore() {
     notifyListeners();
     return profile;
   }
-  // No session — allow exactly one anonymous bootstrap per browser install in prod.
-  if (localStorage.getItem(LS_ANON_BOOTSTRAPPED) === '1') {
-    currentUser = null;
-    notifyListeners();
-    return null;
-  }
-  return prodCreateAnonymous();
+  // No session — return null (anonymous user created lazily on first draw)
+  return null;
 }
 
 async function prodLogout() {
@@ -215,6 +225,26 @@ export async function logout() {
   return prodLogout();
 }
 
+export async function ensureUser() {
+  if (currentUser) return currentUser;
+  if (!CONFIG.isProd) {
+    await devCreateAnonymous();
+  } else {
+    await prodCreateAnonymous();
+  }
+  // Apply pending referral on first user creation (triggered by first draw)
+  const pendingRef = localStorage.getItem('fu_pending_referral');
+  if (pendingRef) {
+    try {
+      await applyReferral(pendingRef);
+    } catch (e) {
+      console.warn('Referral application failed:', e);
+    }
+    localStorage.removeItem('fu_pending_referral');
+  }
+  return currentUser;
+}
+
 export async function restoreSession() {
   if (!CONFIG.isProd) return devRestore();
   return prodRestore();
@@ -227,13 +257,26 @@ export function getReferralFromUrl() {
 }
 
 export async function applyReferral(referralCode) {
-  if (!currentUser || currentUser.referred_by) return;
-  // Referral tracking is prod-only (Supabase) — in dev, just log it.
-  if (!CONFIG.isProd) {
-    // dev mode: referral code noted locally
-    return;
+  if (!currentUser || currentUser.referred_by) return null;
+  if (!referralCode) return null;
+
+  if (CONFIG.isProd) {
+    const sb = await getSupabaseClient();
+    const { data, error } = await sb.rpc('apply_referral', { p_referral_code: referralCode });
+    if (error) { console.warn('Referral RPC error:', error); return null; }
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row?.referred_by_id) {
+      applyProfilePatch({ referred_by: row.referred_by_id });
+      return row;
+    }
+    return null;
   }
-  // Prod: Supabase edge function or direct query handles referral credit
+
+  // Dev mode: record referral locally
+  currentUser.referred_by = referralCode;
+  await storage.upsertProfile(currentUser);
+  notifyListeners();
+  return { referred_by_id: referralCode };
 }
 
 // Refresh profile from storage
