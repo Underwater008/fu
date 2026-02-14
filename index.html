@@ -60,6 +60,21 @@
         </div>
 
         <div class="rewards-content">
+            <!-- Sign In prompt (hidden when logged in) -->
+            <div id="auth-logged-out" class="rewards-signin-row">
+                <button id="btn-login" class="rewards-btn rewards-btn--fill rewards-signin-btn">
+                    <span>Sign In</span><span class="rewards-btn-badge">Save Progress</span>
+                </button>
+            </div>
+            <!-- Logged-in user info (hidden when logged out) -->
+            <div id="auth-logged-in" class="rewards-user-row" style="display:none">
+                <button id="btn-auth-user" class="rewards-user-badge"></button>
+                <div id="auth-dropdown" class="auth-dropdown" style="display:none">
+                    <span id="auth-email" class="auth-email"></span>
+                    <button id="btn-logout" class="rewards-btn rewards-btn--fill rewards-btn--small">Logout</button>
+                </div>
+            </div>
+
             <!-- Free draws section -->
             <div class="rewards-section">
                 <span class="rewards-section-label">Free</span>
@@ -167,19 +182,6 @@
     <!-- Collection panel -->
     <div id="collection-panel">
         <div class="collection-header">
-            <!-- Sign In / Account: top-right corner -->
-            <div id="collection-account" class="collection-account-corner">
-                <div id="auth-logged-out" class="auth-logged-out-row">
-                    <button id="btn-login" class="collection-pill-btn">SIGN IN</button>
-                </div>
-                <div id="auth-logged-in" class="auth-logged-in-row" style="display:none">
-                    <button id="btn-auth-user" class="collection-pill-btn btn-user-badge"></button>
-                    <div id="auth-dropdown" class="auth-dropdown" style="display:none">
-                        <span id="auth-email" class="auth-email"></span>
-                        <button id="btn-logout" class="collection-pill-btn collection-pill-sm">Logout</button>
-                    </div>
-                </div>
-            </div>
             <!-- Title left + Progress right -->
             <div class="collection-hero-row">
                 <h1 class="collection-title-en">
