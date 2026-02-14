@@ -1,6 +1,6 @@
 // monetization-ui.js — Auth bar, rewards panel, gift UI, share card generation
 import { getUser, onAuthChange, sendMagicLink, linkAnonymousToEmail, isAnonymous, logout } from './auth.js';
-import { claimShareReward, canShare, getShareCooldownRemaining, getAdCooldownRemaining, claimDailyLogin } from './rewards.js';
+import { claimShareReward, canShare, getShareCooldownRemaining, getAdCooldownRemaining, getLoginCooldownRemaining, claimDailyLogin } from './rewards.js';
 import { showRewardedAd } from './ads.js';
 import { purchaseDraws, DRAW_BUNDLES } from './payments.js';
 import { createGift, canGift } from './gifting.js';
@@ -54,8 +54,10 @@ export function initMonetizationUI() {
   onAuthChange(updateAuthUI);
 
   // Update cooldown timers
+  setInterval(updateLoginCooldown, 1000);
   setInterval(updateShareCooldown, 1000);
   setInterval(updateAdCooldown, 1000);
+  updateLoginCooldown();
 }
 
 // --- Auth UI ---
@@ -216,18 +218,14 @@ function wireRewardsPanel() {
       try {
         const result = await claimDailyLogin();
         if (result) {
+          _loginJustClaimed = true;
           btnLogin.querySelector('.rewards-btn-badge').textContent = `+${result.draws} Claimed!`;
           updateAuthUI(getUser());
-          setTimeout(() => {
-            btnLogin.querySelector('.rewards-btn-badge').textContent = '+6 daily';
-            btnLogin.disabled = false;
-          }, 2000);
+          setTimeout(() => { _loginJustClaimed = false; }, 2000);
         } else {
+          _loginJustClaimed = true;
           btnLogin.querySelector('.rewards-btn-badge').textContent = 'Already claimed';
-          setTimeout(() => {
-            btnLogin.querySelector('.rewards-btn-badge').textContent = '+6 daily';
-            btnLogin.disabled = false;
-          }, 2000);
+          setTimeout(() => { _loginJustClaimed = false; }, 2000);
         }
       } catch (e) {
         console.warn('Daily login claim failed:', e);
@@ -281,10 +279,15 @@ function wireRewardsPanel() {
       const refUrl = `${window.location.origin}${window.location.pathname}?ref=${user.referral_code}`;
       try {
         await navigator.clipboard.writeText(refUrl);
-        btnReferral.textContent = 'Copied!';
-        setTimeout(() => { btnReferral.textContent = 'Copy Invite Link'; }, 2000);
+        btnReferral.innerHTML = '<span>Invite</span><span class="rewards-btn-badge">Copied!</span>';
+        setTimeout(() => {
+          btnReferral.innerHTML = '<span>Invite</span><span class="rewards-btn-badge">+30</span>';
+        }, 2000);
       } catch {
-        btnReferral.textContent = refUrl;
+        btnReferral.innerHTML = '<span>Invite</span><span class="rewards-btn-badge">Copied!</span>';
+        setTimeout(() => {
+          btnReferral.innerHTML = '<span>Invite</span><span class="rewards-btn-badge">+30</span>';
+        }, 2000);
       }
     });
   }
@@ -294,6 +297,29 @@ function formatCooldown(ms) {
   const mins = Math.floor(ms / 60000);
   const secs = Math.floor((ms % 60000) / 1000);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function formatLongCooldown(ms) {
+  const hrs = Math.floor(ms / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  const secs = Math.floor((ms % 60000) / 1000);
+  return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+let _loginJustClaimed = false;
+
+function updateLoginCooldown() {
+  if (_loginJustClaimed) return;
+  const btn = document.getElementById('login-streak-btn');
+  if (!btn) return;
+  const remaining = getLoginCooldownRemaining();
+  if (remaining <= 0) {
+    btn.disabled = false;
+    btn.querySelector('.rewards-btn-badge').textContent = '+6 daily';
+  } else {
+    btn.disabled = true;
+    btn.querySelector('.rewards-btn-badge').textContent = formatLongCooldown(remaining);
+  }
 }
 
 function updateShareCooldown() {

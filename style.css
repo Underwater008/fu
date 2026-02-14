@@ -2127,6 +2127,19 @@ canvas#c {
     gap: 24px;
 }
 
+@media (orientation: landscape) {
+    .collection-hero-row {
+        max-width: 100%;
+    }
+    .collection-hero-row .collection-title-en {
+        flex: 1;
+    }
+    .collection-hero-row::after {
+        content: '';
+        flex: 1;
+    }
+}
+
 /* --- Title block (left-aligned) --- */
 .collection-title-en {
     margin: 0;

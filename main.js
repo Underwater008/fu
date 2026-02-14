@@ -2841,7 +2841,7 @@ function updateMultiDajiToGPU(skipRender) {
         const uv = (p.fontIdx != null && charToUV[p.char + '|' + p.fontIdx]) || charToUV[p.char];
         if (uv) instUV.setXY(visibleCount, uv.u, uv.v);
 
-        let scale = cellSize * 0.85 * scaleFactor;
+        let scale = cellSize * lerp(1.1, 0.85, entryT) * scaleFactor;
         // Convergence: shrink as they rush to center
         if (p.converging && !p.fadingOut) {
             const ct = Math.min(1, (globalTime - p.convergeStartTime) / p.convergeDuration);

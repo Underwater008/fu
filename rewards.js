@@ -81,6 +81,17 @@ export async function canShare() {
   return elapsed >= CONFIG.rewards.shareCooldownMs;
 }
 
+export function getLoginCooldownRemaining() {
+  const user = getUser();
+  if (!user || !user.last_login_date) return 0;
+  const today = new Date().toISOString().slice(0, 10);
+  if (user.last_login_date !== today) return 0; // can claim now
+  // Ms until UTC midnight
+  const now = new Date();
+  const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  return tomorrow.getTime() - now.getTime();
+}
+
 export function getShareCooldownRemaining() {
   const user = getUser();
   if (!user || !user.last_share_time) return 0;
