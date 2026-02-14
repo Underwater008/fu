@@ -149,9 +149,9 @@ body {
 
 .cny-label-en {
     font-family: 'Courier New', monospace;
-    font-size: clamp(1.6rem, 7vw, 3rem);
+    font-size: clamp(0.6rem, 4.5vw, 1.8rem);
+    white-space: nowrap;
     letter-spacing: 3px;
-    text-transform: uppercase;
     margin-bottom: 10px;
     text-shadow: 0 0 16px rgba(255, 215, 0, 0.6), 0 0 6px rgba(255, 69, 0, 0.3);
 }
@@ -221,7 +221,6 @@ body {
 .swipe-text-en {
     font-size: clamp(1.0rem, 4vw, 1.3rem);
     letter-spacing: 3px;
-    text-transform: uppercase;
     font-weight: bold;
 }
 

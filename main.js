@@ -5677,15 +5677,15 @@ function initStartOverlay() {
             
             const pad = n => String(n).padStart(2, '0');
             countdownEl.innerHTML = `
-                <div class="countdown-unit"><span class="countdown-number">${days}</span><span class="countdown-label">DAYS</span></div>
+                <div class="countdown-unit"><span class="countdown-number">${days}</span><span class="countdown-label">Days</span></div>
                 <span class="countdown-separator">:</span>
-                <div class="countdown-unit"><span class="countdown-number">${pad(hours)}</span><span class="countdown-label">HRS</span></div>
+                <div class="countdown-unit"><span class="countdown-number">${pad(hours)}</span><span class="countdown-label">Hrs</span></div>
                 <span class="countdown-separator">:</span>
-                <div class="countdown-unit"><span class="countdown-number">${pad(mins)}</span><span class="countdown-label">MIN</span></div>
+                <div class="countdown-unit"><span class="countdown-number">${pad(mins)}</span><span class="countdown-label">Min</span></div>
                 <span class="countdown-separator">:</span>
-                <div class="countdown-unit"><span class="countdown-number">${pad(secs)}</span><span class="countdown-label">SEC</span></div>`;
+                <div class="countdown-unit"><span class="countdown-number">${pad(secs)}</span><span class="countdown-label">Sec</span></div>`;
             labelTopEl.innerHTML = `
-                <div class="cny-label-en">UNTIL YEAR OF THE <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>`;
+                <div class="cny-label-en">Until Year of the <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>`;
             labelBottomEl.innerHTML = `
                 <div class="cny-label-cn">
                     <span class="cny-label-char">${escapeHtml(zodiac.ganZhi)}</span>
@@ -5708,9 +5708,9 @@ function initStartOverlay() {
             const dateStr = `${lastTarget.date.getFullYear()}.${String(lastTarget.date.getMonth() + 1).padStart(2, '0')}.${String(lastTarget.date.getDate()).padStart(2, '0')}`;
             
             countdownEl.innerHTML = `
-                <div class="countdown-unit"><span class="countdown-number">${days}</span><span class="countdown-label">DAYS AGO</span></div>`;
+                <div class="countdown-unit"><span class="countdown-number">${days}</span><span class="countdown-label">Days Ago</span></div>`;
             labelTopEl.innerHTML = `
-                <div class="cny-label-en">SINCE YEAR OF THE <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>`;
+                <div class="cny-label-en">Since Year of the <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>`;
             labelBottomEl.innerHTML = `
                 <div class="cny-label-cn">
                     <span class="cny-label-char">${escapeHtml(zodiac.ganZhi)}</span>
@@ -5766,7 +5766,7 @@ function initStartOverlay() {
 function getZodiac(year) {
     const stems = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
     const branches = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
-    const elements = ['WOOD', 'WOOD', 'FIRE', 'FIRE', 'EARTH', 'EARTH', 'METAL', 'METAL', 'WATER', 'WATER'];
+    const elements = ['Wood', 'Wood', 'Fire', 'Fire', 'Earth', 'Earth', 'Metal', 'Metal', 'Water', 'Water'];
 
     const stemIdx = (year - 4) % 10;
     const stem = stems[stemIdx];
@@ -5775,18 +5775,18 @@ function getZodiac(year) {
     const element = elements[stemIdx];
 
     const animals = [
-        { en: 'RAT', cn: '鼠' },
-        { en: 'OX', cn: '牛' },
-        { en: 'TIGER', cn: '虎' },
-        { en: 'RABBIT', cn: '兔' },
-        { en: 'DRAGON', cn: '龍' },
-        { en: 'SNAKE', cn: '蛇' },
-        { en: 'HORSE', cn: '馬' },
-        { en: 'GOAT', cn: '羊' },
-        { en: 'MONKEY', cn: '猴' },
-        { en: 'ROOSTER', cn: '雞' },
-        { en: 'DOG', cn: '狗' },
-        { en: 'PIG', cn: '豬' }
+        { en: 'Rat', cn: '鼠' },
+        { en: 'Ox', cn: '牛' },
+        { en: 'Tiger', cn: '虎' },
+        { en: 'Rabbit', cn: '兔' },
+        { en: 'Dragon', cn: '龍' },
+        { en: 'Snake', cn: '蛇' },
+        { en: 'Horse', cn: '馬' },
+        { en: 'Goat', cn: '羊' },
+        { en: 'Monkey', cn: '猴' },
+        { en: 'Rooster', cn: '雞' },
+        { en: 'Dog', cn: '狗' },
+        { en: 'Pig', cn: '豬' }
     ];
 
     const animal = animals[(year - 4) % 12];
