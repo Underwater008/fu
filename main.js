@@ -588,7 +588,7 @@ function setCell(col, row, depth, char, r, g, b, alpha) {
 // --- Character Sampling ---
 function sampleCharacterShape(char, resolution, fontOverride) {
     const off = document.createElement('canvas');
-    const octx = off.getContext('2d');
+    const octx = off.getContext('2d', { willReadFrequently: true });
     const charCount = [...char].length;
     const w = resolution * charCount;
     const h = resolution;
@@ -5306,7 +5306,7 @@ function initStartOverlay() {
             const testCanvas = document.createElement('canvas');
             testCanvas.width = testSize;
             testCanvas.height = testSize;
-            const tc = testCanvas.getContext('2d');
+            const tc = testCanvas.getContext('2d', { willReadFrequently: true });
 
             function renderGlyph(fontSpec, char) {
                 tc.clearRect(0, 0, testSize, testSize);

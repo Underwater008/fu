@@ -127,29 +127,54 @@ async function prodSendMagicLink(email) {
   if (error) throw error;
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isAnonymousAuthUser(user) {
+  return user?.is_anonymous === true || !user?.email;
+}
+
+async function loadProfileWithRetry(userId, maxAttempts = 6) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const profile = await storage.getProfile(userId);
+    if (profile) return profile;
+    if (attempt < maxAttempts) {
+      await delay(120 * attempt);
+    }
+  }
+  return null;
+}
+
+async function ensureProfileForSessionUser(sessionUser) {
+  let profile = await loadProfileWithRetry(sessionUser.id);
+  if (profile) return profile;
+
+  profile = createDefaultProfile(sessionUser.id, sessionUser.email ?? null, isAnonymousAuthUser(sessionUser));
+  return storage.upsertProfile(profile);
+}
+
 async function prodCreateAnonymous() {
   const sb = await getSupabaseClient();
   // Reuse existing session if available (prevents duplicate signups on reload)
   const { data: existing } = await sb.auth.getSession();
   if (existing?.session?.user) {
-    const userId = existing.session.user.id;
-    let profile = await storage.getProfile(userId);
-    if (profile) {
-      currentUser = profile;
-      notifyListeners();
-      return profile;
+    const profile = await ensureProfileForSessionUser(existing.session.user);
+    currentUser = profile;
+    if (profile?.is_anonymous) {
+      try { localStorage.setItem(LS_ANON_BOOTSTRAPPED, '1'); } catch {}
     }
-    // Session exists but no profile — fall through to create profile below
+    notifyListeners();
+    return profile;
   }
   const { data, error } = await sb.auth.signInAnonymously();
-  if (error) throw error;
-  const userId = data.user.id;
-  let profile = await storage.getProfile(userId);
-  if (!profile) {
-    profile = createDefaultProfile(userId, null, true);
-    await storage.upsertProfile(profile);
-    await storage.addTransaction(userId, { type: 'welcome', draws_granted: CONFIG.rewards.anonymousWelcomeDraws });
+  if (error) {
+    if ((error.message || '').includes('Database error creating anonymous user')) {
+      throw new Error('Anonymous signup failed in Supabase. Check Auth anonymous provider settings and the handle_new_user trigger.');
+    }
+    throw error;
   }
+  const profile = await ensureProfileForSessionUser(data.user);
   currentUser = profile;
   try { localStorage.setItem(LS_ANON_BOOTSTRAPPED, '1'); } catch {}
   notifyListeners();
@@ -208,16 +233,7 @@ async function prodRestore() {
   });
 
   if (session?.user) {
-    let profile = await storage.getProfile(session.user.id);
-    if (!profile) {
-      const isAnon = session.user.is_anonymous || !session.user.email;
-      profile = createDefaultProfile(session.user.id, session.user.email, isAnon);
-      await storage.upsertProfile(profile);
-      await storage.addTransaction(session.user.id, {
-        type: 'welcome',
-        draws_granted: isAnon ? CONFIG.rewards.anonymousWelcomeDraws : CONFIG.rewards.welcomeDraws,
-      });
-    }
+    const profile = await ensureProfileForSessionUser(session.user);
     currentUser = profile;
     if (profile.is_anonymous) {
       try { localStorage.setItem(LS_ANON_BOOTSTRAPPED, '1'); } catch {}
