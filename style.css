@@ -279,7 +279,7 @@ canvas {
     right: 0;
     padding: 0 20px calc(20px + env(safe-area-inset-bottom)); /* Respect safe area */
     display: flex;
-    justify-content: flex-start;
+    justify-content: center;
     gap: 18px;
     align-items: center;
     z-index: 15;
@@ -293,7 +293,6 @@ canvas {
     display: flex;
     flex: 0 0 auto;
     min-width: 140px;
-    margin-left: auto;
     background: rgba(0, 0, 0, 0.3);
     border: 1.5px solid rgba(255, 215, 0, 0.4);
     border-radius: 24px;
@@ -2550,14 +2549,20 @@ canvas {
     transition-duration: 0.1s;
 }
 
-/* --- Floating Draw Counter (bottom, near controls) --- */
+/* --- Draw Counter (inline in bottom controls, left of toggle) --- */
 .draw-counter-float {
-    position: fixed;
-    bottom: 90px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 500;
-    pointer-events: none;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    transform: translateY(20px);
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+.draw-counter-float.visible {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
 }
 .btn-auth {
     background: linear-gradient(135deg,
@@ -2615,14 +2620,19 @@ canvas {
 
 /* --- Draw Counter Badge --- */
 .draw-counter {
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 180, 0, 0.1));
-    border: 1px solid rgba(255, 215, 0, 0.5);
+    background: rgba(0, 0, 0, 0.3);
+    border: 1.5px solid rgba(255, 215, 0, 0.4);
     color: #FFD700;
-    padding: 3px 10px;
-    border-radius: 12px;
-    font-size: 13px;
+    padding: 0 16px;
+    border-radius: 24px;
+    font-size: 15px;
     font-weight: 700;
     white-space: nowrap;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     animation: drawCounterPulse 2s ease-in-out infinite;
 }
 @keyframes drawCounterPulse {
@@ -2691,7 +2701,22 @@ canvas {
     margin: 8px 0 0;
 }
 
-/* --- Rewards Panel (slide-up drawer) --- */
+/* --- Rewards Panel Backdrop --- */
+.rewards-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1499;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: rp-fadeIn 0.2s ease-out;
+}
+@keyframes rp-fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* --- Rewards Panel (frosted glass drawer) --- */
 .rewards-panel {
     position: fixed;
     bottom: 0;
@@ -2700,104 +2725,221 @@ canvas {
     z-index: 1500;
     display: flex;
     flex-direction: column;
-    max-height: 75vh;
-    background: linear-gradient(180deg, rgba(40, 5, 5, 0.97), rgba(20, 2, 2, 0.99));
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid rgba(255, 215, 0, 0.3);
+    max-height: 72vh;
+    /* True frosted glass — mostly transparent, heavy blur */
+    background: rgba(20, 0, 0, 0.42);
+    backdrop-filter: blur(60px) saturate(1.6);
+    -webkit-backdrop-filter: blur(60px) saturate(1.6);
     border-radius: 20px 20px 0 0;
-    animation: slideUp 0.3s ease-out;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+        0 -4px 60px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    animation: rp-slideUp 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
-@keyframes slideUp {
+@keyframes rp-slideUp {
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
 }
+
+/* Drag handle */
+.rewards-handle {
+    display: flex;
+    justify-content: center;
+    padding: 8px 0 0;
+}
+.rewards-handle-bar {
+    width: 32px;
+    height: 3px;
+    border-radius: 1.5px;
+    background: rgba(255, 255, 255, 0.14);
+}
+
+/* Header */
 .rewards-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px 12px;
-    border-bottom: 1px solid rgba(255, 215, 0, 0.15);
+    padding: 10px 18px 8px;
 }
-.rewards-header h2 {
+.rewards-title {
     color: #FFD700;
-    font-size: 18px;
-    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    text-shadow: 0 0 16px rgba(255, 215, 0, 0.4), 0 0 40px rgba(255, 215, 0, 0.15);
 }
-.btn-close {
-    background: none;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: rgba(255, 255, 255, 0.6);
-    width: 32px;
-    height: 32px;
+.rewards-close {
+    background: rgba(255, 255, 255, 0.06);
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
-    font-size: 16px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    transition: all 0.15s;
 }
-.btn-close:hover {
-    border-color: rgba(255, 215, 0, 0.4);
-    color: #FFD700;
+.rewards-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
 }
+
+/* Scrollable content */
 .rewards-content {
     overflow-y: auto;
-    padding: 16px 20px 30px;
+    padding: 2px 16px 28px;
     -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
-.reward-section {
-    margin-bottom: 20px;
+
+/* Section glass card */
+.rewards-section {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 4px 0;
+    overflow: hidden;
 }
-.reward-section h3 {
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 14px;
-    margin: 0 0 10px;
-    letter-spacing: 0.5px;
+.rewards-section-label {
+    display: block;
+    padding: 10px 14px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: rgba(255, 215, 0, 0.55);
 }
-.reward-desc {
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 12px;
-    margin: 0 0 10px;
+
+/* Row inside section */
+.rewards-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    gap: 10px;
 }
-.btn-reward {
-    width: 100%;
-    padding: 12px;
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 215, 0, 0.05));
-    border: 1px solid rgba(255, 215, 0, 0.35);
+.rewards-row--actions {
+    gap: 8px;
+    align-items: stretch;
+}
+.rewards-row--meta {
+    padding-top: 0;
+    gap: 6px;
+}
+.rewards-row--meta:empty,
+.rewards-row--meta:not(:has(.cooldown-text:not(:empty))) {
+    display: none;
+}
+.rewards-row-text {
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 13px;
+    font-weight: 500;
+}
+.rewards-row-sub {
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 10px;
+}
+
+/* Thin divider between rows */
+.rewards-divider {
+    height: 1px;
+    margin: 0 14px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Action buttons — minimal, clean */
+.rewards-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: rgba(255, 215, 0, 0.1);
+    border: 1px solid rgba(255, 215, 0, 0.18);
     color: #FFD700;
-    border-radius: 12px;
-    font-size: 14px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
-.btn-reward:hover {
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0.1));
-    box-shadow: 0 0 16px rgba(255, 215, 0, 0.15);
+.rewards-btn:hover {
+    background: rgba(255, 215, 0, 0.18);
+    border-color: rgba(255, 215, 0, 0.35);
 }
-.btn-reward:disabled {
-    opacity: 0.5;
+.rewards-btn:active {
+    transform: scale(0.97);
+}
+.rewards-btn:disabled {
+    opacity: 0.35;
     cursor: not-allowed;
+    transform: none;
 }
+.rewards-btn--fill {
+    flex: 1;
+    justify-content: center;
+    flex-direction: column;
+    gap: 5px;
+    padding: 14px 6px;
+    font-size: 13px;
+    border-radius: 10px;
+}
+.rewards-btn--static {
+    cursor: default;
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.7);
+}
+.rewards-btn--static:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+.rewards-btn--sm {
+    padding: 5px 12px;
+    font-size: 11px;
+}
+.rewards-btn-sub {
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.35);
+}
+.rewards-btn-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255, 215, 0, 0.9);
+    background: rgba(255, 215, 0, 0.12);
+    padding: 1px 6px;
+    border-radius: 5px;
+    letter-spacing: 0.3px;
+}
+
+/* Cooldown text */
 .cooldown-text {
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 12px;
-    display: block;
-    margin-top: 6px;
-    text-align: center;
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 11px;
+    font-family: inherit;
 }
+
+/* Streak dots */
 .streak-dots {
     display: flex;
-    gap: 6px;
-    justify-content: center;
+    gap: 5px;
+    margin-left: auto;
 }
 
 /* --- Purchase Grid --- */
 .purchase-grid {
     display: flex;
-    gap: 10px;
+    gap: 8px;
+    padding: 6px 14px 12px;
 }
 .btn-purchase {
     flex: 1;
@@ -2805,39 +2947,44 @@ canvas {
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    padding: 14px 8px;
-    background: linear-gradient(135deg, rgba(40, 10, 10, 0.8), rgba(20, 5, 5, 0.9));
-    border: 1px solid rgba(255, 215, 0, 0.3);
-    border-radius: 12px;
+    padding: 16px 6px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    transition: all 0.15s ease;
 }
 .btn-purchase:hover {
-    border-color: rgba(255, 215, 0, 0.6);
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.15);
-    transform: translateY(-2px);
+    background: rgba(255, 215, 0, 0.06);
+    border-color: rgba(255, 215, 0, 0.25);
+    transform: translateY(-1px);
+}
+.btn-purchase:active {
+    transform: scale(0.97);
 }
 .btn-purchase:disabled {
-    opacity: 0.5;
+    opacity: 0.35;
     transform: none;
 }
 .purchase-draws {
-    color: #FFD700;
+    color: rgba(255, 255, 255, 0.9);
     font-size: 14px;
     font-weight: 700;
 }
 .purchase-price {
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 16px;
-    font-weight: 600;
+    color: #FFD700;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
 }
 .purchase-savings {
-    color: #22C55E;
-    font-size: 10px;
+    color: #4ADE80;
+    font-size: 9px;
     font-weight: 600;
-    background: rgba(34, 197, 94, 0.15);
-    padding: 2px 6px;
-    border-radius: 6px;
+    background: rgba(74, 222, 128, 0.1);
+    padding: 1px 5px;
+    border-radius: 4px;
 }
 
 /* --- Share Result Button (fortune screen) --- */

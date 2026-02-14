@@ -18,10 +18,7 @@
 <body>
     <canvas id="c"></canvas>
 
-    <!-- Draw counter (floating, bottom area) -->
-    <div id="draw-counter-float" class="draw-counter-float" style="display:none">
-        <span id="draw-counter" class="draw-counter">🎫 ×10</span>
-    </div>
+    <!-- Draw counter (moved into bottom-controls) -->
 
     <!-- Login modal -->
     <div id="login-modal" class="modal-overlay" style="display:none">
@@ -36,31 +33,44 @@
     </div>
 
     <!-- Rewards panel (slide-up drawer) -->
+    <div id="rewards-panel-backdrop" class="rewards-backdrop" style="display:none"></div>
     <div id="rewards-panel" class="rewards-panel" style="display:none">
+        <div class="rewards-handle"><span class="rewards-handle-bar"></span></div>
         <div class="rewards-header">
-            <h2>Get More Draws</h2>
-            <button id="btn-close-rewards" class="btn-close">✕</button>
+            <span class="rewards-title">Get More Draws</span>
+            <button id="btn-close-rewards" class="rewards-close">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
         </div>
+
         <div class="rewards-content">
-            <div class="reward-section">
-                <h3>Daily Login</h3>
-                <div id="login-streak" class="streak-dots"></div>
+            <!-- Free draws section -->
+            <div class="rewards-section">
+                <span class="rewards-section-label">Free</span>
+
+                <div class="rewards-row rewards-row--actions">
+                    <div class="rewards-btn rewards-btn--fill rewards-btn--static" id="login-streak-btn">
+                        <span>Login</span><span class="rewards-btn-badge">+6 daily</span><div id="login-streak" class="streak-dots"></div>
+                    </div>
+                    <button id="btn-share-draw" class="rewards-btn rewards-btn--fill">
+                        <span>Share</span><span class="rewards-btn-badge">+10</span>
+                    </button>
+                    <button id="btn-watch-ad" class="rewards-btn rewards-btn--fill">
+                        <span>Ad</span><span class="rewards-btn-badge">+6</span>
+                    </button>
+                    <button id="btn-copy-referral" class="rewards-btn rewards-btn--fill">
+                        <span>Invite</span><span class="rewards-btn-badge">+30</span>
+                    </button>
+                </div>
+                <div class="rewards-row rewards-row--meta">
+                    <span id="share-cooldown" class="cooldown-text"></span>
+                    <span id="ad-count" class="cooldown-text"></span>
+                </div>
             </div>
-            <div class="reward-section">
-                <button id="btn-share-draw" class="btn-reward">Share → 10 Draws</button>
-                <span id="share-cooldown" class="cooldown-text"></span>
-            </div>
-            <div class="reward-section">
-                <button id="btn-watch-ad" class="btn-reward">Watch Ad → 1 Draw</button>
-                <span id="ad-count" class="cooldown-text"></span>
-            </div>
-            <div class="reward-section">
-                <h3>Invite Friends</h3>
-                <p class="reward-desc">1st friend: 30 draws | Each after: 10 draws</p>
-                <button id="btn-copy-referral" class="btn-reward">Copy Invite Link</button>
-            </div>
-            <div class="reward-section">
-                <h3>Buy Draws</h3>
+
+            <!-- Purchase section -->
+            <div class="rewards-section">
+                <span class="rewards-section-label">Shop</span>
                 <div id="purchase-bundles" class="purchase-grid"></div>
             </div>
         </div>
@@ -79,6 +89,10 @@
         </button>
 
         <button id="btn-collection" class="collection-fab">COLLECTION</button>
+
+        <div id="draw-counter-float" class="draw-counter-float">
+            <span id="draw-counter" class="draw-counter">🎫 ×10</span>
+        </div>
 
         <div id="mode-switch" class="mode-switch">
             <div class="switch-track"></div>

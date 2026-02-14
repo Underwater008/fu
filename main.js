@@ -43,7 +43,7 @@ const ctx = canvas.getContext('2d');
 const IS_COARSE_POINTER = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 const DRAW_LAUNCH_PROFILE = IS_COARSE_POINTER
     ? {
-        morphSpeedMul: 0.35,
+        morphSpeedMul: 0.45,
         intensityMul: 0.84,
         blurMul: 0.62,
         trailSpawnMul: 0.58,
@@ -2015,7 +2015,7 @@ function initDrawAnimation() {
         currentDrawResult = performDrawWithPity(pity);
         saveToCollection(currentDrawResult);
         if (currentDrawResult.tierIndex <= 2) {
-            resetPity();
+            resetPity().catch(() => {});
         } else {
             incrementPity().catch(() => {});
         }
@@ -3353,13 +3353,13 @@ function renderDrawOverlay() {
                 let alphaA = 1 - blend;
                 let alphaB = blend;
                 if (IS_COARSE_POINTER) {
-                    // Mobile: show only one font at a time, clean snap transition
+                    // Mobile fallback: avoid dual-glyph overlap by fading out A, then fading in B.
                     if (blend < 0.5) {
-                        alphaA = 1;
+                        alphaA = lerp(1, 0.35, blend / 0.5);
                         alphaB = 0;
                     } else {
                         alphaA = 0;
-                        alphaB = 1;
+                        alphaB = lerp(0.35, 1, (blend - 0.5) / 0.5);
                     }
                 }
                 const intensity = (1 + riseT * 1.8) * DRAW_LAUNCH_PROFILE.intensityMul;
@@ -3411,13 +3411,13 @@ function renderDrawOverlay() {
             let alphaA = 1 - blend;
             let alphaB = blend;
             if (IS_COARSE_POINTER) {
-                // Mobile: show only one font at a time, clean snap transition
+                // Mobile fallback: avoid dual-glyph overlap by fading out A, then fading in B.
                 if (blend < 0.5) {
-                    alphaA = 1;
+                    alphaA = lerp(1, 0.35, blend / 0.5);
                     alphaB = 0;
                 } else {
                     alphaA = 0;
-                    alphaB = 1;
+                    alphaB = lerp(0.35, 1, (blend - 0.5) / 0.5);
                 }
             }
             const intensity = (1 + riseT * 2.5) * DRAW_LAUNCH_PROFILE.intensityMul;
@@ -4807,14 +4807,13 @@ function showCollectionPanel() {
             if (fillCircle) fillCircle.style.strokeDashoffset = offset;
             if (glowCircle) glowCircle.style.strokeDashoffset = offset;
         });
-        // Thin accent bar (append to .collection-header, not .collection-top-bar)
-        const headerEl = collectionPanel.querySelector('.collection-header');
-        let bar = headerEl && headerEl.querySelector('.collection-progress-bar');
-        if (!bar && headerEl) {
+        // Thin accent bar
+        let bar = collectionProgress.parentElement.querySelector('.collection-progress-bar');
+        if (!bar) {
             bar = document.createElement('div');
             bar.className = 'collection-progress-bar';
             bar.innerHTML = '<div class="collection-progress-fill"></div>';
-            headerEl.appendChild(bar);
+            collectionProgress.parentElement.appendChild(bar);
         }
         bar.querySelector('.collection-progress-fill').style.width = `${progress.percentage}%`;
     }
@@ -4832,7 +4831,7 @@ function showCollectionPanel() {
             const titleDiv = document.createElement('div');
             titleDiv.className = 'collection-category-title';
             const collectedInCat = cat.items.filter(it => it.collected).length;
-            titleDiv.innerHTML = `${cat.nameEn} <span>${cat.name}</span><span class="collection-category-count">${collectedInCat}/${cat.items.length}</span>`;
+            titleDiv.innerHTML = `${escapeHtml(cat.nameEn)} <span>${escapeHtml(cat.name)}</span><span class="collection-category-count">${Number(collectedInCat)}/${Number(cat.items.length)}</span>`;
             groupDiv.appendChild(titleDiv);
 
             const gridDiv = document.createElement('div');
@@ -4949,6 +4948,16 @@ function updateUIVisibility() {
         }
     }
 
+    // Draw counter: visible together with collection and toggle
+    const drawCounterFloat = document.getElementById('draw-counter-float');
+    if (drawCounterFloat) {
+        if (!collVisible && (state === 'arrival' || (state === 'fortune' && (!isMultiMode || allMultiRevealed)))) {
+            drawCounterFloat.classList.add('visible');
+        } else {
+            drawCounterFloat.classList.remove('visible');
+        }
+    }
+
     // Reveal All button: visible when multi-fortune cards are showing and not all revealed
     const btnRevealAll = document.getElementById('btn-reveal-all');
     if (btnRevealAll) {
@@ -4964,12 +4973,6 @@ function updateUIVisibility() {
         showMultiShareButton();
     } else {
         hideMultiShareButton();
-    }
-
-    // Hide draw counter float when collection is open
-    const drawCounterFloat = document.getElementById('draw-counter-float');
-    if (drawCounterFloat) {
-        drawCounterFloat.style.display = collVisible ? 'none' : '';
     }
 }
 
