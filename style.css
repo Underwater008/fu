@@ -211,7 +211,7 @@ body {
 .start-seal-row {
     position: absolute;
     left: 50%;
-    bottom: max(12px, calc(8px + env(safe-area-inset-bottom)));
+    bottom: max(14.5vw, calc(14.5vw + env(safe-area-inset-bottom)));
     transform: translateX(-50%);
     display: flex;
     align-items: center;
@@ -254,6 +254,13 @@ body {
 .start-ornament-top,
 .start-ornament-bottom {
     display: none;
+}
+
+/* Desktop: seal avatars at very bottom */
+@media (min-width: 768px) {
+    .start-seal-row {
+        bottom: 8px;
+    }
 }
 
 .mute-btn {
