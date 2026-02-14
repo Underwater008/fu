@@ -163,32 +163,32 @@
     <!-- Collection panel -->
     <div id="collection-panel">
         <div class="collection-header">
-            <div class="collection-title-row">
-                <h1 class="collection-title-en">
-                    <span>FUDUODUO</span>
-                    <span>COLLECTION</span>
-                </h1>
-                <h2>福多多宝典</h2>
-            </div>
-            <div class="collection-status-row">
-                <div id="collection-account" class="collection-account-half">
-                    <div id="auth-logged-out" class="auth-logged-out-row">
-                        <button id="btn-login" class="btn-auth btn-signin-gold">Sign In</button>
-                    </div>
-                    <div id="auth-logged-in" class="auth-logged-in-row" style="display:none">
-                        <button id="btn-auth-user" class="btn-auth btn-signin-gold btn-user-badge"></button>
-                        <div id="auth-dropdown" class="auth-dropdown" style="display:none">
-                            <span id="auth-email" class="auth-email"></span>
-                            <button id="btn-logout" class="btn-auth btn-small">Logout</button>
-                        </div>
+            <!-- Sign In / Account: top-right corner -->
+            <div id="collection-account" class="collection-account-corner">
+                <div id="auth-logged-out" class="auth-logged-out-row">
+                    <button id="btn-login" class="collection-pill-btn">SIGN IN</button>
+                </div>
+                <div id="auth-logged-in" class="auth-logged-in-row" style="display:none">
+                    <button id="btn-auth-user" class="collection-pill-btn btn-user-badge"></button>
+                    <div id="auth-dropdown" class="auth-dropdown" style="display:none">
+                        <span id="auth-email" class="auth-email"></span>
+                        <button id="btn-logout" class="collection-pill-btn collection-pill-sm">Logout</button>
                     </div>
                 </div>
-                <div id="collection-progress" class="collection-progress-half"></div>
+            </div>
+            <!-- Title left + Progress right -->
+            <div class="collection-hero-row">
+                <h1 class="collection-title-en">
+                    <span class="collection-title-main">FUDUODUO</span>
+                    <span class="collection-title-sub">COLLECTION</span>
+                    <span class="collection-title-cn">福多多宝典</span>
+                </h1>
+                <div id="collection-progress" class="collection-progress-center"></div>
             </div>
         </div>
         <div id="collection-grid" class="collection-grid"></div>
         <div class="collection-actions">
-            <button class="btn-action btn-secondary" id="btn-close-collection">CLOSE</button>
+            <button class="collection-pill-btn" id="btn-close-collection">CLOSE</button>
         </div>
     </div>
 

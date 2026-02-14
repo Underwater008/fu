@@ -4773,7 +4773,7 @@ function showCollectionPanel() {
 
     // Update progress — right half of status row
     if (collectionProgress) {
-        collectionProgress.className = 'collection-progress-half';
+        collectionProgress.className = 'collection-progress-center';
         const r = 38, circ = 2 * Math.PI * r;
         const offset = circ - (circ * progress.percentage / 100);
         collectionProgress.innerHTML =
