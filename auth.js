@@ -148,7 +148,11 @@ async function prodLinkAnonymous(email) {
   const sb = await getSupabaseClient();
   // Supabase preserves the same UUID when linking anonymous → email
   const { error } = await sb.auth.updateUser({ email });
-  if (error) throw error;
+  if (error) {
+    // Email already linked to another account — fall back to magic link
+    await prodSendMagicLink(email);
+    throw new Error('This email already has an account. Check your email for a login link.');
+  }
   currentUser.email = email;
   currentUser.display_name = email.split('@')[0];
   currentUser.is_anonymous = false;
