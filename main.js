@@ -387,11 +387,11 @@ function getLayout() {
         };
     }
     return {
-        starsY: 0.27,
+        starsY: 0.23,
         charY: 0.18,
         tierY: 0.60,
         tierEnY: 0.63,
-        cardTop: 0.25,
+        cardTop: 0.21,
         cardBottom: 0.70,
         clusterYOffset: 0.07,
         cardWidth: 0.62,
