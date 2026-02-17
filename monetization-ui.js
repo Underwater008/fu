@@ -139,7 +139,10 @@ function wireAuthButtons() {
           if (loginModal) loginModal.style.display = 'none';
         }
       } catch (e) {
-        if (status) status.textContent = 'Error: ' + e.message;
+        if (status) {
+          status.textContent = e.isInfo ? e.message : 'Error: ' + e.message;
+          status.style.color = e.isInfo ? '' : '#ff6b6b';
+        }
       } finally {
         btnSendLink.disabled = false;
         btnSendLink.textContent = 'Send Magic Link';

@@ -191,7 +191,9 @@ async function prodLinkAnonymous(email) {
   if (error) {
     // Email already linked to another account — fall back to magic link
     await prodSendMagicLink(email);
-    throw new Error('This email already has an account. Check your email for a login link.');
+    const info = new Error('This email already has an account. Check your email for a login link!');
+    info.isInfo = true;
+    throw info;
   }
   currentUser.email = email;
   currentUser.display_name = email.split('@')[0];
