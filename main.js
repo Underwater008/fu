@@ -388,7 +388,7 @@ function getLayout() {
     }
     return {
         starsY: 0.23,
-        charY: 0.18,
+        charY: 0.14,
         tierY: 0.60,
         tierEnY: 0.63,
         cardTop: 0.21,
