@@ -123,7 +123,10 @@ async function devRestore() {
 // --- Prod mode (Supabase) ---
 async function prodSendMagicLink(email) {
   const sb = await getSupabaseClient();
-  const { error } = await sb.auth.signInWithOtp({ email });
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin },
+  });
   if (error) throw error;
 }
 
