@@ -655,11 +655,12 @@ let multiFlipState = null; // { revealedCount, cardElements[] }
 let multiFortuneState = null; // Canvas-integrated multi fortune display
 
 // Force-load all calligraphy fonts with ALL characters used in the app
-const ALL_FONT_CHARS = ALL_LUCKY + '\u00B7\u4E00\u4EBA\u5341\u5927\u99AC\u9A6C\u9F20\u725B\u864E\u5154\u9F8D\u86C7\u7F8A\u7334\u96DE\u72D7\u8C6C';
-const EXTRA_HORSE_FONTS = ['"Long Cang"', '"ZCOOL XiaoWei"'];
+const ALL_FONT_CHARS = ALL_LUCKY + '\u00B7\u4E00\u4EBA\u5341\u5927\u99AC\u9A6C\u9F20\u725B\u864E\u5154\u9F8D\u86C7\u7F8A\u7334\u96DE\u72D7\u8C6C\u9F99\u9E21\u732A';
+const EXTRA_ZODIAC_FONTS = ['"Long Cang"', '"ZCOOL XiaoWei"'];
+const ALL_ZODIAC_CHARS = '\u9F20\u725B\u864E\u5154\u9F8D\u9F99\u86C7\u99AC\u9A6C\u7F8A\u7334\u96DE\u9E21\u72D7\u8C6C\u732A';
 Promise.all([
     ...CALLI_FONTS.map(f => document.fonts.load(`64px ${f}`, ALL_FONT_CHARS)),
-    ...EXTRA_HORSE_FONTS.map(f => document.fonts.load(`64px ${f}`, '\u99AC\u9A6C').catch(() => {})),
+    ...EXTRA_ZODIAC_FONTS.map(f => document.fonts.load(`64px ${f}`, ALL_ZODIAC_CHARS).catch(() => {})),
 ]).then(() => {
     fuShape = sampleCharacterShape('\u798F', 64, chosenFont);
     dajiShape = sampleCharacterShape('\u5927\u5409', 64);
@@ -5557,9 +5558,9 @@ async function handleSwipeUp() {
 // START OVERLAY & CNY COUNTDOWN
 // ============================================================
 const CNY_DATES = [
-    { year: 2025, date: new Date('2025-01-29T00:00:00') },
-    { year: 2026, date: new Date('2026-02-17T00:00:00') },
-    { year: 2027, date: new Date('2027-02-06T00:00:00') },
+    { year: 2025, date: new Date('2025-01-29T00:00:00'), lantern: new Date('2025-02-12T00:00:00') },
+    { year: 2026, date: new Date('2026-02-17T00:00:00'), lantern: new Date('2026-03-03T00:00:00') },
+    { year: 2027, date: new Date('2027-02-06T00:00:00'), lantern: new Date('2027-02-20T00:00:00') },
 ];
 
 function initStartOverlay() {
@@ -5570,7 +5571,7 @@ function initStartOverlay() {
 
     if (!overlay) return;
 
-    // Horse "馬" canvas font-morphing (same technique as single draw)
+    // Zodiac canvas font-morphing (same technique as single draw)
     const horseCanvas = document.getElementById('horse-canvas');
     let horseMorphRunning = true;
     if (horseCanvas) {
@@ -5578,12 +5579,27 @@ function initStartOverlay() {
         const dpr = devicePixelRatio || 1;
         let lastCanvasW = 0, lastCanvasH = 0;
 
+        // Determine which zodiac character to morph based on current display context
+        const _now = new Date();
+        const _activeCNY = CNY_DATES.find(d => _now >= d.date && _now < d.lantern);
+        let _displayYear;
+        if (_activeCNY) {
+            _displayYear = _activeCNY.year;
+        } else {
+            const _next = CNY_DATES.find(d => d.date > _now);
+            _displayYear = _next ? _next.year : CNY_DATES[CNY_DATES.length - 1].year;
+        }
+        const _zodiac = getZodiac(_displayYear);
+        const ZODIAC_TRAD_TO_SIMP = { '\u9F8D': '\u9F99', '\u99AC': '\u9A6C', '\u96DE': '\u9E21', '\u8C6C': '\u732A' };
+        const morphCharTrad = _zodiac.cn;
+        const morphCharSimp = ZODIAC_TRAD_TO_SIMP[morphCharTrad] || morphCharTrad;
+
         // Direct font entries — use known web fonts, no pixel detection needed
         const horseFontEntries = [
-            ...CALLI_FONTS.map(f => ({ font: f, char: '\u9A6C' })),
-            { font: '"Long Cang"', char: '\u9A6C' },
-            { font: '"ZCOOL XiaoWei"', char: '\u9A6C' },
-            { font: '"Noto Serif TC"', char: '\u99AC' },
+            ...CALLI_FONTS.map(f => ({ font: f, char: morphCharSimp })),
+            { font: '"Long Cang"', char: morphCharSimp },
+            { font: '"ZCOOL XiaoWei"', char: morphCharSimp },
+            { font: '"Noto Serif TC"', char: morphCharTrad },
         ];
         const horseFontCount = horseFontEntries.length;
 
@@ -5866,19 +5882,21 @@ function initStartOverlay() {
         if (overlay.style.opacity === '0' || overlay.style.display === 'none') return;
 
         const now = new Date();
-        const nextTarget = CNY_DATES.find(d => d.date > now);
-        
-        if (nextTarget) {
-            const diff = nextTarget.date - now;
+        const pad = n => String(n).padStart(2, '0');
+
+        // Check if we're in CNY celebration period (CNY → Lantern Festival / 正月十五)
+        const activeCNY = CNY_DATES.find(d => now >= d.date && now < d.lantern);
+
+        if (activeCNY) {
+            // Count down to Lantern Festival (正月十五)
+            const diff = activeCNY.lantern - now;
             const days = Math.floor(diff / (1000 * 60 * 60 * 24));
             const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
             const mins = Math.floor((diff / 1000 / 60) % 60);
             const secs = Math.floor((diff / 1000) % 60);
-            
-            const zodiac = getZodiac(nextTarget.year);
-            const dateStr = `${nextTarget.date.getFullYear()}.${String(nextTarget.date.getMonth() + 1).padStart(2, '0')}.${String(nextTarget.date.getDate()).padStart(2, '0')}`;
-            
-            const pad = n => String(n).padStart(2, '0');
+
+            const zodiac = getZodiac(activeCNY.year);
+
             countdownEl.innerHTML = `
                 <div class="countdown-unit"><span class="countdown-number">${days}</span><span class="countdown-label">Days</span></div>
                 <span class="countdown-separator">:</span>
@@ -5888,37 +5906,66 @@ function initStartOverlay() {
                 <span class="countdown-separator">:</span>
                 <div class="countdown-unit"><span class="countdown-number">${pad(secs)}</span><span class="countdown-label">Sec</span></div>`;
             labelTopEl.innerHTML = `
-                <div class="cny-label-en">Until Year of the <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>`;
+                <div class="cny-label-en">Until <span class="cny-label-highlight">正月十五</span> · Lantern Festival</div>`;
             labelBottomEl.innerHTML = `
                 <div class="cny-label-cn">
                     <span class="cny-label-char">${escapeHtml(zodiac.ganZhi)}</span>
-                    <span class="cny-label-date">${escapeHtml(dateStr)}</span>
+                    <span class="cny-label-date">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span>
                 </div>`;
         } else {
-            // If no future date in our list, find the most recent past date
-            let lastTarget = CNY_DATES[CNY_DATES.length - 1];
-            for (let i = CNY_DATES.length - 1; i >= 0; i--) {
-                if (CNY_DATES[i].date <= now) {
-                    lastTarget = CNY_DATES[i];
-                    break;
+            const nextTarget = CNY_DATES.find(d => d.date > now);
+
+            if (nextTarget) {
+                const diff = nextTarget.date - now;
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+                const mins = Math.floor((diff / 1000 / 60) % 60);
+                const secs = Math.floor((diff / 1000) % 60);
+
+                const zodiac = getZodiac(nextTarget.year);
+                const dateStr = `${nextTarget.date.getFullYear()}.${String(nextTarget.date.getMonth() + 1).padStart(2, '0')}.${String(nextTarget.date.getDate()).padStart(2, '0')}`;
+
+                countdownEl.innerHTML = `
+                    <div class="countdown-unit"><span class="countdown-number">${days}</span><span class="countdown-label">Days</span></div>
+                    <span class="countdown-separator">:</span>
+                    <div class="countdown-unit"><span class="countdown-number">${pad(hours)}</span><span class="countdown-label">Hrs</span></div>
+                    <span class="countdown-separator">:</span>
+                    <div class="countdown-unit"><span class="countdown-number">${pad(mins)}</span><span class="countdown-label">Min</span></div>
+                    <span class="countdown-separator">:</span>
+                    <div class="countdown-unit"><span class="countdown-number">${pad(secs)}</span><span class="countdown-label">Sec</span></div>`;
+                labelTopEl.innerHTML = `
+                    <div class="cny-label-en">Until Year of the <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>`;
+                labelBottomEl.innerHTML = `
+                    <div class="cny-label-cn">
+                        <span class="cny-label-char">${escapeHtml(zodiac.ganZhi)}</span>
+                        <span class="cny-label-date">${escapeHtml(dateStr)}</span>
+                    </div>`;
+            } else {
+                // All dates in our list are past — show "since" for most recent
+                let lastTarget = CNY_DATES[CNY_DATES.length - 1];
+                for (let i = CNY_DATES.length - 1; i >= 0; i--) {
+                    if (CNY_DATES[i].date <= now) {
+                        lastTarget = CNY_DATES[i];
+                        break;
+                    }
                 }
+
+                const diff = now - lastTarget.date;
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+                const zodiac = getZodiac(lastTarget.year);
+                const dateStr = `${lastTarget.date.getFullYear()}.${String(lastTarget.date.getMonth() + 1).padStart(2, '0')}.${String(lastTarget.date.getDate()).padStart(2, '0')}`;
+
+                countdownEl.innerHTML = `
+                    <div class="countdown-unit"><span class="countdown-number">${days}</span><span class="countdown-label">Days</span></div>`;
+                labelTopEl.innerHTML = `
+                    <div class="cny-label-en">Since Year of the <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>`;
+                labelBottomEl.innerHTML = `
+                    <div class="cny-label-cn">
+                        <span class="cny-label-char">${escapeHtml(zodiac.ganZhi)}</span>
+                        <span class="cny-label-date">${escapeHtml(dateStr)}</span>
+                    </div>`;
             }
-            
-            const diff = now - lastTarget.date;
-            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-            
-            const zodiac = getZodiac(lastTarget.year);
-            const dateStr = `${lastTarget.date.getFullYear()}.${String(lastTarget.date.getMonth() + 1).padStart(2, '0')}.${String(lastTarget.date.getDate()).padStart(2, '0')}`;
-            
-            countdownEl.innerHTML = `
-                <div class="countdown-unit"><span class="countdown-number">${days}</span><span class="countdown-label">Days Ago</span></div>`;
-            labelTopEl.innerHTML = `
-                <div class="cny-label-en">Since Year of the <span class="cny-label-highlight">${escapeHtml(zodiac.element)} ${escapeHtml(zodiac.en)}</span></div>`;
-            labelBottomEl.innerHTML = `
-                <div class="cny-label-cn">
-                    <span class="cny-label-char">${escapeHtml(zodiac.ganZhi)}</span>
-                    <span class="cny-label-date">${escapeHtml(dateStr)}</span>
-                </div>`;
         }
 
         requestAnimationFrame(updateTime);
