@@ -5906,7 +5906,7 @@ function initStartOverlay() {
                 <span class="countdown-separator">:</span>
                 <div class="countdown-unit"><span class="countdown-number">${pad(secs)}</span><span class="countdown-label">Sec</span></div>`;
             labelTopEl.innerHTML = `
-                <div class="cny-label-en">Until <span class="cny-label-highlight">正月十五</span> · Lantern Festival</div>`;
+                <div class="cny-label-en">Until <span class="cny-label-highlight">正月十五</span> Lantern Festival</div>`;
             labelBottomEl.innerHTML = `
                 <div class="cny-label-cn">
                     <span class="cny-label-char">${escapeHtml(zodiac.ganZhi)}</span>
