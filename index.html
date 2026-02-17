@@ -57,6 +57,18 @@
         </div>
     </div>
 
+    <!-- Gift modal -->
+    <div id="gift-modal" class="modal-overlay" style="display:none">
+        <div class="modal-card">
+            <h2>Gift Character</h2>
+            <p id="gift-modal-desc">Enter the recipient's email address</p>
+            <input type="email" id="gift-email" placeholder="friend@email.com" class="input-email" />
+            <button id="btn-send-gift" class="btn-action btn-primary">Send Gift</button>
+            <button id="btn-close-gift" class="btn-action btn-secondary">Cancel</button>
+            <p id="gift-status" class="gift-status"></p>
+        </div>
+    </div>
+
     <!-- Payment modal (Stripe Elements) -->
     <div id="payment-modal" class="modal-overlay" style="display:none">
         <div class="modal-card payment-modal-card">

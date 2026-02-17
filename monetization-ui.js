@@ -5,6 +5,7 @@ import { showRewardedAd } from './ads.js';
 import { purchaseDraws, DRAW_BUNDLES } from './payments.js';
 import { createGift, canGift } from './gifting.js';
 import { CONFIG } from './config.js';
+import { storage } from './storage.js';
 import { RARITY_TIERS } from './gacha.js';
 
 // Track current draw result for share buttons
@@ -411,41 +412,84 @@ function wireDetailActions() {
   }
 
   if (btnGift) {
-    btnGift.addEventListener('click', async (e) => {
+    btnGift.addEventListener('click', (e) => {
       e.stopPropagation();
       if (!_currentDetailDraw) return;
       const user = getUser();
       if (!user) return;
+      // Show gift modal with character info
+      const modal = document.getElementById('gift-modal');
+      const desc = document.getElementById('gift-modal-desc');
+      const emailInput = document.getElementById('gift-email');
+      const status = document.getElementById('gift-status');
+      if (!modal) return;
+      desc.textContent = `Send "${_currentDetailDraw.char}" to a friend`;
+      emailInput.value = '';
+      status.textContent = '';
+      modal.style.display = '';
+      emailInput.focus();
+    });
+  }
+
+  // Gift modal handlers
+  const giftModal = document.getElementById('gift-modal');
+  const btnSendGift = document.getElementById('btn-send-gift');
+  const btnCloseGift = document.getElementById('btn-close-gift');
+
+  if (btnCloseGift) {
+    btnCloseGift.addEventListener('click', () => {
+      giftModal.style.display = 'none';
+    });
+  }
+  if (giftModal) {
+    giftModal.addEventListener('click', (e) => {
+      if (e.target === giftModal) giftModal.style.display = 'none';
+    });
+  }
+
+  if (btnSendGift) {
+    btnSendGift.addEventListener('click', async () => {
+      const emailInput = document.getElementById('gift-email');
+      const status = document.getElementById('gift-status');
+      const email = emailInput.value.trim();
+      if (!email || !emailInput.validity.valid) {
+        status.textContent = 'Please enter a valid email';
+        return;
+      }
+      if (!_currentDetailDraw) return;
 
       try {
-        btnGift.disabled = true;
-        btnGift.textContent = 'Sending...';
+        btnSendGift.disabled = true;
+        btnSendGift.textContent = 'Sending...';
         const result = await createGift(
           _currentDetailDraw.char,
           _currentDetailDraw.rarity.stars,
-          _currentDetailDraw.category.name
+          _currentDetailDraw.category.name,
+          email
         );
-        // Share the gift URL
-        if (navigator.share) {
-          await navigator.share({
-            title: `A gift from 福 Fortune Gacha!`,
-            text: `I'm gifting you ${_currentDetailDraw.char}!`,
-            url: result.url,
-          });
-        } else {
-          await navigator.clipboard.writeText(result.url);
+        await navigator.clipboard.writeText(result.url);
+        status.textContent = 'Gift sent! Link copied to clipboard';
+        btnSendGift.textContent = 'Sent!';
+        // Update the gift button count in the detail popup
+        const btnGiftEl = document.getElementById('btn-detail-gift');
+        if (btnGiftEl) {
+          const collection = await storage.getCollection(getUser().id);
+          const item = collection[_currentDetailDraw.char];
+          if (item && item.count > 1) {
+            btnGiftEl.textContent = `Gift (×${item.count - 1})`;
+          } else {
+            btnGiftEl.style.display = 'none';
+          }
         }
-        btnGift.textContent = 'Sent!';
         setTimeout(() => {
-          btnGift.textContent = 'Gift';
-          btnGift.disabled = false;
-        }, 2000);
+          giftModal.style.display = 'none';
+          btnSendGift.textContent = 'Send Gift';
+          btnSendGift.disabled = false;
+        }, 1500);
       } catch (err) {
-        btnGift.textContent = err.message === 'No duplicate to gift' ? 'No duplicate' : 'Failed';
-        setTimeout(() => {
-          btnGift.textContent = 'Gift';
-          btnGift.disabled = false;
-        }, 2000);
+        status.textContent = err.message === 'No duplicate to gift' ? 'No duplicate available' : 'Failed to send gift';
+        btnSendGift.textContent = 'Send Gift';
+        btnSendGift.disabled = false;
       }
     });
   }

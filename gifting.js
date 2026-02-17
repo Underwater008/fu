@@ -3,7 +3,7 @@ import { CONFIG } from './config.js';
 import { storage } from './storage.js';
 import { getUser, isAnonymous } from './auth.js';
 
-export async function createGift(character, rarity, categoryName) {
+export async function createGift(character, rarity, categoryName, recipientEmail) {
   const user = getUser();
   if (!user) throw new Error('Not logged in');
 
@@ -20,6 +20,7 @@ export async function createGift(character, rarity, categoryName) {
   const token = crypto.randomUUID().slice(0, 12);
   const gift = {
     sender_id: user.id,
+    recipient_email: recipientEmail || null,
     character,
     rarity,
     category_name: categoryName,
